@@ -29,6 +29,7 @@ import {
   type PriceComparison 
 } from "./priceSources.js";
 import { TradeManager, type TradeConfig } from "./tradeManager.js";
+import { appendFileSync } from "fs";
 
 /* =========================
    CONFIG — tweak here (or via env)
@@ -141,6 +142,30 @@ const tradeConfig: TradeConfig = {
   gusdcToken: "GUSDC|Unit|none|none"
 };
 const tradeManager = new TradeManager(tradeConfig);
+
+// Simple file logging - capture all console output
+let logBuffer = '';
+const originalLog = console.log;
+console.log = (...args) => {
+  // Call original console.log
+  originalLog(...args);
+  
+  // Also write to file
+  const message = args.join(' ') + '\n';
+  logBuffer += message;
+};
+
+function flushLogToFile() {
+  if (logBuffer) {
+    try {
+      const timestamp = new Date().toISOString();
+      appendFileSync('./bot-history.txt', `\n=== ${timestamp} ===\n${logBuffer}`);
+      logBuffer = '';
+    } catch (error) {
+      console.error('Failed to write to log file:', error);
+    }
+  }
+}
 
 function formatET(d = new Date()) {
   return new Intl.DateTimeFormat("en-US", {
@@ -378,6 +403,9 @@ async function runOnce(tag = "scheduled") {
     console.log(`Suggested Action:  ${finalAction} ${cooldownNote}`);
     console.log(`State file:        ${STATE_FILE_PATH}`);
     console.log("=======================================");
+    
+    // Flush all console output to file
+    flushLogToFile();
   } catch (err: any) {
     console.error(`[ERROR ${formatET()}]`, err?.message ?? err);
   }
