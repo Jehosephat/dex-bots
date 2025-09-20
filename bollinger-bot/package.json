@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "backtest": "tsx src/backtest.ts",
     "backtest:build": "tsc && node dist/backtest.js",
+    "test-trade": "node test-trade.js",
     "clean": "rm -rf dist",
     "lint": "eslint src/**/*.ts",
     "test": "echo \"No tests specified\" && exit 0"
