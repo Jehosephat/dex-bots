@@ -30,6 +30,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@gala-chain/gswap-sdk": "^0.0.7",
     "axios": "^1.6.0",
     "dotenv": "^17.2.2",
     "js-sha3": "^0.8.0"

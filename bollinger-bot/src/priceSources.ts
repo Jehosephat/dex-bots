@@ -3,6 +3,8 @@
  * Handles multiple price data sources for comparison and validation
  */
 
+import { GSwap, PrivateKeySigner } from '@gala-chain/gswap-sdk';
+
 export interface PriceData {
   source: string;
   symbol: string;
@@ -112,58 +114,71 @@ export class CoinGeckoSource extends PriceSource {
   }
 }
 
-export class QuoteExactAmountSource extends PriceSource {
-  name = "quoteexactamount";
-  private baseUrl: string;
-  private apiKey?: string | undefined;
+export class GSwapSource extends PriceSource {
+  name = "gswap";
+  private gSwap: GSwap | null = null;
+  private privateKey?: string | undefined;
 
-  constructor(baseUrl: string, apiKey?: string) {
+  constructor(privateKey?: string) {
     super();
-    this.baseUrl = baseUrl;
-    this.apiKey = apiKey;
+    this.privateKey = privateKey;
+  }
+
+  private async initializeGSwap(): Promise<void> {
+    if (!this.gSwap) {
+      if (!this.privateKey) {
+        throw new Error("Private key required for GSwap SDK");
+      }
+      const signer = new PrivateKeySigner(this.privateKey);
+      this.gSwap = new GSwap({ signer });
+    }
   }
 
   async getPrice(symbol: string): Promise<PriceData> {
-    // Placeholder implementation - needs actual API details
-    // This will be updated once QuoteExactAmount API documentation is available
-    
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json"
-    };
-    
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
-    }
-
-    // Placeholder URL - needs to be updated with actual endpoint
-    const url = `${this.baseUrl}/api/v1/price/${symbol}`;
-    
     try {
-      const response = await fetch(url, { headers, cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`QuoteExactAmount API error: ${response.status}`);
-      }
+      await this.initializeGSwap();
+      
+      // Convert symbol to GSwap token format
+      const tokenIn = this.getTokenFormat(symbol, true);  // GUSDC
+      const tokenOut = this.getTokenFormat(symbol, false); // GALA
+      
+      // Get quote for 1 unit of input token
+      const quote = await this.gSwap!.quoting.quoteExactInput(
+        tokenIn,
+        tokenOut,
+        1 // 1 unit of input token
+      );
 
-      const data = await response.json();
+      // Calculate price: output amount / input amount
+      const price = quote.outTokenAmount.toNumber();
       
       return {
         source: this.name,
         symbol: symbol.toUpperCase(),
-        price: data.price || data.last || data.close,
+        price: price,
         timestamp: Date.now(),
         lastUpdated: new Date()
       };
     } catch (error) {
+      console.warn(`GSwap API not available: ${error}`);
       // Fallback to mock data for development
-      console.warn(`QuoteExactAmount API not available, using mock data: ${error}`);
       return {
         source: this.name,
         symbol: symbol.toUpperCase(),
-        price: 0.05, // Mock GALA price
+        price: 0.017, // Mock GALA price in ETH
         timestamp: Date.now(),
         lastUpdated: new Date()
       };
     }
+  }
+
+  private getTokenFormat(symbol: string, isInput: boolean): string {
+    // For GALA/ETH pair, we'll use GALA/GUSDC on GalaChain
+    if (symbol.toLowerCase().includes('gala')) {
+      return isInput ? "GUSDC|Unit|none|none" : "GALA|Unit|none|none";
+    }
+    // Default fallback
+    return isInput ? "GUSDC|Unit|none|none" : "GALA|Unit|none|none";
   }
 }
 

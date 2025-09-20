@@ -125,7 +125,7 @@ The bot uses a `.env` file for configuration, making it easy to adjust settings 
 | `BW_MAX` | `0.16` | Max relative bandwidth (16%) |
 | `COOLDOWN_HOURS` | `3` | Hours between signals |
 | `CG_KEY` | - | CoinGecko API key (optional) |
-| `QEA_KEY` | - | QuoteExactAmount API key (optional) |
+| `PRIVATE_KEY` | - | Private key for GSwap SDK (required for price comparison) |
 
 ### Example Configuration
 
@@ -201,7 +201,7 @@ npm run dev
 
 ### Multi-Source Comparison
 - **Primary**: CoinGecko (default)
-- **Secondary**: QuoteExactAmount API
+- **Secondary**: GSwap SDK (GalaChain DEX)
 - **Tertiary**: Binance
 - **Threshold**: 2% maximum discrepancy
 - **Action**: Blocks trades if sources disagree
@@ -210,8 +210,9 @@ npm run dev
 ```bash
 export ENABLE_PRICE_COMPARISON=true
 export PRIMARY_PRICE_SOURCE=coingecko
-export SECONDARY_PRICE_SOURCE=quoteexactamount
+export SECONDARY_PRICE_SOURCE=gswap
 export PRICE_DISCREPANCY_THRESHOLD=0.02
+export PRIVATE_KEY=0xYourPrivateKeyHere
 ```
 
 ## 📈 Backtesting

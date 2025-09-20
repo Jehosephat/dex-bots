@@ -22,7 +22,7 @@ config();
 import { 
   PriceSourceManager, 
   CoinGeckoSource, 
-  QuoteExactAmountSource, 
+  GSwapSource, 
   BinanceSource,
   formatPriceComparison,
   shouldProceedWithTrade,
@@ -59,9 +59,8 @@ const CONFIG = {
   // Price comparison
   ENABLE_PRICE_COMPARISON: true,
   PRIMARY_PRICE_SOURCE: "coingecko",
-  SECONDARY_PRICE_SOURCE: "quoteexactamount",
+  SECONDARY_PRICE_SOURCE: "gswap",
   PRICE_DISCREPANCY_THRESHOLD: 0.02, // 2%
-  QUOTEEXACTAMOUNT_URL: "https://api.quoteexactamount.com", // placeholder
 } as const;
 
 /* ===== Optional env overrides ===== */
@@ -89,7 +88,6 @@ const ENABLE_PRICE_COMPARISON = process.env.ENABLE_PRICE_COMPARISON === "true" |
 const PRIMARY_PRICE_SOURCE = process.env.PRIMARY_PRICE_SOURCE ?? CONFIG.PRIMARY_PRICE_SOURCE;
 const SECONDARY_PRICE_SOURCE = process.env.SECONDARY_PRICE_SOURCE ?? CONFIG.SECONDARY_PRICE_SOURCE;
 const PRICE_DISCREPANCY_THRESHOLD = numEnv("PRICE_DISCREPANCY_THRESHOLD") ?? CONFIG.PRICE_DISCREPANCY_THRESHOLD;
-const QUOTEEXACTAMOUNT_URL = process.env.QUOTEEXACTAMOUNT_URL ?? CONFIG.QUOTEEXACTAMOUNT_URL;
 
 /* =========================
    Setup & helpers
@@ -104,7 +102,7 @@ const STATE_FILE_PATH = path.isAbsolute(CONFIG.STATE_FILE)
   : path.join(__dirname, CONFIG.STATE_FILE); // dist/state.json by default
 
 const CG_KEY = process.env.CG_KEY ?? ""; // CoinGecko demo/pro key if you have one
-const QEA_KEY = process.env.QEA_KEY ?? ""; // QuoteExactAmount API key if available
+const PRIVATE_KEY = process.env.PRIVATE_KEY ?? ""; // Private key for GSwap SDK
 
 // GALA (v2) on Ethereum:
 const GALA_V2_CONTRACT = "0xd1d2eb1b1e90b638588728b4130137d262c87cae";
@@ -114,7 +112,7 @@ const API_URL =
 // Initialize price source manager
 const priceManager = new PriceSourceManager(PRICE_DISCREPANCY_THRESHOLD);
 priceManager.addSource("coingecko", new CoinGeckoSource(CG_KEY));
-priceManager.addSource("quoteexactamount", new QuoteExactAmountSource(QUOTEEXACTAMOUNT_URL, QEA_KEY));
+priceManager.addSource("gswap", new GSwapSource(PRIVATE_KEY));
 priceManager.addSource("binance", new BinanceSource());
 
 function formatET(d = new Date()) {
