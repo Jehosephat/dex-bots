@@ -115,7 +115,7 @@ export class CoinGeckoSource extends PriceSource {
 export class QuoteExactAmountSource extends PriceSource {
   name = "quoteexactamount";
   private baseUrl: string;
-  private apiKey?: string;
+  private apiKey?: string | undefined;
 
   constructor(baseUrl: string, apiKey?: string) {
     super();

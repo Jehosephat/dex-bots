@@ -18,8 +18,13 @@
  *   - Cooldown between entries
  *
  * Run: npm run backtest
- * Tweak: edit CONFIG below or set env vars (same names).
+ * Tweak: edit .env file or set env vars (same names).
  */
+
+import { config } from "dotenv";
+
+// Load environment variables from .env file
+config();
 
 /* =========================
    CONFIG — tweak here
@@ -98,7 +103,7 @@
     entryIdx: number;
     entryT: number; entry: number;
     exitIdx?: number;
-    exitT?: number; exit?: number;
+    exitT?: number; exit?: number | undefined;
     bars?: number;
     pnl?: number;
     reason?: string;
@@ -115,7 +120,12 @@
     const seedLen = Math.min(n, series.length);
     let e = series.slice(0, seedLen).reduce((a,b)=>a+b,0) / seedLen;
     const k = 2 / (n + 1);
-    for (let i = seedLen; i < series.length; i++) e = series[i] * k + e * (1 - k);
+    for (let i = seedLen; i < series.length; i++) {
+      const value = series[i];
+      if (value !== undefined) {
+        e = value * k + e * (1 - k);
+      }
+    }
     return e;
   }
   function bbFrom(window: number[]) {
@@ -163,14 +173,19 @@
     for (let i = BB_N; i < closes.length; i++) {
       const prev = closes[i - 1];
       const curr = closes[i];
-  
+
+      // Skip if we don't have valid data
+      if (prev === undefined || curr === undefined) {
+        continue;
+      }
+
       // Bands (current and previous)
       const winCurr = closes.slice(i - BB_N, i);
       const bandsCurr = bbFrom(winCurr);
-  
+
       const winPrev = closes.slice(i - BB_N - 1, i - 1);
       const bandsPrev = winPrev.length === BB_N ? bbFrom(winPrev) : bandsCurr;
-  
+
       // Re-entry conditions
       const reEntryBuy  = (prev < bandsCurr.lower && curr >= bandsCurr.lower);
       const reEntrySell = (prev > bandsCurr.upper && curr <= bandsCurr.upper);
@@ -241,36 +256,39 @@
   
         if (exit) {
           position.exit = curr;
-          position.exitT = candles[i].t;
+          position.exitT = candles[i]?.t ?? 0;
           position.exitIdx = i;
           position.bars = barAge;
   
           // PnL per unit in quote currency, minus fees on both sides
           const feeRate = FEE_BPS / 10_000;
-          const gross = (side === "LONG") ? (position.exit - position.entry)
-                                          : (position.entry - position.exit);
-          const fees = position.entry * feeRate + position.exit * feeRate;
+          const exitPrice = position.exit ?? 0;
+          const gross = (side === "LONG") ? (exitPrice - position.entry)
+                                          : (position.entry - exitPrice);
+          const fees = position.entry * feeRate + exitPrice * feeRate;
           position.pnl = gross - fees;
   
           position.reason = reason;
           trades.push(position);
           position = null;
-          lastSignalAt = candles[i].t; // cooldown starts after exit
+          lastSignalAt = candles[i]?.t ?? 0; // cooldown starts after exit
           continue; // don't enter on same bar as exit
         }
       }
   
       // --- Flat: consider entry (respect cooldown) ---
       if (!position && (signal === "BUY" || signal === "SELL")) {
-        const nowT = candles[i].t;
-        const okCooldown = !lastSignalAt || ((nowT - lastSignalAt) / 3_600_000) >= COOLDOWN_HOURS;
-        if (okCooldown) {
-          position = {
-            side: signal === "BUY" ? "LONG" : "SHORT",
-            entry: curr,
-            entryT: nowT,
-            entryIdx: i
-          };
+        const nowT = candles[i]?.t;
+        if (nowT !== undefined) {
+          const okCooldown = !lastSignalAt || ((nowT - lastSignalAt) / 3_600_000) >= COOLDOWN_HOURS;
+          if (okCooldown) {
+            position = {
+              side: signal === "BUY" ? "LONG" : "SHORT",
+              entry: curr,
+              entryT: nowT,
+              entryIdx: i
+            };
+          }
         }
       }
     }
@@ -278,19 +296,22 @@
     // Close any open position at the end
     if (position) {
       const last = candles[candles.length - 1];
-      position.exit = last.c;
-      position.exitT = last.t;
-      position.exitIdx = candles.length - 1;
-      position.bars = position.exitIdx - position.entryIdx;
+      if (last) {
+        position.exit = last.c;
+        position.exitT = last.t;
+        position.exitIdx = candles.length - 1;
+        position.bars = position.exitIdx - position.entryIdx;
+
+        const feeRate = FEE_BPS / 10_000;
+        const exitPrice = position.exit ?? 0;
+        const gross = (position.side === "LONG") ? (exitPrice - position.entry)
+                                                : (position.entry - exitPrice);
+        const fees = position.entry * feeRate + exitPrice * feeRate;
+        position.pnl = gross - fees;
   
-      const feeRate = FEE_BPS / 10_000;
-      const gross = (position.side === "LONG") ? (position.exit - position.entry)
-                                              : (position.entry - position.exit);
-      const fees = position.entry * feeRate + position.exit * feeRate;
-      position.pnl = gross - fees;
-  
-      position.reason = "eod";
-      trades.push(position);
+        position.reason = "eod";
+        trades.push(position);
+      }
     }
   
     // --- Stats ---

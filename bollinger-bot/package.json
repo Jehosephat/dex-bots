@@ -1,0 +1,53 @@
+{
+  "name": "bollinger-bot",
+  "version": "1.0.0",
+  "description": "GALA (Ethereum v2) Bollinger Band trading bot with advanced filtering and multi-source price validation",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "backtest": "tsx src/backtest.ts",
+    "backtest:build": "tsc && node dist/backtest.js",
+    "clean": "rm -rf dist",
+    "lint": "eslint src/**/*.ts",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "trading",
+    "bot",
+    "bollinger-bands",
+    "gala",
+    "cryptocurrency",
+    "defi",
+    "mean-reversion",
+    "algorithmic-trading"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.2",
+    "js-sha3": "^0.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/bollinger-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/bollinger-bot/issues"
+  },
+  "homepage": "https://github.com/yourusername/bollinger-bot#readme"
+}

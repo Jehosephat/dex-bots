@@ -11,10 +11,14 @@
  * Requirements: Node 18+ (built-in fetch)
  */
 
+import { config } from "dotenv";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+
+// Load environment variables from .env file
+config();
 import { 
   PriceSourceManager, 
   CoinGeckoSource, 
@@ -142,7 +146,12 @@ function ema(series: number[], n: number): number {
   const seedLen = Math.min(n, series.length);
   let e = series.slice(0, seedLen).reduce((a,b)=>a+b,0) / seedLen;
   const k = 2 / (n + 1);
-  for (let i = seedLen; i < series.length; i++) e = series[i] * k + e * (1 - k);
+  for (let i = seedLen; i < series.length; i++) {
+    const value = series[i];
+    if (value !== undefined) {
+      e = value * k + e * (1 - k);
+    }
+  }
   return e;
 }
 function bandsFrom(win: number[]) {
@@ -171,6 +180,11 @@ function decideSignal(closes: number[]) {
   const i = closes.length - 1;
   const prev = closes[i - 1];
   const curr = closes[i];
+
+  // Check for undefined values
+  if (prev === undefined || curr === undefined) {
+    return { signal: "NONE" as const, prev: 0, curr: 0, bandsCurr: { mid: 0, upper: 0, lower: 0 }, bandsPrev: { mid: 0, upper: 0, lower: 0 }, relBW: 0, bPrev: 0, bCurr: 0, reasons: ["insufficient data"] };
+  }
 
   // Bands current & previous
   const winCurr = closes.slice(i - BB_N, i);
@@ -297,7 +311,7 @@ async function runOnce(tag = "scheduled") {
     console.log(`Period/Params:     1h  N=${BB_N}  K=${BB_K}  Entry=${ENTRY_MODE}`);
     console.log(`Trend filter:      ${TREND_FILTER_MODE === "off" ? "off" : `EMA(${EMA_N}) scope=${TREND_FILTER_MODE}`}`);
     console.log(`Filters:           Overshoot=${OVERSHOOT_B}  BW_MAX=${BW_MAX}  Cooldown=${COOLDOWN_HOURS}h`);
-    console.log(`Closes:            prev=${formatNum(prev)}  curr=${formatNum(curr)}`);
+    console.log(`Closes:            prev=${formatNum(prev ?? 0)}  curr=${formatNum(curr ?? 0)}`);
     console.log(`Bands:             mid=${formatNum(bandsCurr.mid)}  upper=${formatNum(bandsCurr.upper)}  lower=${formatNum(bandsCurr.lower)}`);
     console.log(`Rel bandwidth:     ${(relBW * 100).toFixed(2)}%`);
     if (reasons.length) console.log(`Filters hit:       ${reasons.join(", ")}`);
