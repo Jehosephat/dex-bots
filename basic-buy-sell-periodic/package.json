@@ -1,0 +1,25 @@
+{
+  "name": "galaswap-periodic-bot",
+  "version": "1.0.0",
+  "description": "Periodic buy/sell bot for GalaSwap V3 GALA/GUSDC trading",
+  "type": "module",
+  "main": "buy-sell-periodic.mjs",
+  "scripts": {
+    "start": "node buy-sell-periodic.mjs",
+    "dev": "node --inspect buy-sell-periodic.mjs"
+  },
+  "dependencies": {
+    "@gala-chain/gswap-sdk": "^0.0.7",
+    "dotenv": "^17.2.2"
+  },
+  "keywords": [
+    "galaswap",
+    "defi",
+    "trading",
+    "bot",
+    "gala",
+    "gusdc"
+  ],
+  "author": "GalaSwap Bot",
+  "license": "MIT"
+}
