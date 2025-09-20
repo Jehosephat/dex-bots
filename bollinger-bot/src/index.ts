@@ -28,6 +28,7 @@ import {
   shouldProceedWithTrade,
   type PriceComparison 
 } from "./priceSources.js";
+import { TradeManager, type TradeConfig } from "./tradeManager.js";
 
 /* =========================
    CONFIG — tweak here (or via env)
@@ -61,6 +62,13 @@ const CONFIG = {
   PRIMARY_PRICE_SOURCE: "coingecko",
   SECONDARY_PRICE_SOURCE: "gswap",
   PRICE_DISCREPANCY_THRESHOLD: 0.02, // 2%
+
+  // Trade execution
+  ENABLE_AUTO_TRADING: false,        // Set to true to enable automatic trade execution
+  BUY_AMOUNT: 10,                    // Amount of GUSDC to spend on BUY trades
+  SELL_AMOUNT: 1000,                 // Amount of GALA to sell on SELL trades
+  SLIPPAGE_TOLERANCE: 0.05,          // 5% slippage tolerance
+  WALLET_ADDRESS: "",                // Your wallet address (eth|0x...)
 } as const;
 
 /* ===== Optional env overrides ===== */
@@ -89,6 +97,13 @@ const PRIMARY_PRICE_SOURCE = process.env.PRIMARY_PRICE_SOURCE ?? CONFIG.PRIMARY_
 const SECONDARY_PRICE_SOURCE = process.env.SECONDARY_PRICE_SOURCE ?? CONFIG.SECONDARY_PRICE_SOURCE;
 const PRICE_DISCREPANCY_THRESHOLD = numEnv("PRICE_DISCREPANCY_THRESHOLD") ?? CONFIG.PRICE_DISCREPANCY_THRESHOLD;
 
+// Trade execution settings
+const ENABLE_AUTO_TRADING = process.env.ENABLE_AUTO_TRADING === "true" || CONFIG.ENABLE_AUTO_TRADING;
+const BUY_AMOUNT = numEnv("BUY_AMOUNT") ?? CONFIG.BUY_AMOUNT;
+const SELL_AMOUNT = numEnv("SELL_AMOUNT") ?? CONFIG.SELL_AMOUNT;
+const SLIPPAGE_TOLERANCE = numEnv("SLIPPAGE_TOLERANCE") ?? CONFIG.SLIPPAGE_TOLERANCE;
+const WALLET_ADDRESS = process.env.WALLET_ADDRESS ?? CONFIG.WALLET_ADDRESS;
+
 /* =========================
    Setup & helpers
    ========================= */
@@ -114,6 +129,18 @@ const priceManager = new PriceSourceManager(PRICE_DISCREPANCY_THRESHOLD);
 priceManager.addSource("coingecko", new CoinGeckoSource(CG_KEY));
 priceManager.addSource("gswap", new GSwapSource(PRIVATE_KEY));
 priceManager.addSource("binance", new BinanceSource());
+
+// Initialize trade manager
+const tradeConfig: TradeConfig = {
+  privateKey: PRIVATE_KEY,
+  walletAddress: WALLET_ADDRESS,
+  buyAmount: BUY_AMOUNT,
+  sellAmount: SELL_AMOUNT,
+  slippageTolerance: SLIPPAGE_TOLERANCE,
+  galaToken: "GALA|Unit|none|none",
+  gusdcToken: "GUSDC|Unit|none|none"
+};
+const tradeManager = new TradeManager(tradeConfig);
 
 function formatET(d = new Date()) {
   return new Intl.DateTimeFormat("en-US", {
@@ -289,6 +316,8 @@ async function runOnce(tag = "scheduled") {
       : "No trade";
 
     let cooldownNote = "";
+    let tradeResult = null;
+    
     if (actionable && priceValid) {
       const lastAt = state.lastSignalAt ?? 0;
       const hoursSince = (nowMs - lastAt) / 3_600_000;
@@ -300,6 +329,28 @@ async function runOnce(tag = "scheduled") {
         state.lastSignalAt = nowMs;
         state.lastAction = signal as "BUY" | "SELL";
         await saveState(state);
+
+        // Execute trade if auto-trading is enabled
+        if (ENABLE_AUTO_TRADING && tradeManager.isConfigured()) {
+          console.log(`🚀 Auto-trading enabled - executing ${signal} trade...`);
+          try {
+            if (signal === "BUY") {
+              tradeResult = await tradeManager.executeBuy();
+            } else if (signal === "SELL") {
+              tradeResult = await tradeManager.executeSell();
+            }
+            
+            if (tradeResult?.success) {
+              finalAction = `✅ EXECUTED ${signal} - ${tradeResult.amountOut?.toFixed(6)} ${signal === "BUY" ? "GALA" : "GUSDC"} received`;
+            } else {
+              finalAction = `❌ ${signal} TRADE FAILED - ${tradeResult?.error || "Unknown error"}`;
+            }
+          } catch (error: any) {
+            finalAction = `❌ ${signal} TRADE ERROR - ${error.message}`;
+          }
+        } else if (ENABLE_AUTO_TRADING && !tradeManager.isConfigured()) {
+          finalAction = `⚠️ AUTO-TRADING ENABLED BUT NOT CONFIGURED - ${finalAction}`;
+        }
       }
     }
 
@@ -315,6 +366,14 @@ async function runOnce(tag = "scheduled") {
     if (reasons.length) console.log(`Filters hit:       ${reasons.join(", ")}`);
     if (priceComparison) {
       console.log(`Price comparison:  ${formatPriceComparison(priceComparison)}`);
+    }
+    if (ENABLE_AUTO_TRADING) {
+      const configInfo = tradeManager.getConfigInfo();
+      console.log(`Auto-trading:      ${tradeManager.isConfigured() ? "✅ ENABLED" : "⚠️ NOT CONFIGURED"}`);
+      if (tradeManager.isConfigured()) {
+        console.log(`Trade config:      BUY: ${configInfo.buyAmount} GUSDC, SELL: ${configInfo.sellAmount} GALA, ${(configInfo.slippageTolerance * 100)}% slippage`);
+        console.log(`Wallet:            ${configInfo.walletAddress}`);
+      }
     }
     console.log(`Suggested Action:  ${finalAction} ${cooldownNote}`);
     console.log(`State file:        ${STATE_FILE_PATH}`);

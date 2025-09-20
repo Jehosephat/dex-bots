@@ -125,7 +125,12 @@ The bot uses a `.env` file for configuration, making it easy to adjust settings 
 | `BW_MAX` | `0.16` | Max relative bandwidth (16%) |
 | `COOLDOWN_HOURS` | `3` | Hours between signals |
 | `CG_KEY` | - | CoinGecko API key (optional) |
-| `PRIVATE_KEY` | - | Private key for GSwap SDK (required for price comparison) |
+| `PRIVATE_KEY` | - | Private key for GSwap SDK (required for price comparison and trading) |
+| `WALLET_ADDRESS` | - | Your wallet address (eth\|0x...) |
+| `ENABLE_AUTO_TRADING` | `false` | Enable automatic trade execution |
+| `BUY_AMOUNT` | `10` | Amount of GUSDC to spend on BUY trades |
+| `SELL_AMOUNT` | `1000` | Amount of GALA to sell on SELL trades |
+| `SLIPPAGE_TOLERANCE` | `0.05` | Slippage tolerance (5%) |
 
 ### Example Configuration
 
@@ -250,12 +255,43 @@ npx tsx backtest.ts
 - Maintains cooldown state in `state.json`
 - Provides manual trading suggestions
 
-### Manual Execution
-The bot provides signals but requires manual execution:
+## 🤖 Trade Execution
+
+### Manual Mode (Default)
+The bot runs in manual mode by default, providing trading signals that you can execute manually:
 - Logs current market conditions
 - Shows band values and price levels
 - Indicates filter status and reasoning
 - Provides final actionable recommendation
+
+### Automatic Trading Mode
+Enable automatic trade execution by setting `ENABLE_AUTO_TRADING=true` in your `.env` file:
+
+```bash
+# Enable automatic trading
+ENABLE_AUTO_TRADING=true
+PRIVATE_KEY=0xYourPrivateKeyHere
+WALLET_ADDRESS=eth|0xYourWalletAddressHere
+BUY_AMOUNT=10
+SELL_AMOUNT=1000
+SLIPPAGE_TOLERANCE=0.05
+```
+
+### Trade Execution Features
+- **Automatic BUY/SELL**: Executes trades when signals are generated
+- **Slippage Protection**: Configurable slippage tolerance (default 5%)
+- **Price Validation**: Only trades when price sources agree
+- **Cooldown Respect**: Respects cooldown periods between trades
+- **Error Handling**: Graceful error handling with detailed logging
+- **Transaction Tracking**: Logs transaction hashes and amounts
+
+### Safety Features
+- **Manual by Default**: Auto-trading is disabled by default
+- **Configuration Required**: Must provide private key and wallet address
+- **Price Validation**: Blocks trades on significant price discrepancies
+- **Cooldown Protection**: Prevents over-trading
+- **Slippage Protection**: Protects against unfavorable price movements
+
 
 ## 🛡️ Risk Management
 
