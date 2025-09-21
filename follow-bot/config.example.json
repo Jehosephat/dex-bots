@@ -1,0 +1,36 @@
+{
+  "targetWallets": [
+    {
+      "address": "eth|0x...",
+      "name": "Example Trader 1",
+      "maxCopyAmount": 1000,
+      "enabled": true,
+      "priority": 1,
+      "type": "ethereum"
+    },
+    {
+      "address": "client|...",
+      "name": "Example Client Trader",
+      "maxCopyAmount": 500,
+      "enabled": true,
+      "priority": 2,
+      "type": "client"
+    }
+  ],
+  "globalSettings": {
+    "maxTotalExposure": 0.3,
+    "blacklistedTokens": ["TOKEN1", "TOKEN2"],
+    "whitelistedTokens": ["GALA", "GWETH", "GUSDC"],
+    "defaultMaxCopyAmount": {
+      "ethereum": 1000,
+      "client": 500
+    },
+    "copyMode": "proportional",
+    "executionDelay": 30,
+    "cooldownMinutes": 5,
+    "slippageTolerance": 0.05,
+    "maxDailyTrades": 50,
+    "websocketReconnectDelay": 5000,
+    "websocketMaxRetries": 10
+  }
+}

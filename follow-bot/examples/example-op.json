@@ -1,0 +1,22 @@
+{
+    "fee": 10000,
+    "amount": "0.17558877109808826",
+    "token0": {
+      "type": "none",
+      "category": "Unit",
+      "collection": "GUSDT",
+      "additionalKey": "none"
+    },
+    "token1": {
+      "type": "none",
+      "category": "Unit",
+      "collection": "GWETH",
+      "additionalKey": "none"
+    },
+    "signature": "0172e3024c2dd8de5edfd9abc5a882d995177d2346d043760a5b8fe3460059eb6bf7e978be56b21840c667ac83f4f2b48d94b227324fea44ccf068b6adc1ecf81c",
+    "uniqueKey": "galaswap-operation-71da35f5-9a42-49d6-a5bb-201b014e1508",
+    "zeroForOne": false,
+    "sqrtPriceLimit": "0.014737706676093914",
+    "amountInMaximum": "0.17558877109808826",
+    "amountOutMinimum": "-796.4436545799999"
+  }
