@@ -11,14 +11,12 @@
  * Requirements: Node 18+ (built-in fetch)
  */
 
-import { config } from "dotenv";
 import { readFile, writeFile } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-// Load environment variables from .env file
-config();
+// Configuration will be loaded after __dirname is defined
 import { 
   PriceSourceManager, 
   CoinGeckoSource, 
@@ -83,27 +81,7 @@ function strEnv<T extends string>(name: string, allowed: readonly T[], fallback:
   const vv = v.toLowerCase() as T;
   return (allowed as readonly string[]).includes(vv) ? vv as T : fallback;
 }
-const VS               = (process.env.VS as "eth" | "usd") ?? CONFIG.VS;
-const DAYS             = numEnv("DAYS")             ?? CONFIG.DAYS;
-const BB_N             = numEnv("BB_N")             ?? CONFIG.BB_N;
-const BB_K             = numEnv("BB_K")             ?? CONFIG.BB_K;
-const ENTRY_MODE       = strEnv("ENTRY_MODE", ["reentry","touch","touch_or_reentry"] as const, CONFIG.ENTRY_MODE);
-const TREND_FILTER_MODE= strEnv("TREND_FILTER_MODE", ["both","longs_only","shorts_only","off"] as const, CONFIG.TREND_FILTER_MODE);
-const EMA_N            = numEnv("EMA_N")            ?? CONFIG.EMA_N;
-const OVERSHOOT_B      = numEnv("OVERSHOOT_B")      ?? CONFIG.OVERSHOOT_B;
-const BW_MAX           = numEnv("BW_MAX")           ?? CONFIG.BW_MAX;
-const COOLDOWN_HOURS   = numEnv("COOLDOWN_HOURS")   ?? CONFIG.COOLDOWN_HOURS;
-const ENABLE_PRICE_COMPARISON = process.env.ENABLE_PRICE_COMPARISON === "true" || CONFIG.ENABLE_PRICE_COMPARISON;
-const PRIMARY_PRICE_SOURCE = process.env.PRIMARY_PRICE_SOURCE ?? CONFIG.PRIMARY_PRICE_SOURCE;
-const SECONDARY_PRICE_SOURCE = process.env.SECONDARY_PRICE_SOURCE ?? CONFIG.SECONDARY_PRICE_SOURCE;
-const PRICE_DISCREPANCY_THRESHOLD = numEnv("PRICE_DISCREPANCY_THRESHOLD") ?? CONFIG.PRICE_DISCREPANCY_THRESHOLD;
-
-// Trade execution settings
-const ENABLE_AUTO_TRADING = process.env.ENABLE_AUTO_TRADING === "true" || CONFIG.ENABLE_AUTO_TRADING;
-const BUY_AMOUNT = numEnv("BUY_AMOUNT") ?? CONFIG.BUY_AMOUNT;
-const SELL_AMOUNT = numEnv("SELL_AMOUNT") ?? CONFIG.SELL_AMOUNT;
-const SLIPPAGE_TOLERANCE = numEnv("SLIPPAGE_TOLERANCE") ?? CONFIG.SLIPPAGE_TOLERANCE;
-const WALLET_ADDRESS = process.env.WALLET_ADDRESS ?? CONFIG.WALLET_ADDRESS;
+// Configuration variables will be set after config is loaded
 
 /* =========================
    Setup & helpers
@@ -111,14 +89,50 @@ const WALLET_ADDRESS = process.env.WALLET_ADDRESS ?? CONFIG.WALLET_ADDRESS;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load configuration from JSON file
+let config: any = {};
+try {
+  const configPath = path.resolve(__dirname, '..', 'config.json');
+  const configContent = readFileSync(configPath, 'utf8');
+  config = JSON.parse(configContent);
+  console.log('✅ Configuration loaded from config.json');
+} catch (error) {
+  console.error('❌ Failed to load config.json:', error);
+  process.exit(1);
+}
+
+// Use JSON config values
+const VS               = (config.vs as "eth" | "usd") ?? CONFIG.VS;
+const DAYS             = config.days ?? CONFIG.DAYS;
+const BB_N             = config.bbN ?? CONFIG.BB_N;
+const BB_K             = config.bbK ?? CONFIG.BB_K;
+const ENTRY_MODE       = config.entryMode ?? CONFIG.ENTRY_MODE;
+const TREND_FILTER_MODE= config.trendFilterMode ?? CONFIG.TREND_FILTER_MODE;
+const EMA_N            = config.emaN ?? CONFIG.EMA_N;
+const OVERSHOOT_B      = config.overshootB ?? CONFIG.OVERSHOOT_B;
+const BW_MAX           = config.bwMax ?? CONFIG.BW_MAX;
+const COOLDOWN_HOURS   = config.cooldownHours ?? CONFIG.COOLDOWN_HOURS;
+const ENABLE_PRICE_COMPARISON = config.enablePriceComparison ?? CONFIG.ENABLE_PRICE_COMPARISON;
+const PRIMARY_PRICE_SOURCE = config.primaryPriceSource ?? CONFIG.PRIMARY_PRICE_SOURCE;
+const SECONDARY_PRICE_SOURCE = config.secondaryPriceSource ?? CONFIG.SECONDARY_PRICE_SOURCE;
+const PRICE_DISCREPANCY_THRESHOLD = config.priceDiscrepancyThreshold ?? CONFIG.PRICE_DISCREPANCY_THRESHOLD;
+
+// Trade execution settings
+const ENABLE_AUTO_TRADING = config.enableAutoTrading ?? CONFIG.ENABLE_AUTO_TRADING;
+const BUY_AMOUNT = config.buyAmount ?? CONFIG.BUY_AMOUNT;
+const SELL_AMOUNT = config.sellAmount ?? CONFIG.SELL_AMOUNT;
+const SLIPPAGE_TOLERANCE = config.slippageTolerance ?? CONFIG.SLIPPAGE_TOLERANCE;
+const WALLET_ADDRESS = config.walletAddress ?? CONFIG.WALLET_ADDRESS;
+
+
 type BotState = { lastSignalAt?: number; lastAction?: "BUY" | "SELL" };
 
 const STATE_FILE_PATH = path.isAbsolute(CONFIG.STATE_FILE)
   ? CONFIG.STATE_FILE
   : path.join(__dirname, CONFIG.STATE_FILE); // dist/state.json by default
 
-const CG_KEY = process.env.CG_KEY ?? ""; // CoinGecko demo/pro key if you have one
-const PRIVATE_KEY = process.env.PRIVATE_KEY ?? ""; // Private key for GSwap SDK
+const CG_KEY = ""; // CoinGecko demo/pro key if you have one
+const PRIVATE_KEY = config.privateKey ?? ""; // Private key for GSwap SDK
 
 // GALA (v2) on Ethereum:
 const GALA_V2_CONTRACT = "0xd1d2eb1b1e90b638588728b4130137d262c87cae";

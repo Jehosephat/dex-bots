@@ -17,6 +17,9 @@ build/
 .env.test.local
 .env.production.local
 
+# Configuration files with sensitive data
+config.json
+
 # State files
 state.json
 *.state

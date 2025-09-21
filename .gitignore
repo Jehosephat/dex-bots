@@ -166,3 +166,4 @@ temp/
 # Backup files
 *.bak
 *.backup
+bollinger-bot/bot-history.txt
