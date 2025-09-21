@@ -325,6 +325,8 @@ Implement real-time transaction monitoring that filters and processes GalaSwap t
 - [x] GalaSwap transaction identification and parsing
 - [x] Transaction deduplication to prevent double-processing
 - [x] Transaction queue for processing
+- [x] **Real GalaChain data structure support** (✅ Fixed - Now handles actual block structure)
+- [x] **Proper BatchSubmit parsing** (✅ Fixed - Correctly extracts wallet addresses and token data)
 
 #### Testing Results ✅
 ```bash
@@ -338,6 +340,12 @@ npx tsx src/monitoring/transactionMonitor.test.ts
 # All transaction monitor tests passed successfully
 # Transaction filtering, DEX operation processing, token filtering working
 # Event emission and queue management working
+
+# ✅ Real GalaChain block testing
+npx tsx test-real-block.ts
+# Successfully processes real block 8667673 from GalaChain explorer
+# Correctly detects GALA → GUSDC swap transaction
+# Properly extracts wallet address: eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC
 ```
 
 #### Implementation Results ✅
@@ -350,12 +358,18 @@ npx tsx src/monitoring/transactionMonitor.test.ts
 - [x] Create transaction parsing utilities
 - [x] Integrate with WebSocket manager
 - [x] Add event emission for wallet activity
+- [x] **Fix real GalaChain data structure handling** (✅ Critical fix)
+- [x] **Update wallet address detection for BatchSubmit transactions** (✅ Critical fix)
+- [x] **Enhance token information extraction** (✅ Critical fix)
+- [x] **Add real wallet to test configuration** (✅ Testing improvement)
 
 #### Files Created:
 - `src/monitoring/transactionMonitor.ts` - Complete transaction monitoring system
 - `src/monitoring/transactionMonitor.test.ts` - Comprehensive test suite
+- `test-real-block.ts` - Real GalaChain block testing script
 - Updated `src/websocket/websocketManager.ts` - Integrated transaction monitoring
 - Updated `src/index.ts` - Added transaction monitor event handlers
+- Updated `config/config.json` - Added real wallet from block 8667673
 
 #### Key Features Implemented:
 - **Transaction Filtering**: Filters transactions for target wallets only
@@ -368,6 +382,24 @@ npx tsx src/monitoring/transactionMonitor.test.ts
 - **Error Handling**: Comprehensive error handling and recovery
 - **Health Monitoring**: Transaction monitor health checks
 - **Configuration Integration**: Uses configuration for filtering rules
+- **Real GalaChain Support**: Handles actual block structure from GalaChain explorer
+- **Proper BatchSubmit Parsing**: Correctly extracts wallet addresses from `operation.dto.recipient`
+- **Enhanced Token Extraction**: Properly extracts token pairs, amounts, and swap details
+- **Real-world Testing**: Tested with actual GalaChain block data
+
+#### Critical Fixes Applied ✅
+1. **Block Structure Fix**: Updated to handle both `block.parsedBlock.transactions` and `block.transactions`
+2. **Wallet Address Detection**: Fixed to extract wallet addresses from `operation.dto.recipient` in BatchSubmit transactions
+3. **Token Information Extraction**: Enhanced to properly extract `token0.collection`, `token1.collection`, amounts, and swap details
+4. **Real Wallet Testing**: Added actual wallet `eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC` from block 8667673
+5. **Enhanced Debug Logging**: Added detailed logging to track transaction processing
+
+#### Real-world Validation ✅
+- **Block 8667673**: Successfully processes real GalaChain swap transaction
+- **GALA → GUSDC Swap**: Correctly detects and parses 5 GALA → ~284.88 GUSDC swap
+- **Wallet Detection**: Properly identifies target wallet `eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC`
+- **Token Extraction**: Accurately extracts token pair, amounts, and swap direction
+- **Event Emission**: Successfully emits wallet activity events for real transactions
 
 ---
 
@@ -938,22 +970,25 @@ Each task is considered complete when:
 - **Core Infrastructure**: Complete configuration, logging, state management, and error handling
 - **Socket.IO Integration**: Successfully connected to GalaChain explorer API
 - **Real-time Monitoring**: Live block processing and BatchSubmit transaction detection
-- **Transaction Monitoring**: Complete transaction filtering and processing system
+- **Transaction Monitoring**: Complete transaction filtering and processing system with real GalaChain data support
 - **DEX Operation Detection**: Automatic identification of swaps, liquidity changes, and other DEX operations
-- **Wallet Activity Tracking**: Real-time monitoring of target wallet transactions
+- **Wallet Activity Tracking**: Real-time monitoring of target wallet transactions with proper address extraction
 - **Error Recovery**: Comprehensive error handling with circuit breakers and automatic reconnection
 - **State Persistence**: Complete state management with auto-save and recovery
+- **Real-world Validation**: Successfully tested with actual GalaChain block data (block 8667673)
 
 ### 🔄 **Currently Active Features**
 - **Live GalaChain Connection**: Connected to `https://explorer-api.galachain.com/`
-- **Block Monitoring**: Real-time processing of new blocks
-- **BatchSubmit Detection**: Automatic detection of DEX operations in blocks
-- **Transaction Filtering**: Filters transactions for target wallets only
-- **DEX Operation Processing**: Parses and processes swap, liquidity operations
-- **Transaction Queue**: Asynchronous processing with deduplication
+- **Block Monitoring**: Real-time processing of new blocks with proper structure handling
+- **BatchSubmit Detection**: Automatic detection of DEX operations in blocks with correct parsing
+- **Transaction Filtering**: Filters transactions for target wallets only with enhanced address detection
+- **DEX Operation Processing**: Parses and processes swap, liquidity operations with real token data
+- **Transaction Queue**: Asynchronous processing with deduplication and retry logic
 - **Event Emission**: Real-time events for wallet activity and DEX operations
 - **Health Monitoring**: Continuous system health checks
 - **Graceful Shutdown**: Clean shutdown with state preservation
+- **Real GalaChain Data Support**: Handles actual block structure from GalaChain explorer
+- **Enhanced Token Extraction**: Properly extracts token pairs, amounts, and swap details from real transactions
 
 ### 🚀 **Ready for Next Phase**
 The system is now ready for:
@@ -965,6 +1000,10 @@ The system is now ready for:
 - **Integration Tests**: WebSocket connection and error handling verified
 - **Real-world Testing**: Successfully monitoring live GalaChain activity
 - **Error Recovery**: Circuit breakers and reconnection mechanisms verified
+- **Real Block Validation**: Successfully tested with actual GalaChain block 8667673
+- **Transaction Parsing**: Verified correct parsing of real BatchSubmit transactions
+- **Wallet Detection**: Confirmed proper extraction of wallet addresses from real transactions
+- **Token Extraction**: Validated accurate extraction of token pairs and amounts from real swaps
 
 ### 📊 **Performance Metrics**
 - **Connection Stability**: Automatic reconnection with exponential backoff
@@ -972,3 +1011,20 @@ The system is now ready for:
 - **Error Handling**: Comprehensive error categorization and recovery
 - **State Management**: Persistent state with automatic backup and recovery
 - **Memory Usage**: Optimized with proper cleanup and garbage collection
+
+### 🔧 **Recent Critical Fixes (Task 6 Enhancement)**
+- **Real GalaChain Data Structure**: Fixed block structure handling to support actual GalaChain explorer data
+- **BatchSubmit Transaction Parsing**: Corrected wallet address extraction from `operation.dto.recipient`
+- **Token Information Extraction**: Enhanced to properly extract token pairs, amounts, and swap details
+- **Real-world Validation**: Successfully tested with block 8667673 containing GALA → GUSDC swap
+- **Enhanced Debug Logging**: Added detailed logging for transaction processing tracking
+- **Configuration Updates**: Added real wallet address for testing and validation
+
+### 🎯 **Real-world Transaction Detection**
+The system now successfully detects and processes real GalaChain transactions:
+- **Block 8667673**: GALA → GUSDC swap (5 GALA → ~284.88 GUSDC)
+- **Wallet**: `eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC`
+- **Token Pair**: GALA → GUSDC
+- **Swap Direction**: `zeroForOne: false` (GALA to GUSDC)
+- **Fee**: 10000 (0.1%)
+- **Status**: ✅ Successfully detected, parsed, and queued for processing
