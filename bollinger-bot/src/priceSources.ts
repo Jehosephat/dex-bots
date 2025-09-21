@@ -149,8 +149,10 @@ export class GSwapSource extends PriceSource {
         1 // 1 unit of input token
       );
 
-      // Calculate price: output amount / input amount
-      const price = quote.outTokenAmount.toNumber();
+      // Calculate price: we get GALA per GUSDC, but we want GUSDC per GALA
+      // If 1 GUSDC = X GALA, then 1 GALA = 1/X GUSDC
+      const galaPerGusdc = quote.outTokenAmount.toNumber();
+      const price = 1 / galaPerGusdc; // Convert to GUSDC per GALA
       
       return {
         source: this.name,
