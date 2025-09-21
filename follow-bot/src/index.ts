@@ -11,6 +11,9 @@
 import dotenv from 'dotenv';
 import { ConfigurationManager } from './config/configManager';
 import { StateManager } from './utils/stateManager';
+import { ErrorHandler, ErrorCategory, ErrorSeverity } from './utils/errorHandler';
+import { HealthCheckSystem } from './utils/healthCheck';
+import { WebSocketManager } from './websocket/websocketManager';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -21,6 +24,14 @@ async function initializeBot(): Promise<void> {
     logger.info('🤖 Starting Follow Bot...');
     logger.info('📋 Environment:', process.env['NODE_ENV'] || 'development');
     
+    // Initialize error handler first
+    logger.info('🛡️ Initializing error handler...');
+    const errorHandler = ErrorHandler.getInstance();
+    
+    // Initialize health check system
+    logger.info('🏥 Initializing health check system...');
+    const healthCheckSystem = HealthCheckSystem.getInstance();
+    
     // Initialize configuration manager
     logger.info('🔧 Initializing configuration manager...');
     const configManager = ConfigurationManager.getInstance();
@@ -30,6 +41,16 @@ async function initializeBot(): Promise<void> {
     logger.info('💾 Initializing state manager...');
     const stateManager = StateManager.getInstance();
     await stateManager.initialize();
+    
+    // Create circuit breakers for external services first
+    errorHandler.createCircuitBreaker('galachain-api');
+    errorHandler.createCircuitBreaker('websocket-connection');
+    logger.info('🔒 Circuit breakers created for external services');
+    
+    // Initialize WebSocket manager
+    logger.info('🔌 Initializing WebSocket manager...');
+    const wsManager = WebSocketManager.getInstance();
+    await wsManager.initialize();
     
     // Get configurations
     const envConfig = configManager.getEnvironmentConfig();
@@ -50,8 +71,29 @@ async function initializeBot(): Promise<void> {
     logger.info(`💼 Current positions: ${currentState.positions.length}`);
     logger.info(`⏰ Active cooldowns: ${currentState.cooldowns.length}`);
     
-    // TODO: Initialize all components
-    // - WebSocket Manager  
+    // Setup WebSocket event handlers
+    wsManager.on('walletActivity', (activity) => {
+      logger.info(`🎯 Wallet activity detected: ${activity.walletAddress} - ${activity.activityType}`);
+      // TODO: Process wallet activity for trade copying
+    });
+    
+    wsManager.on('connected', () => {
+      logger.info('✅ WebSocket connected and ready for monitoring');
+    });
+    
+    wsManager.on('disconnected', (data) => {
+      logger.warn(`⚠️ WebSocket disconnected: ${data.code} - ${data.reason}`);
+    });
+    
+    wsManager.on('error', (error) => {
+      logger.error('❌ WebSocket error:', error);
+    });
+    
+    // Run initial health check
+    const healthStatus = await healthCheckSystem.getHealthStatus();
+    logger.info(`🏥 Initial health check: ${healthStatus.body.overall}`);
+    
+    // TODO: Initialize remaining components
     // - Wallet Monitor
     // - Trade Analyzer
     // - Position Manager
@@ -63,6 +105,15 @@ async function initializeBot(): Promise<void> {
     logger.info('🚀 Ready to monitor target wallets and copy trades');
     
   } catch (error) {
+    // Use error handler to categorize and handle initialization errors
+    const errorHandler = ErrorHandler.getInstance();
+    await errorHandler.handleError(
+      error as Error,
+      ErrorCategory.SYSTEM,
+      ErrorSeverity.CRITICAL,
+      { phase: 'initialization' }
+    );
+    
     logger.error('❌ Failed to initialize Follow Bot:', error);
     process.exit(1);
   }
@@ -76,9 +127,20 @@ async function gracefulShutdown(signal: string): Promise<void> {
   logger.info(`\n🛑 Received ${signal}, shutting down gracefully...`);
   
   try {
+    // Set error handler to shutting down mode
+    const errorHandler = ErrorHandler.getInstance();
+    errorHandler.setShuttingDown();
+    
+    // Shutdown WebSocket manager
+    const wsManager = WebSocketManager.getInstance();
+    await wsManager.shutdown();
+    
     // Shutdown state manager
     const stateManager = StateManager.getInstance();
     await stateManager.shutdown();
+    
+    // Cleanup error handler
+    errorHandler.cleanupOldErrors();
     
     logger.info('✅ Graceful shutdown completed');
     process.exit(0);

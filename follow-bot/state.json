@@ -23,16 +23,16 @@
     "totalVolume": 10,
     "lastReset": 1758469569604
   },
-  "lastHeartbeat": 1758469569605,
+  "lastHeartbeat": 1758487652539,
   "totalTradesExecuted": 1,
   "totalVolumeTraded": 10,
   "lastConfigurationReload": 1758469569604,
   "successfulTrades": 1,
   "failedTrades": 0,
   "averageExecutionTime": 0,
-  "websocketConnected": true,
-  "lastWebSocketReconnect": 1758469569611,
-  "websocketReconnectCount": 2,
+  "websocketConnected": false,
+  "lastWebSocketReconnect": 1758487652877,
+  "websocketReconnectCount": 4,
   "version": "1.0.0",
-  "lastSaved": 1758469569614
+  "lastSaved": 1758487732476
 }
