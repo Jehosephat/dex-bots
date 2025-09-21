@@ -1,0 +1,53 @@
+{
+  "name": "follow-bot",
+  "version": "1.0.0",
+  "description": "GalaSwap Copy Trading Bot - Automatically replicates trades from successful traders",
+  "main": "dist/index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "nodemon --exec tsx src/index.ts",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
+    "clean": "rm -rf dist",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:config": "tsx src/config/configManager.ts",
+    "validate:config": "tsx scripts/validate-config.ts"
+  },
+  "keywords": [
+    "gala",
+    "galachain",
+    "trading",
+    "bot",
+    "copy-trading",
+    "defi",
+    "gswap"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@gala-chain/gswap-sdk": "^0.0.7",
+    "dotenv": "^17.2.2",
+    "winston": "^3.17.0",
+    "ws": "^8.18.3"
+  }
+}
