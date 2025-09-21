@@ -6,7 +6,7 @@ async function testTrade() {
   console.log("===================");
   
   // Your configuration (hardcoded for simplicity)
-  const privateKey = "0xd1d04f1aeeb9a918479d1097a2c04b88c9b890419bf31ca837eec26636ae29df";
+  const privateKey = "0xd1d15f1aeeb9a918479d1097a2c04b88c9b890419bf31ca837eec26636ae31df";
   const walletAddress = "eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC";
   const buyAmount = 1; // 1 GUSDC
   const slippageTolerance = 0.05; // 5%

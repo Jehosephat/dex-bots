@@ -1,0 +1,184 @@
+{
+    "blockNumber": "8667673",
+    "channelName": "asset-channel",
+    "configtxs": [],
+    "createdAt": "2025-09-21T21:14:16.048Z",
+    "header": {
+        "number": "8667673",
+        "previous_hash": "0c73aaf958d4dc0e3310c6db1d004d213c30ea7e990a4b7dc2cf8541f973f5b7",
+        "data_hash": "3d559d47e503063efedf477594284bdd99a3bbddc5191a08278556e6efd4064c"
+    },
+    "isConfigurationBlock": false,
+    "transactions": [
+        {
+            "logger": {
+                "context": "ChainBlockTransaction",
+                "options": {}
+            },
+            "actions": [
+                {
+                    "args": [
+                        "DexV3Contract:BatchSubmit",
+                        "{\"operations\":[{\"dto\":{\"fee\":10000,\"types\":{\"Swap\":[{\"name\":\"token0\",\"type\":\"token0\"},{\"name\":\"token1\",\"type\":\"token1\"},{\"name\":\"fee\",\"type\":\"int256\"},{\"name\":\"amount\",\"type\":\"string\"},{\"name\":\"zeroForOne\",\"type\":\"bool\"},{\"name\":\"sqrtPriceLimit\",\"type\":\"string\"},{\"name\":\"recipient\",\"type\":\"string\"},{\"name\":\"amountOutMinimum\",\"type\":\"string\"},{\"name\":\"amountInMaximum\",\"type\":\"string\"},{\"name\":\"uniqueKey\",\"type\":\"string\"}],\"token0\":[{\"name\":\"collection\",\"type\":\"string\"},{\"name\":\"category\",\"type\":\"string\"},{\"name\":\"type\",\"type\":\"string\"},{\"name\":\"additionalKey\",\"type\":\"string\"}],\"token1\":[{\"name\":\"collection\",\"type\":\"string\"},{\"name\":\"category\",\"type\":\"string\"},{\"name\":\"type\",\"type\":\"string\"},{\"name\":\"additionalKey\",\"type\":\"string\"}]},\"amount\":\"5\",\"domain\":{\"name\":\"base\",\"chainId\":8453},\"token0\":{\"type\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"additionalKey\":\"none\"},\"token1\":{\"type\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDC\",\"additionalKey\":\"none\"},\"recipient\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"signature\":\"0x707099de820612981f1a49d8d7b866638e00c468a7d53cb85babee09c605a58c2d0243b3ed14c3f60de4e49ca1f3eb834e91608f200a21765376d9edf7db0c7b1c\",\"uniqueKey\":\"galaswap - operation - 3af117b7-a0c8-4a16-9dee-eec45a0c829d-1758489251681-eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"zeroForOne\":false,\"sqrtPriceLimit\":\"18446050999999999999\",\"amountInMaximum\":\"5\",\"amountOutMinimum\":\"-283.455923176\"},\"method\":\"Swap\",\"uniqueId\":\"4f907463-7062-4375-ae1d-de3533796745\"}],\"uniqueKey\":\"e5b76cce-096a-4ca8-8fcb-ab2892e5e2ce\",\"signature\":\"8d37dc2082564dc6e4d7cc7ec66672b24f99d1e8a199bdf6cfb3854d07e9368c420479a4eace5c18063092b9698b13805d1f01319865a85074d63bf91d6ae1c01c\",\"trace\":{\"traceId\":\"907366489937976559\",\"spanId\":\"5840666039480093821\"}}"
+                    ],
+                    "chaincode": {
+                        "name": "basic-asset",
+                        "version": "50527314"
+                    },
+                    "chaincodeResponse": {
+                        "status": 200,
+                        "message": "",
+                        "payload": "{\"Data\":[{\"Data\":{\"amount0\":\"-284.88032481\",\"amount1\":\"5.000000\",\"poolAlias\":\"service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c\",\"poolFee\":10000,\"poolHash\":\"760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c\",\"timeStamp\":1758489256048,\"token0\":\"GALA\",\"token0ImageUrl\":\"https://static.gala.games/images/icons/units/gala.png\",\"token1\":\"GUSDC\",\"token1ImageUrl\":\"https://tokens.gala.games/compressed-images/logos/USDC-icon.png\",\"userAddress\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\"},\"Status\":1}],\"Status\":1}"
+                    },
+                    "endorserMsps": [
+                        "CuratorOrg"
+                    ],
+                    "reads": [
+                        {
+                            "key": "namespaces/fields/basic-asset/Sequence"
+                        },
+                        {
+                            "key": "/GCBSA/"
+                        },
+                        {
+                            "key": "/GCDXCHLPL/GALA$Unit$none$none/GUSDC$Unit$none$none/10000/"
+                        },
+                        {
+                            "key": "/GCFE/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/"
+                        },
+                        {
+                            "key": "/GCFP/galachain/"
+                        },
+                        {
+                            "key": "/GCFS/Swap/"
+                        },
+                        {
+                            "key": "/GCFTU/Swap/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/"
+                        },
+                        {
+                            "key": "/GCTB/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GUSDC/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c/GUSDC/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTBR/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GALA/Unit/none/none/0/1758489256048/"
+                        },
+                        {
+                            "key": "/GCTI/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTI/GUSDC/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTI2/GALA/Unit/none/none/0/"
+                        },
+                        {
+                            "key": "/GCTI2/GUSDC/Unit/none/none/0/"
+                        },
+                        {
+                            "key": "/GCUP/9D985c2F9E17C0b3E66d8bD71639F052E7cC2397/"
+                        },
+                        {
+                            "key": "/GCUP/D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/"
+                        },
+                        {
+                            "key": "/UNTX/e5b76cce-096a-4ca8-8fcb-ab2892e5e2ce/"
+                        },
+                        {
+                            "key": "/UNTX/galaswap - operation - 3af117b7-a0c8-4a16-9dee-eec45a0c829d-1758489251681-eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/"
+                        },
+                        {
+                            "key": "GCTBRC/GALA/Unit/none/none/0141911998241510743952/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/0/15922674634.16631169"
+                        },
+                        {
+                            "key": "/GCFD/Swap/0/"
+                        },
+                        {
+                            "key": "/GCFD/Swap/1000000/"
+                        }
+                    ],
+                    "writes": [
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCHLPL/GALA$Unit$none$none/GUSDC$Unit$none$none/10000/",
+                            "value": "{\"bitmap\":{\"-1\":\"608454991184943644672\",\"-18\":\"23945242826029513411849172299223580994042798784118784\",\"-2\":\"93536104789177786765035829293842113257979682750464\",\"0\":\"1\",\"17\":\"4835703278458516698824704\"},\"fee\":10000,\"feeGrowthGlobal0\":\"0.12335116740067967089\",\"feeGrowthGlobal1\":\"0.00488429516948178435\",\"grossPoolLiquidity\":\"193000333043.2451000700924684\",\"liquidity\":\"23878264.58411273858693898\",\"maxLiquidityPerTick\":\"38347248999678653400142060922857318.01636519561716576269\",\"protocolFees\":0.1,\"protocolFeesToken0\":\"77673.308392452544034852882695320300412754448\",\"protocolFeesToken1\":\"1307.5765189679682718293027180332806595549248499994065\",\"sqrtPrice\":\"0.13181708791899034328\",\"tickSpacing\":200,\"token0\":\"GALA$Unit$none$none\",\"token0ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"type\":\"none\"},\"token1\":\"GUSDC$Unit$none$none\",\"token1ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDC\",\"type\":\"none\"}}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCFR/2025/09/21/Swap/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e|0/",
+                            "value": "{\"day\":\"21\",\"feeCode\":\"Swap\",\"month\":\"09\",\"paidByUser\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"quantity\":\"1\",\"status\":2,\"txId\":\"8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e|0\",\"year\":\"2025\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCFTU/Swap/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/",
+                            "value": "{\"cumulativeFeeQuantity\":\"31\",\"cumulativeUses\":\"31\",\"feeCode\":\"Swap\",\"user\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GALA/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"quantity\":\"1071.20786065\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GUSDC/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDC\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"quantity\":\"14.693244\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c/GALA/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c\",\"quantity\":\"26705948.80048872\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c/GUSDC/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDC\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"service|pool_760ae55afa52316deb0eeb5d38178d80d90f3a85fcfb93b1c18e2c86c28e886c\",\"quantity\":\"188342.591405\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTBR/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/GALA/Unit/none/none/0/1758489256048/",
+                            "value": "{\"additionalKey\":\"none\",\"burnedBy\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"category\":\"Unit\",\"collection\":\"GALA\",\"created\":1758489256048,\"instance\":\"0\",\"quantity\":\"1\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCUR/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/2025/09/21/8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e|0/",
+                            "value": "{\"day\":\"21\",\"feeCode\":\"Swap\",\"month\":\"09\",\"paidByUser\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"quantity\":\"1\",\"status\":2,\"txId\":\"8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e|0\",\"year\":\"2025\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/UNTX/e5b76cce-096a-4ca8-8fcb-ab2892e5e2ce/",
+                            "value": "{\"created\":1758489256048,\"transactionId\":\"8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e\",\"uniqueKey\":\"e5b76cce-096a-4ca8-8fcb-ab2892e5e2ce\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/UNTX/galaswap - operation - 3af117b7-a0c8-4a16-9dee-eec45a0c829d-1758489251681-eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/",
+                            "value": "{\"created\":1758489256048,\"transactionId\":\"8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e|0\",\"uniqueKey\":\"galaswap - operation - 3af117b7-a0c8-4a16-9dee-eec45a0c829d-1758489251681-eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTBRC/GALA/Unit/none/none/0141911998241510743952/eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC/0/15922674634.16631169",
+                            "value": "{\"additionalKey\":\"none\",\"burnedBy\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC\",\"category\":\"Unit\",\"collection\":\"GALA\",\"created\":1758489256048,\"epoch\":\"0000000000000000000NaN\",\"instance\":\"0\",\"quantity\":\"1\",\"referenceId\":\"eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC$GALA$Unit$none$none$eth|D1499B10A0e1F4912FD1d771b183DfDfBDF766DC$1758489256048\",\"timeKey\":\"0141911998241510743952\",\"totalKnownBurnsCount\":\"15922674634.16631169\",\"type\":\"none\"}"
+                        }
+                    ]
+                }
+            ],
+            "creator": {
+                "mspId": "GalaUsersOrg",
+                "name": "Client|galausers"
+            },
+            "id": "8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e",
+            "type": "ENDORSER_TRANSACTION",
+            "validationCode": {
+                "transactionId": "8889bc44b67f8dd9190ed6fa1daba3935df3a362ed1380c47d4624a632fbd33e",
+                "validationCode": 0,
+                "validationEnum": "VALID"
+            }
+        }
+    ]
+}

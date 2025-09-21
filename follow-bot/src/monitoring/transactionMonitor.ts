@@ -140,14 +140,19 @@ export class TransactionMonitor extends EventEmitter {
    */
   public processBlock(block: any): void {
     try {
-      if (!block.parsedBlock?.transactions) {
+      // Handle both parsedBlock.transactions and direct transactions
+      const transactions = block.parsedBlock?.transactions || block.transactions;
+      const blockNumber = block.parsedBlock?.blockNumber || block.blockNumber;
+
+      if (!transactions || !Array.isArray(transactions)) {
         return;
       }
 
-      logger.debug(`🔍 Processing block ${block.parsedBlock.blockNumber} with ${block.parsedBlock.transactions.length} transactions`);
+      logger.info(`🔍 Processing block ${blockNumber} with ${transactions.length} transactions`);
 
-      for (const transaction of block.parsedBlock.transactions) {
-        this.processTransaction(transaction, block.parsedBlock.blockNumber);
+      for (const transaction of transactions) {
+        logger.debug(`📝 Processing transaction: ${transaction.id}`);
+        this.processTransaction(transaction, blockNumber);
       }
 
     } catch (error) {
@@ -169,8 +174,11 @@ export class TransactionMonitor extends EventEmitter {
       // Check if transaction involves target wallets
       const targetWallet = this.findTargetWallet(transaction);
       if (!targetWallet) {
+        logger.debug(`⏭️ Transaction ${transaction.id} not from target wallet, skipping`);
         return; // Not a target wallet transaction
       }
+      
+      logger.info(`🎯 Found target wallet transaction: ${transaction.id} from ${targetWallet}`);
 
       // Check for BatchSubmit transactions (DEX operations)
       if (this.isBatchSubmitTransaction(transaction)) {
@@ -197,7 +205,7 @@ export class TransactionMonitor extends EventEmitter {
   private findTargetWallet(transaction: any): string | null {
     const targetWallets = this.filter.targetWallets;
     
-    // Check transaction from/to addresses
+    // Check transaction from/to addresses (for regular transactions)
     if (transaction.from && targetWallets.includes(transaction.from.toLowerCase())) {
       return transaction.from.toLowerCase();
     }
@@ -206,10 +214,32 @@ export class TransactionMonitor extends EventEmitter {
       return transaction.to.toLowerCase();
     }
 
-    // Check transaction actions for wallet addresses
+    // Check transaction actions for wallet addresses (for BatchSubmit transactions)
     if (transaction.actions && Array.isArray(transaction.actions)) {
       for (const action of transaction.actions) {
-        if (action.args && Array.isArray(action.args)) {
+        if (action.args && Array.isArray(action.args) && action.args.length >= 2) {
+          const actionType = action.args[0];
+          
+          // Check for BatchSubmit transactions
+          if (actionType === 'DexV3Contract:BatchSubmit') {
+            try {
+              const batchData = JSON.parse(action.args[1]);
+              if (batchData.operations && Array.isArray(batchData.operations)) {
+                for (const operation of batchData.operations) {
+                  if (operation.dto && operation.dto.recipient) {
+                    const recipient = operation.dto.recipient.toLowerCase();
+                    if (targetWallets.includes(recipient)) {
+                      return recipient;
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              logger.debug('Failed to parse BatchSubmit data:', error);
+            }
+          }
+          
+          // Check other action arguments for wallet addresses
           for (const arg of action.args) {
             if (typeof arg === 'string' && targetWallets.includes(arg.toLowerCase())) {
               return arg.toLowerCase();
@@ -285,6 +315,15 @@ export class TransactionMonitor extends EventEmitter {
         return;
       }
 
+      // Extract token information from the real GalaChain structure
+      const tokenIn = dto.token0?.collection || 'Unknown';
+      const tokenOut = dto.token1?.collection || 'Unknown';
+      const amountIn = dto.amount || dto.amount0Desired || '0';
+      const amountOut = dto.amount1Desired || '0';
+      const recipient = dto.recipient || targetWallet;
+      const fee = dto.fee || '0';
+      const zeroForOne = dto.zeroForOne;
+
       // Create transaction object
       const galaSwapTransaction: GalaSwapTransaction = {
         id: uniqueId || `${transaction.id}_${Date.now()}`,
@@ -292,19 +331,19 @@ export class TransactionMonitor extends EventEmitter {
         blockNumber: blockNumber,
         timestamp: Date.now(),
         from: targetWallet,
-        to: dto.recipient || targetWallet,
+        to: recipient,
         value: '0',
         gasUsed: '0',
         gasPrice: '0',
         logs: [],
         method: method,
-        tokenIn: dto.token0?.collection,
-        tokenOut: dto.token1?.collection,
-        amountIn: dto.amount || dto.amount0Desired,
-        amountOut: dto.amount1Desired,
-        recipient: dto.recipient,
-        fee: dto.fee,
-        zeroForOne: dto.zeroForOne
+        tokenIn: tokenIn,
+        tokenOut: tokenOut,
+        amountIn: amountIn,
+        amountOut: amountOut,
+        recipient: recipient,
+        fee: fee,
+        zeroForOne: zeroForOne
       };
 
       // Determine activity type
