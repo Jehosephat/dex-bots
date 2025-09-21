@@ -167,3 +167,4 @@ temp/
 *.bak
 *.backup
 bollinger-bot/bot-history.txt
+follow-bot/state.json

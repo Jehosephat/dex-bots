@@ -77,6 +77,22 @@ async function initializeBot(): Promise<void> {
       // TODO: Process wallet activity for trade copying
     });
     
+    // Setup transaction monitor event handlers
+    const transactionMonitor = wsManager['transactionMonitor']; // Access private property
+    transactionMonitor.on('walletActivity', (activity) => {
+      logger.info(`📊 Transaction processed: ${activity.walletAddress} - ${activity.activityType}`);
+      logger.info(`   Block: ${activity.blockNumber}, Hash: ${activity.transactionHash}`);
+      if (activity.transaction.tokenIn && activity.transaction.tokenOut) {
+        logger.info(`   Tokens: ${activity.transaction.tokenIn} → ${activity.transaction.tokenOut}`);
+      }
+      // TODO: Process wallet activity for trade copying
+    });
+    
+    transactionMonitor.on('transactionDetected', (activity) => {
+      logger.info(`🔍 Transaction detected: ${activity.walletAddress} - ${activity.activityType}`);
+      // TODO: Add to trade analysis queue
+    });
+    
     wsManager.on('connected', () => {
       logger.info('✅ WebSocket connected and ready for monitoring');
     });

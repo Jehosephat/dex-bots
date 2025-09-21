@@ -10,6 +10,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 import { ErrorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { StateManager } from '../utils/stateManager';
+import { TransactionMonitor } from '../monitoring/transactionMonitor';
 
 // WebSocket message types
 export interface WebSocketMessage {
@@ -75,12 +76,14 @@ export class WebSocketManager extends EventEmitter {
   private lastMessageTime = 0;
   private errorHandler: ErrorHandler;
   private stateManager: StateManager;
+  private transactionMonitor: TransactionMonitor;
   private isConnecting = false;
 
   private constructor() {
     super();
     this.errorHandler = ErrorHandler.getInstance();
     this.stateManager = StateManager.getInstance();
+    this.transactionMonitor = TransactionMonitor.getInstance();
     
     this.config = {
       url: process.env['GALACHAIN_WEBSOCKET_URL'] || 'https://explorer-api.galachain.com/',
@@ -106,6 +109,9 @@ export class WebSocketManager extends EventEmitter {
     try {
       logger.info('🔌 Initializing WebSocket manager...');
       logger.info(`📡 WebSocket URL: ${this.config.url}`);
+      
+      // Initialize transaction monitor
+      await this.transactionMonitor.initialize();
       
       await this.connect();
       
@@ -302,88 +308,14 @@ export class WebSocketManager extends EventEmitter {
       // Emit block event
       this.emit('block', { type: 'block', data: block, timestamp: Date.now() });
 
-      // Check for BatchSubmit transactions (DEX operations)
-      this.detectBatchSubmitTransactions(block);
+      // Process block through transaction monitor
+      this.transactionMonitor.processBlock(block);
 
     } catch (error) {
       logger.error('❌ Error processing block:', error);
     }
   }
 
-  /**
-   * Detect BatchSubmit transactions in a block
-   * These contain batches of DEX operations like swap, add/remove liquidity, etc.
-   */
-  private detectBatchSubmitTransactions(block: any): void {
-    if (!block.parsedBlock?.transactions) {
-      return;
-    }
-
-    for (const transaction of block.parsedBlock.transactions) {
-      if (!transaction.actions || transaction.actions.length === 0) {
-        continue;
-      }
-
-      // Check if this transaction contains BatchSubmit
-      const firstAction = transaction.actions[0];
-      if (firstAction.args && firstAction.args.length > 0) {
-        const actionType = firstAction.args[0];
-        
-        if (actionType === 'DexV3Contract:BatchSubmit') {
-          const blockNumber = block.parsedBlock.blockNumber;
-          
-          logger.info('🎯 BATCHSUBMIT DETECTED!', {
-            blockNumber: blockNumber,
-            blockTimestamp: block.parsedBlock.createdAt,
-            channelName: block.parsedBlock.channelName,
-            transactionId: transaction.id,
-            actionType: actionType,
-            argsCount: firstAction.args.length
-          });
-
-          // Parse the operations from the second argument
-          if (firstAction.args.length > 1) {
-            try {
-              const batchData = JSON.parse(firstAction.args[1]);
-              this.parseAndLogOperations(batchData, blockNumber, transaction.id);
-            } catch (error) {
-              logger.error('Failed to parse BatchSubmit operations', error, {
-                blockNumber: blockNumber,
-                transactionId: transaction.id,
-                rawData: firstAction.args[1]
-              });
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Parse and log summaries of DEX operations from BatchSubmit data
-   */
-  private parseAndLogOperations(batchData: any, blockNumber: string, transactionId: string): void {
-    if (!batchData.operations || !Array.isArray(batchData.operations)) {
-      logger.warn('No operations array found in BatchSubmit data', {
-        blockNumber,
-        transactionId,
-        batchDataKeys: Object.keys(batchData)
-      });
-      return;
-    }
-
-    const operations = batchData.operations;
-    logger.info(`📊 Found ${operations.length} operation(s) in BatchSubmit:`, {
-      blockNumber,
-      transactionId,
-      operationCount: operations.length,
-      operations: operations.map((op: any) => ({
-        method: op.method,
-        uniqueId: op.uniqueId,
-        hasDto: !!op.dto
-      }))
-    });
-  }
 
   /**
    * Handle Socket.IO disconnect event
@@ -593,6 +525,9 @@ export class WebSocketManager extends EventEmitter {
    */
   public async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down WebSocket manager...');
+    
+    // Shutdown transaction monitor first
+    await this.transactionMonitor.shutdown();
     
     this.stopHeartbeat();
     this.disconnect();
