@@ -87,7 +87,7 @@ export class ConfigurationManager {
   // private envPath: string; // Reserved for future use
 
   private constructor() {
-    this.configPath = path.join(process.cwd(), 'config', 'config.json');
+    this.configPath = path.join(process.cwd(), 'config.json');
     // this.envPath = path.join(process.cwd(), '.env'); // Reserved for future use
   }
 

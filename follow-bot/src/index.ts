@@ -14,6 +14,7 @@ import { StateManager } from './utils/stateManager';
 import { ErrorHandler, ErrorCategory, ErrorSeverity } from './utils/errorHandler';
 import { HealthCheckSystem } from './utils/healthCheck';
 import { WebSocketManager } from './websocket/websocketManager';
+import { WalletMonitor } from './monitoring/walletMonitor';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -52,6 +53,11 @@ async function initializeBot(): Promise<void> {
     const wsManager = WebSocketManager.getInstance();
     await wsManager.initialize();
     
+    // Initialize wallet monitor
+    logger.info('👥 Initializing wallet monitor...');
+    const walletMonitor = WalletMonitor.getInstance();
+    await walletMonitor.initialize();
+    
     // Get configurations
     const envConfig = configManager.getEnvironmentConfig();
     const enabledWallets = configManager.getEnabledTargetWallets();
@@ -79,18 +85,35 @@ async function initializeBot(): Promise<void> {
     
     // Setup transaction monitor event handlers
     const transactionMonitor = wsManager['transactionMonitor']; // Access private property
-    transactionMonitor.on('walletActivity', (activity) => {
+    transactionMonitor.on('walletActivity', async (activity) => {
       logger.info(`📊 Transaction processed: ${activity.walletAddress} - ${activity.activityType}`);
       logger.info(`   Block: ${activity.blockNumber}, Hash: ${activity.transactionHash}`);
       if (activity.transaction.tokenIn && activity.transaction.tokenOut) {
         logger.info(`   Tokens: ${activity.transaction.tokenIn} → ${activity.transaction.tokenOut}`);
       }
-      // TODO: Process wallet activity for trade copying
+      
+      // Process wallet activity through wallet monitor
+      await walletMonitor.processWalletActivity(activity);
     });
     
     transactionMonitor.on('transactionDetected', (activity) => {
       logger.info(`🔍 Transaction detected: ${activity.walletAddress} - ${activity.activityType}`);
       // TODO: Add to trade analysis queue
+    });
+    
+    // Setup wallet monitor event handlers
+    walletMonitor.on('walletActivity', (data) => {
+      logger.info(`👥 Wallet activity updated: ${data.wallet.name} - ${data.activity.activityType}`);
+      logger.info(`   Performance Score: ${data.wallet.performanceScore.toFixed(2)}`);
+      logger.info(`   Risk Score: ${data.wallet.riskScore.toFixed(2)}`);
+      logger.info(`   Total Trades: ${data.wallet.totalTrades}`);
+    });
+    
+    walletMonitor.on('walletAlert', (alert) => {
+      logger.warn(`🚨 Wallet Alert [${alert.severity.toUpperCase()}]: ${alert.message}`);
+      logger.warn(`   Wallet: ${alert.walletAddress}`);
+      logger.warn(`   Type: ${alert.type}`);
+      // TODO: Implement alert handling (notifications, etc.)
     });
     
     wsManager.on('connected', () => {
@@ -150,6 +173,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Shutdown WebSocket manager
     const wsManager = WebSocketManager.getInstance();
     await wsManager.shutdown();
+    
+    // Shutdown wallet monitor
+    const walletMonitor = WalletMonitor.getInstance();
+    await walletMonitor.shutdown();
     
     // Shutdown state manager
     const stateManager = StateManager.getInstance();
