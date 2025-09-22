@@ -178,7 +178,8 @@ export class TransactionMonitor extends EventEmitter {
         return; // Not a target wallet transaction
       }
       
-      logger.info(`🎯 Found target wallet transaction: ${transaction.id} from ${targetWallet}`);
+      const walletName = this.getWalletName(targetWallet);
+      logger.info(`🎯 Found target wallet transaction: ${transaction.id} from ${targetWallet}${walletName ? ` (${walletName})` : ''}`);
 
       // Check for BatchSubmit transactions (DEX operations)
       if (this.isBatchSubmitTransaction(transaction)) {
@@ -284,7 +285,8 @@ export class TransactionMonitor extends EventEmitter {
         return;
       }
 
-      logger.info(`🎯 Processing BatchSubmit from wallet ${targetWallet} in block ${blockNumber}`);
+      const walletName = this.getWalletName(targetWallet);
+      logger.info(`🎯 Processing BatchSubmit from wallet ${targetWallet}${walletName ? ` (${walletName})` : ''} in block ${blockNumber}`);
 
       for (const operation of batchData.operations) {
         this.processDEXOperation(operation, transaction, blockNumber, targetWallet);
@@ -327,13 +329,24 @@ export class TransactionMonitor extends EventEmitter {
       let amountOut = '0';
       
       if (method === 'Swap') {
-        // Try to extract from chaincodeResponse payload
+        // Log the full transaction structure to understand the data (using info level for visibility)
+        logger.info('🔍 Swap transaction data:', {
+          dto: dto,
+          chaincodeResponse: transaction.chaincodeResponse,
+          zeroForOne: zeroForOne
+        });
+        
+        // Try to extract from chaincodeResponse payload first
         try {
           const chaincodeResponse = transaction.chaincodeResponse;
           if (chaincodeResponse && chaincodeResponse.payload) {
             const payload = JSON.parse(chaincodeResponse.payload);
+            logger.info('🔍 ChaincodeResponse payload:', payload);
+            
             if (payload.Data && payload.Data[0] && payload.Data[0].Data) {
               const swapData = payload.Data[0].Data;
+              logger.info('🔍 Swap data from payload:', swapData);
+              
               const amount0 = parseFloat(swapData.amount0 || '0');
               const amount1 = parseFloat(swapData.amount1 || '0');
               
@@ -353,10 +366,59 @@ export class TransactionMonitor extends EventEmitter {
           logger.debug('Failed to parse chaincodeResponse payload:', error);
         }
         
-        // Fallback to dto fields if chaincodeResponse parsing failed
+        // Fallback to dto fields if chaincodeResponse parsing failed or amounts are still 0
         if (amountIn === '0' && amountOut === '0') {
-          amountIn = Math.abs(parseFloat(dto.amount || dto.amountInMaximum || '0')).toString();
-          amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
+          logger.info('🔍 Using dto fallback for amounts');
+          
+          // For swaps, use the correct fields based on zeroForOne
+          if (zeroForOne) {
+            // Selling token0 (GALA) for token1 (GUSDC)
+            // amountIn should be the amount of GALA being sold (amountInMaximum)
+            // amountOut should be the amount of GUSDC expected (amountOutMinimum, but positive)
+            amountIn = Math.abs(parseFloat(dto.amountInMaximum || '0')).toString();
+            amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
+          } else {
+            // Selling token1 (GUSDC) for token0 (GALA)
+            // amountIn should be the amount of GUSDC being sold (amountInMaximum)
+            // amountOut should be the amount of GALA expected (amountOutMinimum, but positive)
+            amountIn = Math.abs(parseFloat(dto.amountInMaximum || '0')).toString();
+            amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
+          }
+        }
+        
+        // Additional fallback: try to get amounts from dto directly if they exist
+        if (amountIn === '0' && amountOut === '0') {
+          logger.info('🔍 Trying additional dto fields for amounts');
+          // Check if dto has amount0/amount1 fields
+          if (dto.amount0 && dto.amount1) {
+            if (zeroForOne) {
+              amountIn = Math.abs(parseFloat(dto.amount0)).toString();
+              amountOut = Math.abs(parseFloat(dto.amount1)).toString();
+            } else {
+              amountIn = Math.abs(parseFloat(dto.amount1)).toString();
+              amountOut = Math.abs(parseFloat(dto.amount0)).toString();
+            }
+          }
+        }
+        
+        // Final fallback: try to extract from transaction logs or other sources
+        if (amountIn === '0' && amountOut === '0') {
+          logger.debug('🔍 Trying to extract amounts from transaction logs');
+          // Look for amounts in transaction logs or other fields
+          if (transaction.logs && transaction.logs.length > 0) {
+            for (const log of transaction.logs) {
+              if (log.data && log.data.length > 66) { // Skip function selector
+                try {
+                  // Try to parse log data for amounts
+                  const data = log.data.slice(2); // Remove 0x prefix
+                  // This is a simplified approach - real implementation would need to decode based on event signature
+                  logger.debug('🔍 Log data found:', { address: log.address, data: log.data, parsedData: data });
+                } catch (error) {
+                  logger.debug('Failed to parse log data:', error);
+                }
+              }
+            }
+          }
         }
       } else {
         // For non-swap operations, use the original logic with absolute values
@@ -415,13 +477,14 @@ export class TransactionMonitor extends EventEmitter {
         transactionHash: transaction.id
       };
       
-      // Debug logging for transaction amounts
-      logger.debug(`🔍 Created wallet activity with amounts:`, {
+      // Log final amounts being used
+      logger.info(`🔍 Final amounts extracted:`, {
         amountIn: galaSwapTransaction.amountIn,
         amountOut: galaSwapTransaction.amountOut,
         tokenIn: galaSwapTransaction.tokenIn,
         tokenOut: galaSwapTransaction.tokenOut,
-        method: galaSwapTransaction.method
+        method: galaSwapTransaction.method,
+        zeroForOne: zeroForOne
       });
 
       // Apply filters
@@ -559,8 +622,9 @@ export class TransactionMonitor extends EventEmitter {
     this.transactionQueue.push(processedTransaction);
     this.processedTransactions.add(transactionId);
 
+    const walletName = this.getWalletName(walletActivity.walletAddress);
     logger.info(`📥 Added transaction to queue: ${transactionId} (${walletActivity.activityType})`);
-    logger.info(`   Wallet: ${walletActivity.walletAddress}`);
+    logger.info(`   Wallet: ${walletActivity.walletAddress}${walletName ? ` (${walletName})` : ''}`);
     logger.info(`   Method: ${walletActivity.transaction.method}`);
     if (walletActivity.transaction.tokenIn && walletActivity.transaction.tokenOut) {
       logger.info(`   Tokens: ${walletActivity.transaction.tokenIn} → ${walletActivity.transaction.tokenOut}`);
@@ -775,5 +839,21 @@ export class TransactionMonitor extends EventEmitter {
     
     // Default to 'buy' for other cases (could be improved with more logic)
     return 'buy';
+  }
+
+  /**
+   * Get wallet name from configuration
+   */
+  private getWalletName(walletAddress: string): string | null {
+    try {
+      const walletConfig = this.configManager.getWalletConfig();
+      const targetWallet = walletConfig.targetWallets.find(w => 
+        w.address.toLowerCase() === walletAddress.toLowerCase()
+      );
+      return targetWallet?.name || null;
+    } catch (error) {
+      logger.debug('Failed to get wallet name:', error);
+      return null;
+    }
   }
 }

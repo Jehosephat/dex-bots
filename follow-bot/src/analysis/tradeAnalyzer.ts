@@ -144,7 +144,8 @@ export class TradeAnalyzer extends EventEmitter {
    */
   public async analyzeWalletActivity(activity: WalletActivity): Promise<TradeAnalysis | null> {
     try {
-      logger.info(`🔍 Analyzing wallet activity: ${activity.walletAddress} - ${activity.activityType}`);
+      const walletName = this.getWalletName(activity.walletAddress);
+      logger.info(`🔍 Analyzing wallet activity: ${activity.walletAddress}${walletName ? ` (${walletName})` : ''} - ${activity.activityType}`);
       
       // Get target wallet configuration
       const targetWallet = this.getTargetWallet(activity.walletAddress);
@@ -640,5 +641,21 @@ export class TradeAnalyzer extends EventEmitter {
    */
   public getRecentAnalyses(limit: number = 10): TradeAnalysis[] {
     return this.analysisQueue.slice(-limit);
+  }
+
+  /**
+   * Get wallet name from configuration
+   */
+  private getWalletName(walletAddress: string): string | null {
+    try {
+      const walletConfig = this.configManager.getWalletConfig();
+      const targetWallet = walletConfig.targetWallets.find(w => 
+        w.address.toLowerCase() === walletAddress.toLowerCase()
+      );
+      return targetWallet?.name || null;
+    } catch (error) {
+      logger.debug('Failed to get wallet name:', error);
+      return null;
+    }
   }
 }

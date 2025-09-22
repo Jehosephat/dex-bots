@@ -338,8 +338,19 @@ export class TradeExecutor extends EventEmitter {
       const quote = await this.getQuote(execution.trade);
       
       // Validate slippage
-      if (!this.validateSlippage(execution, quote)) {
-        throw new Error('Slippage exceeds maximum tolerance');
+      const slippageValidation = this.validateSlippage(execution, quote);
+      
+      // Log slippage details
+      logger.info(`📊 Slippage analysis:`, {
+        expectedAmountOut: slippageValidation.expectedAmountOut,
+        actualAmountOut: slippageValidation.actualAmountOut,
+        actualSlippage: `${(slippageValidation.actualSlippage * 100).toFixed(2)}%`,
+        maxSlippage: `${(slippageValidation.maxSlippage * 100).toFixed(2)}%`,
+        isValid: slippageValidation.isValid
+      });
+      
+      if (!slippageValidation.isValid) {
+        throw new Error(`Slippage exceeds maximum tolerance. Actual: ${(slippageValidation.actualSlippage * 100).toFixed(2)}%, Max: ${(slippageValidation.maxSlippage * 100).toFixed(2)}%`);
       }
       
       // Execute the swap
@@ -390,14 +401,20 @@ export class TradeExecutor extends EventEmitter {
   /**
    * Validate slippage
    */
-  private validateSlippage(execution: TradeExecution, quote: any): boolean {
+  private validateSlippage(execution: TradeExecution, quote: any): { isValid: boolean; actualSlippage: number; maxSlippage: number; expectedAmountOut: number; actualAmountOut: number } {
     const expectedAmountOut = execution.trade.amountOut;
     const actualAmountOut = quote.outTokenAmount.toNumber();
-    const slippage = Math.abs(actualAmountOut - expectedAmountOut) / expectedAmountOut;
+    const actualSlippage = Math.abs(actualAmountOut - expectedAmountOut) / expectedAmountOut;
     
     const maxSlippage = execution.executionStrategy.maxSlippage || execution.trade.maxSlippage;
     
-    return slippage <= maxSlippage;
+    return {
+      isValid: actualSlippage <= maxSlippage,
+      actualSlippage,
+      maxSlippage,
+      expectedAmountOut,
+      actualAmountOut
+    };
   }
 
   /**
