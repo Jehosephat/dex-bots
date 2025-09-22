@@ -33,8 +33,11 @@ WALLET_ADDRESS=eth|0xYourWalletAddressHere
 # REQUIRED: Your private key (format: 0x...)
 PRIVATE_KEY=0xYourPrivateKeyHere
 
-# OPTIONAL: Trade amount in GUSDC (default: 10)
-TRADE_AMOUNT=10
+# OPTIONAL: Buy amount in GUSDC (default: 10)
+BUY_AMOUNT=10
+
+# OPTIONAL: Sell amount in GALA (default: 10)
+SELL_AMOUNT=10
 
 # OPTIONAL: Duration of each buy/sell phase in milliseconds (default: 300000 = 5 minutes)
 TRADE_DURATION=300000
@@ -153,7 +156,8 @@ pm2 show buy-sell-periodic-bot
 You can override any setting by setting environment variables:
 
 ```bash
-export TRADE_AMOUNT="20"
+export BUY_AMOUNT="20"
+export SELL_AMOUNT="600"
 export TRADE_FREQUENCY="60000"
 export SLIPPAGE_TOLERANCE="0.08"
 npm run pm2:start:prod

@@ -25,7 +25,8 @@ dotenv.config();
 // Configuration - Set these values according to your needs
 const CONFIG = {
   // Trading parameters
-  TRADE_AMOUNT: parseFloat(process.env.TRADE_AMOUNT) || 10, // Amount to trade in each transaction
+  BUY_AMOUNT: parseFloat(process.env.BUY_AMOUNT) || 10, // Amount to buy in each transaction
+  SELL_AMOUNT: parseFloat(process.env.SELL_AMOUNT) || 10, // Amount to sell in each transaction
   TRADE_FREQUENCY: parseInt(process.env.TRADE_FREQUENCY) || 30000, // 30 seconds between trades
   TRADE_DURATION: parseInt(process.env.TRADE_DURATION) || 300000, // 5 minutes per phase
   
@@ -84,14 +85,15 @@ async function executeTrade(isBuy) {
     const tokenIn = isBuy ? CONFIG.GUSDC_TOKEN : CONFIG.GALA_TOKEN;
     const tokenOut = isBuy ? CONFIG.GALA_TOKEN : CONFIG.GUSDC_TOKEN;
     const tradeType = isBuy ? 'BUY' : 'SELL';
+    const tradeAmount = isBuy ? CONFIG.BUY_AMOUNT : CONFIG.SELL_AMOUNT;
     
-    log(`Executing ${tradeType} trade: ${CONFIG.TRADE_AMOUNT} ${tokenIn.split('|')[0]} -> ${tokenOut.split('|')[0]}`);
+    log(`Executing ${tradeType} trade: ${tradeAmount} ${tokenIn.split('|')[0]} -> ${tokenOut.split('|')[0]}`);
 
     // Get quote using the SDK
     const quote = await gSwap.quoting.quoteExactInput(
       tokenIn,
       tokenOut,
-      CONFIG.TRADE_AMOUNT
+      tradeAmount
     );
 
     log(`Best rate found on ${quote.feeTier} fee tier pool`);
@@ -107,7 +109,7 @@ async function executeTrade(isBuy) {
       tokenOut,
       quote.feeTier,
       {
-        exactIn: CONFIG.TRADE_AMOUNT,
+        exactIn: tradeAmount,
         amountOutMinimum: amountOutMinimum
       },
       CONFIG.WALLET_ADDRESS
@@ -175,7 +177,8 @@ async function runTradingBot() {
 
   log('🤖 Starting GalaSwap V3 Periodic Trading Bot');
   log(`Configuration:`);
-  log(`  Trade Amount: ${CONFIG.TRADE_AMOUNT}`);
+  log(`  Buy Amount: ${CONFIG.BUY_AMOUNT} GUSDC`);
+  log(`  Sell Amount: ${CONFIG.SELL_AMOUNT} GALA`);
   log(`  Trade Frequency: ${CONFIG.TRADE_FREQUENCY / 1000}s`);
   log(`  Trade Duration: ${CONFIG.TRADE_DURATION / 1000}s per phase`);
   log(`  Slippage Tolerance: ${CONFIG.SLIPPAGE_TOLERANCE * 100}%`);
