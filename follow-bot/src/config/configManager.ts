@@ -5,7 +5,8 @@
  * including environment variables, wallet configurations, and runtime settings.
  */
 
-import fs from 'fs';
+import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger';
 
@@ -122,6 +123,20 @@ export class ConfigurationManager {
   }
 
   /**
+   * Load config file
+   */
+  private async loadConfigFile(): Promise<any> {
+    try {
+      const configPath = path.join(process.cwd(), 'config.json');
+      const configData = await fs.readFile(configPath, 'utf-8');
+      return JSON.parse(configData);
+    } catch (error) {
+      logger.warn('⚠️ Could not load config.json, using defaults');
+      return {};
+    }
+  }
+
+  /**
    * Load and validate environment variables
    */
   private async loadEnvironmentConfig(): Promise<void> {
@@ -145,22 +160,26 @@ export class ConfigurationManager {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
 
-    // Parse and validate environment variables
+    // Load config file first to get defaults
+    const configFile = await this.loadConfigFile();
+    const globalSettings = configFile.globalSettings || {};
+    
+    // Parse and validate environment variables (env vars override config file)
     this.envConfig = {
       // Required
       privateKey: this.validatePrivateKey(process.env['PRIVATE_KEY']!),
       walletAddress: this.validateWalletAddress(process.env['WALLET_ADDRESS']!),
       targetWallets: process.env['TARGET_WALLETS']!,
       
-      // Copy Trading Settings with defaults
-      copyMode: (process.env['COPY_MODE'] as 'exact' | 'proportional') || 'proportional',
-      maxPositionSize: this.parseNumber(process.env['MAX_POSITION_SIZE'], 0.1),
-      executionDelay: this.parseNumber(process.env['EXECUTION_DELAY'], 30),
-      cooldownMinutes: this.parseNumber(process.env['COOLDOWN_MINUTES'], 5),
-      slippageTolerance: this.parseNumber(process.env['SLIPPAGE_TOLERANCE'], 0.05),
-      enableAutoTrading: process.env['ENABLE_AUTO_TRADING'] === 'true',
+      // Copy Trading Settings - env vars override config file
+      copyMode: (process.env['COPY_MODE'] as 'exact' | 'proportional') || globalSettings.copyMode || 'proportional',
+      maxPositionSize: this.parseNumber(process.env['MAX_POSITION_SIZE'], globalSettings.maxTotalExposure || 0.1),
+      executionDelay: this.parseNumber(process.env['EXECUTION_DELAY'], globalSettings.executionDelay || 30),
+      cooldownMinutes: this.parseNumber(process.env['COOLDOWN_MINUTES'], globalSettings.cooldownMinutes || 5),
+      slippageTolerance: this.parseNumber(process.env['SLIPPAGE_TOLERANCE'], globalSettings.slippageTolerance || 0.05),
+      enableAutoTrading: process.env['ENABLE_AUTO_TRADING'] === 'true' || globalSettings.enableAutoTrading === true,
       minTradeAmount: this.parseNumber(process.env['MIN_TRADE_AMOUNT'], 10),
-      maxDailyTrades: this.parseNumber(process.env['MAX_DAILY_TRADES'], 50),
+      maxDailyTrades: this.parseNumber(process.env['MAX_DAILY_TRADES'], globalSettings.maxDailyTrades || 50),
       
       // WebSocket Configuration
       websocketReconnectDelay: this.parseNumber(process.env['WEBSOCKET_RECONNECT_DELAY'], 5000),
@@ -192,11 +211,11 @@ export class ConfigurationManager {
     logger.info('📋 Loading wallet configuration...');
     
     try {
-      if (!fs.existsSync(this.configPath)) {
+      if (!fsSync.existsSync(this.configPath)) {
         throw new Error(`Configuration file not found: ${this.configPath}`);
       }
 
-      const configData = fs.readFileSync(this.configPath, 'utf8');
+      const configData = fsSync.readFileSync(this.configPath, 'utf8');
       const parsedConfig = JSON.parse(configData) as WalletConfig;
       
       // Validate wallet configuration structure
@@ -336,7 +355,7 @@ export class ConfigurationManager {
     const backupPath = path.join(process.cwd(), 'config', `config.backup.${timestamp}.json`);
     
     if (this.walletConfig) {
-      fs.writeFileSync(backupPath, JSON.stringify(this.walletConfig, null, 2));
+      fsSync.writeFileSync(backupPath, JSON.stringify(this.walletConfig, null, 2));
       logger.info(`✅ Configuration backed up to: ${backupPath}`);
       return backupPath;
     }
@@ -348,17 +367,17 @@ export class ConfigurationManager {
    * Restore configuration from backup
    */
   public async restore(backupPath: string): Promise<void> {
-    if (!fs.existsSync(backupPath)) {
+    if (!fsSync.existsSync(backupPath)) {
       throw new Error(`Backup file not found: ${backupPath}`);
     }
 
-    const backupData = fs.readFileSync(backupPath, 'utf8');
+    const backupData = fsSync.readFileSync(backupPath, 'utf8');
     const parsedConfig = JSON.parse(backupData) as WalletConfig;
     
     this.validateWalletConfigStructure(parsedConfig);
     
     // Write to current config file
-    fs.writeFileSync(this.configPath, JSON.stringify(parsedConfig, null, 2));
+    fsSync.writeFileSync(this.configPath, JSON.stringify(parsedConfig, null, 2));
     
     // Reload configuration
     await this.reload();

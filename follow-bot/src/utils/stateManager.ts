@@ -290,7 +290,7 @@ export class StateManager {
     this.state.dailyLimits.totalVolume += trade.copiedTrade.amountIn;
     this.state.totalVolumeTraded += trade.copiedTrade.amountIn;
     
-    logger.info(`📈 Trade added: ${trade.copiedTrade.type} ${trade.copiedTrade.amountIn} ${trade.copiedTrade.tokenIn}`);
+    logger.info(`📈 Trade added: ${trade.copiedTrade.type} ${trade.copiedTrade.amountIn} ${trade.copiedTrade.tokenIn} → ${trade.copiedTrade.amountOut} ${trade.copiedTrade.tokenOut}`);
   }
 
   /**

@@ -249,7 +249,17 @@ export class WalletMonitor extends EventEmitter {
   public async processWalletActivity(activity: WalletActivity): Promise<void> {
     try {
       const walletAddress = activity.walletAddress;
-      const stats = this.walletStats.get(walletAddress);
+      // Find stats by case-insensitive comparison
+      let stats = this.walletStats.get(walletAddress);
+      if (!stats) {
+        // Try to find with different case
+        for (const [storedAddress, storedStats] of this.walletStats.entries()) {
+          if (storedAddress.toLowerCase() === walletAddress.toLowerCase()) {
+            stats = storedStats;
+            break;
+          }
+        }
+      }
       
       if (!stats) {
         logger.warn(`⚠️ Received activity for unmonitored wallet: ${walletAddress}`);
@@ -567,7 +577,18 @@ export class WalletMonitor extends EventEmitter {
    */
   public getWalletStats(walletAddress?: string): WalletStats | Map<string, WalletStats> | null {
     if (walletAddress) {
-      return this.walletStats.get(walletAddress) || null;
+      // Try exact match first
+      let stats = this.walletStats.get(walletAddress);
+      if (!stats) {
+        // Try case-insensitive match
+        for (const [storedAddress, storedStats] of this.walletStats.entries()) {
+          if (storedAddress.toLowerCase() === walletAddress.toLowerCase()) {
+            stats = storedStats;
+            break;
+          }
+        }
+      }
+      return stats || null;
     }
     return this.walletStats;
   }

@@ -318,11 +318,67 @@ export class TransactionMonitor extends EventEmitter {
       // Extract token information from the real GalaChain structure
       const tokenIn = dto.token0?.collection || 'Unknown';
       const tokenOut = dto.token1?.collection || 'Unknown';
-      const amountIn = dto.amount || dto.amount0Desired || '0';
-      const amountOut = dto.amount1Desired || '0';
       const recipient = dto.recipient || targetWallet;
       const fee = dto.fee || '0';
       const zeroForOne = dto.zeroForOne;
+      
+      // For swaps, we need to extract amounts from the chaincodeResponse payload
+      let amountIn = '0';
+      let amountOut = '0';
+      
+      if (method === 'Swap') {
+        // Try to extract from chaincodeResponse payload
+        try {
+          const chaincodeResponse = transaction.chaincodeResponse;
+          if (chaincodeResponse && chaincodeResponse.payload) {
+            const payload = JSON.parse(chaincodeResponse.payload);
+            if (payload.Data && payload.Data[0] && payload.Data[0].Data) {
+              const swapData = payload.Data[0].Data;
+              const amount0 = parseFloat(swapData.amount0 || '0');
+              const amount1 = parseFloat(swapData.amount1 || '0');
+              
+              // Determine input/output based on zeroForOne and amounts
+              if (zeroForOne) {
+                // Selling token0 (GALA) for token1 (GUSDC)
+                amountIn = Math.abs(amount0).toString();
+                amountOut = Math.abs(amount1).toString();
+              } else {
+                // Selling token1 (GUSDC) for token0 (GALA)
+                amountIn = Math.abs(amount1).toString();
+                amountOut = Math.abs(amount0).toString();
+              }
+            }
+          }
+        } catch (error) {
+          logger.debug('Failed to parse chaincodeResponse payload:', error);
+        }
+        
+        // Fallback to dto fields if chaincodeResponse parsing failed
+        if (amountIn === '0' && amountOut === '0') {
+          amountIn = Math.abs(parseFloat(dto.amount || dto.amountInMaximum || '0')).toString();
+          amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
+        }
+      } else {
+        // For non-swap operations, use the original logic with absolute values
+        amountIn = Math.abs(parseFloat(dto.amount || dto.amount0Desired || '0')).toString();
+        amountOut = Math.abs(parseFloat(dto.amount1Desired || '0')).toString();
+      }
+
+      // Determine correct tokenIn and tokenOut based on zeroForOne
+      let finalTokenIn = tokenIn;
+      let finalTokenOut = tokenOut;
+      
+      if (method === 'Swap' && zeroForOne !== undefined) {
+        if (zeroForOne) {
+          // Selling token0 (GALA) for token1 (GUSDC)
+          finalTokenIn = tokenIn; // GALA
+          finalTokenOut = tokenOut; // GUSDC
+        } else {
+          // Selling token1 (GUSDC) for token0 (GALA)
+          finalTokenIn = tokenOut; // GUSDC
+          finalTokenOut = tokenIn; // GALA
+        }
+      }
 
       // Create transaction object
       const galaSwapTransaction: GalaSwapTransaction = {
@@ -337,8 +393,8 @@ export class TransactionMonitor extends EventEmitter {
         gasPrice: '0',
         logs: [],
         method: method,
-        tokenIn: tokenIn,
-        tokenOut: tokenOut,
+        tokenIn: finalTokenIn,
+        tokenOut: finalTokenOut,
         amountIn: amountIn,
         amountOut: amountOut,
         recipient: recipient,
@@ -358,6 +414,15 @@ export class TransactionMonitor extends EventEmitter {
         blockNumber: blockNumber,
         transactionHash: transaction.id
       };
+      
+      // Debug logging for transaction amounts
+      logger.debug(`🔍 Created wallet activity with amounts:`, {
+        amountIn: galaSwapTransaction.amountIn,
+        amountOut: galaSwapTransaction.amountOut,
+        tokenIn: galaSwapTransaction.tokenIn,
+        tokenOut: galaSwapTransaction.tokenOut,
+        method: galaSwapTransaction.method
+      });
 
       // Apply filters
       if (this.passesFilters(walletActivity)) {
@@ -568,14 +633,20 @@ export class TransactionMonitor extends EventEmitter {
         id: processedTransaction.id,
         targetWallet: processedTransaction.walletActivity.walletAddress,
         originalTrade: {
-          type: processedTransaction.walletActivity.activityType === 'swap' ? 'buy' : 'sell',
+          type: this.determineTradeType(
+            processedTransaction.walletActivity.transaction.tokenIn || 'Unknown',
+            processedTransaction.walletActivity.transaction.tokenOut || 'Unknown'
+          ),
           tokenIn: processedTransaction.walletActivity.transaction.tokenIn || 'Unknown',
           tokenOut: processedTransaction.walletActivity.transaction.tokenOut || 'Unknown',
           amountIn: parseFloat(processedTransaction.walletActivity.transaction.amountIn || '0'),
           amountOut: parseFloat(processedTransaction.walletActivity.transaction.amountOut || '0')
         },
         copiedTrade: {
-          type: processedTransaction.walletActivity.activityType === 'swap' ? 'buy' : 'sell',
+          type: this.determineTradeType(
+            processedTransaction.walletActivity.transaction.tokenIn || 'Unknown',
+            processedTransaction.walletActivity.transaction.tokenOut || 'Unknown'
+          ),
           tokenIn: processedTransaction.walletActivity.transaction.tokenIn || 'Unknown',
           tokenOut: processedTransaction.walletActivity.transaction.tokenOut || 'Unknown',
           amountIn: parseFloat(processedTransaction.walletActivity.transaction.amountIn || '0'),
@@ -683,5 +754,26 @@ export class TransactionMonitor extends EventEmitter {
     }
 
     logger.info('✅ Transaction Monitor shutdown complete');
+  }
+
+  /**
+   * Determine trade type based on token direction
+   */
+  private determineTradeType(tokenIn: string, tokenOut: string): 'buy' | 'sell' {
+    // Common base tokens that are typically "sold" to get other tokens
+    const baseTokens = ['GUSDC', 'GUSDT', 'GWETH'];
+    
+    // If selling a base token to get another token, it's a "buy" of the output token
+    if (baseTokens.includes(tokenIn.toUpperCase())) {
+      return 'buy';
+    }
+    
+    // If selling a non-base token to get a base token, it's a "sell" of the input token
+    if (baseTokens.includes(tokenOut.toUpperCase())) {
+      return 'sell';
+    }
+    
+    // Default to 'buy' for other cases (could be improved with more logic)
+    return 'buy';
   }
 }
