@@ -15,6 +15,7 @@ import { ErrorHandler, ErrorCategory, ErrorSeverity } from './utils/errorHandler
 import { HealthCheckSystem } from './utils/healthCheck';
 import { WebSocketManager } from './websocket/websocketManager';
 import { WalletMonitor } from './monitoring/walletMonitor';
+import { TradeAnalyzer } from './analysis/tradeAnalyzer';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -57,6 +58,11 @@ async function initializeBot(): Promise<void> {
     logger.info('👥 Initializing wallet monitor...');
     const walletMonitor = WalletMonitor.getInstance();
     await walletMonitor.initialize();
+    
+    // Initialize trade analyzer
+    logger.info('🔍 Initializing trade analyzer...');
+    const tradeAnalyzer = TradeAnalyzer.getInstance();
+    await tradeAnalyzer.initialize();
     
     // Get configurations
     const envConfig = configManager.getEnvironmentConfig();
@@ -102,11 +108,14 @@ async function initializeBot(): Promise<void> {
     });
     
     // Setup wallet monitor event handlers
-    walletMonitor.on('walletActivity', (data) => {
+    walletMonitor.on('walletActivity', async (data) => {
       logger.info(`👥 Wallet activity updated: ${data.wallet.name} - ${data.activity.activityType}`);
       logger.info(`   Performance Score: ${data.wallet.performanceScore.toFixed(2)}`);
       logger.info(`   Risk Score: ${data.wallet.riskScore.toFixed(2)}`);
       logger.info(`   Total Trades: ${data.wallet.totalTrades}`);
+      
+      // Analyze the wallet activity for potential trade copying
+      await tradeAnalyzer.analyzeWalletActivity(data.activity);
     });
     
     walletMonitor.on('walletAlert', (alert) => {
@@ -114,6 +123,29 @@ async function initializeBot(): Promise<void> {
       logger.warn(`   Wallet: ${alert.walletAddress}`);
       logger.warn(`   Type: ${alert.type}`);
       // TODO: Implement alert handling (notifications, etc.)
+    });
+    
+    // Setup trade analyzer event handlers
+    tradeAnalyzer.on('tradeAnalysis', (analysis) => {
+      logger.info(`🔍 Trade analysis completed: ${analysis.analysisResult}`);
+      logger.info(`   Wallet: ${analysis.targetWallet.name}`);
+      logger.info(`   Risk Score: ${analysis.riskScore.toFixed(2)}`);
+      logger.info(`   Confidence Score: ${analysis.confidenceScore.toFixed(2)}`);
+      logger.info(`   Action: ${analysis.recommendedAction.action}`);
+    });
+    
+    tradeAnalyzer.on('tradeApproved', (analysis) => {
+      logger.info(`✅ Trade approved for execution: ${analysis.id}`);
+      logger.info(`   Trade: ${analysis.calculatedTrade.amountIn} ${analysis.calculatedTrade.tokenIn} → ${analysis.calculatedTrade.amountOut} ${analysis.calculatedTrade.tokenOut}`);
+      logger.info(`   Copy Mode: ${analysis.calculatedTrade.copyMode}`);
+      // TODO: Send to trade execution engine
+    });
+    
+    tradeAnalyzer.on('tradeRejected', (analysis) => {
+      logger.warn(`❌ Trade rejected: ${analysis.id}`);
+      logger.warn(`   Reason: ${analysis.rejectionReason || 'Unknown'}`);
+      logger.warn(`   Risk Score: ${analysis.riskScore.toFixed(2)}`);
+      // TODO: Log rejection for analysis
     });
     
     wsManager.on('connected', () => {
@@ -177,6 +209,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Shutdown wallet monitor
     const walletMonitor = WalletMonitor.getInstance();
     await walletMonitor.shutdown();
+    
+    // Shutdown trade analyzer
+    const tradeAnalyzer = TradeAnalyzer.getInstance();
+    await tradeAnalyzer.shutdown();
     
     // Shutdown state manager
     const stateManager = StateManager.getInstance();
