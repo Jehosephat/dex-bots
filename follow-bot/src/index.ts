@@ -17,6 +17,7 @@ import { WebSocketManager } from './websocket/websocketManager';
 import { WalletMonitor } from './monitoring/walletMonitor';
 import { TradeAnalyzer } from './analysis/tradeAnalyzer';
 import { PositionTracker } from './positions/positionTracker';
+import { TradeExecutor } from './execution/tradeExecutor';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -69,6 +70,11 @@ async function initializeBot(): Promise<void> {
     logger.info('📊 Initializing position tracker...');
     const positionTracker = PositionTracker.getInstance();
     await positionTracker.initialize();
+    
+    // Initialize trade executor
+    logger.info('🚀 Initializing trade executor...');
+    const tradeExecutor = TradeExecutor.getInstance();
+    await tradeExecutor.initialize();
     
     // Get configurations
     const envConfig = configManager.getEnvironmentConfig();
@@ -151,7 +157,9 @@ async function initializeBot(): Promise<void> {
         logger.info(`📊 Position created for approved trade: ${position.id}`);
       }
       
-      // TODO: Send to trade execution engine
+      // Execute the approved trade
+      const execution = await tradeExecutor.executeTrade(analysis);
+      logger.info(`🚀 Trade execution queued: ${execution.id}`);
     });
     
     tradeAnalyzer.on('tradeRejected', (analysis) => {
@@ -192,6 +200,39 @@ async function initializeBot(): Promise<void> {
       // TODO: Implement alert handling (notifications, etc.)
     });
     
+    // Setup trade executor event handlers
+    tradeExecutor.on('executionQueued', (execution) => {
+      logger.info(`🚀 Trade execution queued: ${execution.id}`);
+      logger.info(`   Strategy: ${execution.executionStrategy.type}`);
+      logger.info(`   Trade: ${execution.trade.amountIn} ${execution.trade.tokenIn} → ${execution.trade.amountOut} ${execution.trade.tokenOut}`);
+    });
+    
+    tradeExecutor.on('executionStarted', (execution) => {
+      logger.info(`🚀 Trade execution started: ${execution.id}`);
+      logger.info(`   Attempt: ${execution.attempts}/${execution.maxAttempts}`);
+    });
+    
+    tradeExecutor.on('executionCompleted', (execution) => {
+      logger.info(`✅ Trade execution completed: ${execution.id}`);
+      if (execution.result) {
+        logger.info(`   Transaction ID: ${execution.result.transactionId}`);
+        logger.info(`   Actual Output: ${execution.result.actualAmountOut}`);
+        logger.info(`   Slippage: ${(execution.result.slippage * 100).toFixed(2)}%`);
+        logger.info(`   Execution Time: ${execution.result.executionTime}ms`);
+      }
+    });
+    
+    tradeExecutor.on('executionFailed', (execution) => {
+      logger.error(`❌ Trade execution failed: ${execution.id}`);
+      logger.error(`   Error: ${execution.error}`);
+      logger.error(`   Attempts: ${execution.attempts}/${execution.maxAttempts}`);
+    });
+    
+    tradeExecutor.on('executionCancelled', (execution) => {
+      logger.warn(`⚠️ Trade execution cancelled: ${execution.id}`);
+      logger.warn(`   Reason: ${execution.error || 'Manual cancellation'}`);
+    });
+    
     wsManager.on('connected', () => {
       logger.info('✅ WebSocket connected and ready for monitoring');
     });
@@ -209,10 +250,6 @@ async function initializeBot(): Promise<void> {
     logger.info(`🏥 Initial health check: ${healthStatus.body.overall}`);
     
     // TODO: Initialize remaining components
-    // - Wallet Monitor
-    // - Trade Analyzer
-    // - Position Manager
-    // - Trade Executor
     // - Risk Manager
     // - Safety Manager
     
@@ -261,6 +298,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Shutdown position tracker
     const positionTracker = PositionTracker.getInstance();
     await positionTracker.shutdown();
+    
+    // Shutdown trade executor
+    const tradeExecutor = TradeExecutor.getInstance();
+    await tradeExecutor.shutdown();
     
     // Shutdown state manager
     const stateManager = StateManager.getInstance();

@@ -238,11 +238,15 @@ export class TradeAnalyzer extends EventEmitter {
       analysis.recommendedAction = recommendedAction;
       
       // Step 7: Final decision
-      if (recommendedAction.action === 'execute' && confidenceScore >= 0.7 && riskScore <= 0.6) {
+      const envConfig = this.configManager.getEnvironmentConfig();
+      if (recommendedAction.action === 'execute' && confidenceScore >= 0.7 && riskScore <= 0.6 && envConfig.enableAutoTrading) {
         analysis.analysisResult = 'approved';
       } else if (recommendedAction.action === 'skip') {
         analysis.analysisResult = 'rejected';
         analysis.rejectionReason = recommendedAction.reason;
+      } else if (!envConfig.enableAutoTrading && recommendedAction.action === 'execute') {
+        analysis.analysisResult = 'rejected';
+        analysis.rejectionReason = 'Auto-trading is disabled';
       } else {
         analysis.analysisResult = 'pending';
       }
