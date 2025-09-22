@@ -18,7 +18,18 @@
     "clean": "rm -rf dist",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:config": "tsx src/config/configManager.ts",
-    "validate:config": "tsx scripts/validate-config.ts"
+    "validate:config": "tsx scripts/validate-config.ts",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start:dev": "pm2 start ecosystem.config.js --env development",
+    "pm2:start:prod": "pm2 start ecosystem.config.js --env production",
+    "pm2:stop": "pm2 stop follow-bot",
+    "pm2:restart": "pm2 restart follow-bot",
+    "pm2:reload": "pm2 reload follow-bot",
+    "pm2:delete": "pm2 delete follow-bot",
+    "pm2:status": "pm2 status",
+    "pm2:logs": "pm2 logs follow-bot",
+    "pm2:logs:follow": "pm2 logs follow-bot --follow",
+    "pm2:monit": "pm2 monit"
   },
   "keywords": [
     "gala",
