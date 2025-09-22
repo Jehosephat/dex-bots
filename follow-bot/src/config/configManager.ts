@@ -33,6 +33,7 @@ export interface GlobalSettings {
   cooldownMinutes: number;
   slippageTolerance: number;
   maxDailyTrades: number;
+  galaMinimumThreshold: number;
   websocketReconnectDelay: number;
   websocketMaxRetries: number;
 }
@@ -59,6 +60,7 @@ export interface EnvironmentConfig {
   enableAutoTrading: boolean;
   minTradeAmount: number;
   maxDailyTrades: number;
+  galaMinimumThreshold: number;
   
   // WebSocket Configuration
   websocketReconnectDelay: number;
@@ -180,6 +182,7 @@ export class ConfigurationManager {
       enableAutoTrading: process.env['ENABLE_AUTO_TRADING'] === 'true' || globalSettings.enableAutoTrading === true,
       minTradeAmount: this.parseNumber(process.env['MIN_TRADE_AMOUNT'], 10),
       maxDailyTrades: this.parseNumber(process.env['MAX_DAILY_TRADES'], globalSettings.maxDailyTrades || 50),
+      galaMinimumThreshold: this.parseNumber(process.env['GALA_MINIMUM_THRESHOLD'], globalSettings.galaMinimumThreshold || 50),
       
       // WebSocket Configuration
       websocketReconnectDelay: this.parseNumber(process.env['WEBSOCKET_RECONNECT_DELAY'], 5000),

@@ -323,6 +323,24 @@ export class TradeAnalyzer extends EventEmitter {
         errors.push('Invalid input amount');
         logger.debug(`❌ Invalid amountIn: ${activity.transaction.amountIn}`);
       }
+      
+      // Check GALA minimum threshold (configurable minimum for any swap involving GALA)
+      const envConfig = this.configManager.getEnvironmentConfig();
+      const galaMinimum = envConfig.galaMinimumThreshold || 50;
+      const tokenIn = activity.transaction.tokenIn;
+      const tokenOut = activity.transaction.tokenOut;
+      const amountIn = parseFloat(activity.transaction.amountIn);
+      const amountOut = parseFloat(activity.transaction.amountOut);
+      
+      if (tokenIn === 'GALA' && amountIn < galaMinimum) {
+        errors.push(`GALA input amount (${amountIn}) below minimum threshold (${galaMinimum})`);
+        logger.debug(`❌ GALA amount too small: ${amountIn} < ${galaMinimum}`);
+      }
+      
+      if (tokenOut === 'GALA' && amountOut < galaMinimum) {
+        errors.push(`GALA output amount (${amountOut}) below minimum threshold (${galaMinimum})`);
+        logger.debug(`❌ GALA amount too small: ${amountOut} < ${galaMinimum}`);
+      }
     }
     
     // Check market conditions

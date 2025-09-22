@@ -55,6 +55,7 @@ A sophisticated trading bot that monitors target wallets on GalaChain and automa
 | `TARGET_WALLETS` | Comma-separated list of target wallets | ✅ | - |
 | `ENABLE_AUTO_TRADING` | Enable automatic trade execution | ❌ | `false` |
 | `COPY_MODE` | Trading mode: `exact` or `proportional` | ❌ | `proportional` |
+| `GALA_MINIMUM_THRESHOLD` | Minimum GALA amount for swaps involving GALA | ❌ | `500` |
 | `MAX_POSITION_SIZE` | Maximum position size (0.0-1.0) | ❌ | `0.1` |
 | `EXECUTION_DELAY` | Delay before execution (seconds) | ❌ | `30` |
 | `COOLDOWN_MINUTES` | Cooldown between trades (minutes) | ❌ | `5` |
@@ -84,7 +85,8 @@ A sophisticated trading bot that monitors target wallets on GalaChain and automa
     "cooldownMinutes": 5,
     "slippageTolerance": 0.05,
     "enableAutoTrading": true,
-    "maxDailyTrades": 50
+    "maxDailyTrades": 50,
+    "galaMinimumThreshold": 50
   }
 }
 ```
@@ -218,6 +220,7 @@ The bot includes sophisticated risk management:
 - **Whitelist**: Only trade whitelisted tokens (default: GALA, GWETH, GUSDC)
 - **Blacklist**: Never trade blacklisted tokens
 - **Liquidity Checks**: Ensures sufficient liquidity before trading
+- **GALA Minimum Threshold**: Filters out small GALA trades (default: 50 GALA minimum)
 
 ## 📊 Monitoring and Analytics
 
@@ -266,6 +269,11 @@ The bot includes sophisticated risk management:
 - Consider increasing `slippageTolerance` in config.json
 - Review the actual vs expected slippage in logs
 - Example: `Actual: 8.5%, Max: 5.0%` - increase max to 10%
+
+#### "GALA amount below minimum threshold"
+- Check if the trade involves GALA and the amount is below the threshold
+- Adjust `galaMinimumThreshold` in config.json if needed
+- Example: `GALA input amount (25) below minimum threshold (50)` - increase threshold or accept smaller trades
 
 #### WebSocket disconnections
 - Check network connectivity

@@ -336,6 +336,18 @@ export class TransactionMonitor extends EventEmitter {
           zeroForOne: zeroForOne
         });
         
+        // Log all available fields in the dto to understand the structure
+        logger.info('🔍 Available dto fields:', Object.keys(dto));
+        logger.info('🔍 dto field values:', {
+          amount: dto.amount,
+          amountInMaximum: dto.amountInMaximum,
+          amountOutMinimum: dto.amountOutMinimum,
+          amount0: dto.amount0,
+          amount1: dto.amount1,
+          amount0Desired: dto.amount0Desired,
+          amount1Desired: dto.amount1Desired
+        });
+        
         // Try to extract from chaincodeResponse payload first
         try {
           const chaincodeResponse = transaction.chaincodeResponse;
@@ -378,11 +390,36 @@ export class TransactionMonitor extends EventEmitter {
             amountIn = Math.abs(parseFloat(dto.amountInMaximum || '0')).toString();
             amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
           } else {
-            // Selling token1 (GUSDC) for token0 (GALA)
-            // amountIn should be the amount of GUSDC being sold (amountInMaximum)
+            // Selling token1 (GOSMI) for token0 (GALA)
+            // amountIn should be the amount of GOSMI being sold (amountInMaximum)
             // amountOut should be the amount of GALA expected (amountOutMinimum, but positive)
             amountIn = Math.abs(parseFloat(dto.amountInMaximum || '0')).toString();
             amountOut = Math.abs(parseFloat(dto.amountOutMinimum || '0')).toString();
+          }
+        }
+        
+        // If amountIn is still 0, try alternative parsing methods
+        if (amountIn === '0') {
+          logger.info('🔍 amountIn is still 0, trying alternative parsing');
+          
+          // Check if we can derive amountIn from other fields
+          if (dto.amount && dto.amount !== '0') {
+            // Sometimes amount represents the output amount
+            if (zeroForOne) {
+              // If selling GALA for GUSDC, amount might be the GUSDC amount
+              amountOut = Math.abs(parseFloat(dto.amount)).toString();
+            } else {
+              // If selling GOSMI for GALA, amount might be the GALA amount
+              amountOut = Math.abs(parseFloat(dto.amount)).toString();
+            }
+          }
+          
+          // If we still don't have amountIn, we need to look elsewhere
+          // This might require checking transaction logs or other sources
+          if (amountIn === '0') {
+            logger.warn('⚠️ Could not determine amountIn from transaction data');
+            // For now, we'll skip this transaction as we can't determine the input amount
+            return;
           }
         }
         
