@@ -1,0 +1,532 @@
+{
+    "blockNumber": "8664304",
+    "channelName": "asset-channel",
+    "configtxs": [],
+    "createdAt": "2025-09-20T19:45:29.048Z",
+    "header": {
+        "number": "8664304",
+        "previous_hash": "d37e7cc676ccd8d2aed3ba090c8d15257475a4cb7bb0d2eb729052cad13600cf",
+        "data_hash": "d92d58cf5aabb41cf66e8288995023eff1ba651c533d9d8404fedfe9d4db754b"
+    },
+    "isConfigurationBlock": false,
+    "transactions": [
+        {
+            "logger": {
+                "context": "ChainBlockTransaction",
+                "options": {}
+            },
+            "actions": [
+                {
+                    "args": [
+                        "DexV3Contract:BatchSubmit",
+                        "{\"operations\":[{\"dto\":{\"fee\":10000,\"token0\":{\"type\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"additionalKey\":\"none\"},\"token1\":{\"type\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"additionalKey\":\"none\"},\"signature\":\"13da81bc587aee81ced5254c0da2ff2ff499bf53f852b108c4fd7ede4cfd9e9e3426f06d59fe5d42c62c4c87c37eb19db90dcf9b91b76f18b4e7f07eab1acfe91b\",\"tickLower\":-44800,\"tickUpper\":-36400,\"uniqueKey\":\"galaswap - operation - 41efdcb0-8eea-469e-a0b3-2449f90d40e4\",\"amount0Min\":\"6880.3488170225306329009805\",\"amount1Min\":\"120.5363320175592586789475\",\"positionId\":\"\",\"amount0Desired\":\"8094.52802002650662694233\",\"amount1Desired\":\"141.80744943242265726935\"},\"method\":\"AddLiquidity\",\"uniqueId\":\"6c743c48-16b9-4667-b330-9166fa997a1e\"}],\"uniqueKey\":\"97e47382-b9a0-469a-bc62-f9c718f795c3\",\"signature\":\"d8698930bd4190d7568b4f52024271380d8ff69a291a527c3f0e75079e3d3b655c6930523a6c06be497e8d15acad1bcadd60cf317f9822d0ba7dd57bb33b91821b\",\"trace\":{\"traceId\":\"1525262149523766886\",\"spanId\":\"1701168643481178565\"}}"
+                    ],
+                    "chaincode": {
+                        "name": "basic-asset",
+                        "version": "50527314"
+                    },
+                    "chaincodeResponse": {
+                        "status": 200,
+                        "message": "",
+                        "payload": "{\"Data\":[{\"Data\":{\"amounts\":[\"7411.73484116\",\"141.80745\"],\"poolAlias\":\"service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"poolFee\":10000,\"poolHash\":\"cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"positionId\":\"235e8e131d0459c010aba186963d9201e152da2138f6ce4dc7950dada0605a62\",\"userAddress\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"userBalanceDelta\":{\"token0Balance\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"4546.77313538\",\"type\":\"none\"},\"token1Balance\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"2.945072\",\"type\":\"none\"}}},\"Status\":1}],\"Status\":1}"
+                    },
+                    "endorserMsps": [
+                        "CuratorOrg"
+                    ],
+                    "reads": [
+                        {
+                            "key": "namespaces/fields/basic-asset/Sequence"
+                        },
+                        {
+                            "key": "/GCBSA/"
+                        },
+                        {
+                            "key": "/GCDXCHLPL/GALA$Unit$none$none/GUSDT$Unit$none$none/10000/"
+                        },
+                        {
+                            "key": "/GCDXCHLTDA/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/-36400/"
+                        },
+                        {
+                            "key": "/GCDXCHLTDA/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/-44800/"
+                        },
+                        {
+                            "key": "/GCDXCLPOR/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/"
+                        },
+                        {
+                            "key": "/GCFE/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/"
+                        },
+                        {
+                            "key": "/GCFP/galachain/"
+                        },
+                        {
+                            "key": "/GCFS/AddLiquidity/"
+                        },
+                        {
+                            "key": "/GCFTU/AddLiquidity/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/"
+                        },
+                        {
+                            "key": "/GCTB/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GUSDT/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTB/service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/GUSDT/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTBR/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GALA/Unit/none/none/0/1758397529048/"
+                        },
+                        {
+                            "key": "/GCTI/GALA/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTI/GUSDT/Unit/none/none/"
+                        },
+                        {
+                            "key": "/GCTI2/GALA/Unit/none/none/0/"
+                        },
+                        {
+                            "key": "/GCTI2/GUSDT/Unit/none/none/0/"
+                        },
+                        {
+                            "key": "/GCUP/2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/"
+                        },
+                        {
+                            "key": "/GCUP/9D985c2F9E17C0b3E66d8bD71639F052E7cC2397/"
+                        },
+                        {
+                            "key": "/UNTX/97e47382-b9a0-469a-bc62-f9c718f795c3/"
+                        },
+                        {
+                            "key": "/UNTX/galaswap - operation - 41efdcb0-8eea-469e-a0b3-2449f90d40e4/"
+                        },
+                        {
+                            "key": "GCTBRC/GALA/Unit/none/none/0141911998241602470952/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/0/15921362590.39358474"
+                        },
+                        {
+                            "key": "/GCFD/AddLiquidity/0/"
+                        },
+                        {
+                            "key": "/GCFD/AddLiquidity/1000000/"
+                        }
+                    ],
+                    "writes": [
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCHLPDA/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/-36400/-44800/235e8e131d0459c010aba186963d9201e152da2138f6ce4dc7950dada0605a62/",
+                            "value": "{\"fee\":10000,\"feeGrowthInside0Last\":\"0\",\"feeGrowthInside1Last\":\"0\",\"liquidity\":\"5418.557446244279737869\",\"poolHash\":\"cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"positionId\":\"235e8e131d0459c010aba186963d9201e152da2138f6ce4dc7950dada0605a62\",\"tickLower\":-44800,\"tickUpper\":-36400,\"token0ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"type\":\"none\"},\"token1ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"type\":\"none\"},\"tokensOwed0\":\"0\",\"tokensOwed1\":\"0\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCHLPL/GALA$Unit$none$none/GUSDT$Unit$none$none/10000/",
+                            "value": "{\"bitmap\":{\"-1\":\"21992158430473412935680\",\"-18\":\"23945242826029513411849172299223580994042798784118784\",\"17\":\"4835703278458516698824704\"},\"fee\":10000,\"feeGrowthGlobal0\":\"0.06253033803132391236\",\"feeGrowthGlobal1\":\"0.00108596541568747442\",\"grossPoolLiquidity\":\"348292392213.692621614518663232\",\"liquidity\":\"70128743.06456875139569650562\",\"maxLiquidityPerTick\":\"38347248999678653400142060922857318.01636519561716576269\",\"protocolFees\":0.1,\"protocolFeesToken0\":\"47534.1016670629847871990361681284899\",\"protocolFeesToken1\":\"1009.47815692723899410625625585592162790053270138682234\",\"sqrtPrice\":\"0.13264112909462040936\",\"tickSpacing\":200,\"token0\":\"GALA$Unit$none$none\",\"token0ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"type\":\"none\"},\"token1\":\"GUSDT$Unit$none$none\",\"token1ClassKey\":{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"type\":\"none\"}}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCHLTDA/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/-36400/",
+                            "value": "{\"feeGrowthOutside0\":\"0\",\"feeGrowthOutside1\":\"0\",\"initialised\":true,\"liquidityGross\":\"5418.557446244279737869\",\"liquidityNet\":\"-5418.557446244279737869\",\"poolHash\":\"cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"tick\":-36400}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCHLTDA/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/-44800/",
+                            "value": "{\"feeGrowthOutside0\":\"0.06253033803132391236\",\"feeGrowthOutside1\":\"0.00108596541568747442\",\"initialised\":true,\"liquidityGross\":\"5418.557446244279737869\",\"liquidityNet\":\"5418.557446244279737869\",\"poolHash\":\"cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"tick\":-44800}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCDXCLPOR/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/",
+                            "value": "{\"owner\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"poolHash\":\"cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"tickRangeMap\":{\"-44800:-36400\":[\"235e8e131d0459c010aba186963d9201e152da2138f6ce4dc7950dada0605a62\"]}}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCFR/2025/09/20/AddLiquidity/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b|0/",
+                            "value": "{\"day\":\"20\",\"feeCode\":\"AddLiquidity\",\"month\":\"09\",\"paidByUser\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"1\",\"status\":2,\"txId\":\"f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b|0\",\"year\":\"2025\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCFTU/AddLiquidity/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/",
+                            "value": "{\"cumulativeFeeQuantity\":\"1\",\"cumulativeUses\":\"1\",\"feeCode\":\"AddLiquidity\",\"user\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GALA/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"4546.77313538\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GUSDT/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"2.945072\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/GALA/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GALA\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"quantity\":\"66161201.36060625\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742/GUSDT/Unit/none/none/",
+                            "value": "{\"additionalKey\":\"none\",\"category\":\"Unit\",\"collection\":\"GUSDT\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"service|pool_cc93185e6902353cc0e912099790826089d3e3cba8e1e5aa3d5eba9d0c31d742\",\"quantity\":\"513371.565983\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTBR/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/GALA/Unit/none/none/0/1758397529048/",
+                            "value": "{\"additionalKey\":\"none\",\"burnedBy\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"category\":\"Unit\",\"collection\":\"GALA\",\"created\":1758397529048,\"instance\":\"0\",\"quantity\":\"1\",\"type\":\"none\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCUR/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/2025/09/20/f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b|0/",
+                            "value": "{\"day\":\"20\",\"feeCode\":\"AddLiquidity\",\"month\":\"09\",\"paidByUser\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"quantity\":\"1\",\"status\":2,\"txId\":\"f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b|0\",\"year\":\"2025\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/UNTX/97e47382-b9a0-469a-bc62-f9c718f795c3/",
+                            "value": "{\"created\":1758397529048,\"transactionId\":\"f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b\",\"uniqueKey\":\"97e47382-b9a0-469a-bc62-f9c718f795c3\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/UNTX/galaswap - operation - 41efdcb0-8eea-469e-a0b3-2449f90d40e4/",
+                            "value": "{\"created\":1758397529048,\"transactionId\":\"f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b|0\",\"uniqueKey\":\"galaswap - operation - 41efdcb0-8eea-469e-a0b3-2449f90d40e4\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTBRC/GALA/Unit/none/none/0141911998241602470952/eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f/0/15921362590.39358474",
+                            "value": "{\"additionalKey\":\"none\",\"burnedBy\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f\",\"category\":\"Unit\",\"collection\":\"GALA\",\"created\":1758397529048,\"epoch\":\"0000000000000000000NaN\",\"instance\":\"0\",\"quantity\":\"1\",\"referenceId\":\"eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f$GALA$Unit$none$none$eth|2f7c7e2D248d8784fC186A5Cd2d5aD0e4E6dAE1f$1758397529048\",\"timeKey\":\"0141911998241602470952\",\"totalKnownBurnsCount\":\"15921362590.39358474\",\"type\":\"none\"}"
+                        }
+                    ]
+                }
+            ],
+            "creator": {
+                "mspId": "GalaUsersOrg",
+                "name": "Client|galausers"
+            },
+            "id": "f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b",
+            "type": "ENDORSER_TRANSACTION",
+            "validationCode": {
+                "transactionId": "f84dab0fa82a8ddbc15f0ec8ee3fa0e4b0db7cb5ed3438fc4395f65fe12f415b",
+                "validationCode": 0,
+                "validationEnum": "VALID"
+            }
+        },
+        {
+            "logger": {
+                "context": "ChainBlockTransaction",
+                "options": {}
+            },
+            "actions": [
+                {
+                    "args": [
+                        "GalaChainToken:BatchBridgeTokenIn",
+                        "{\"bridgeInDtos\":[{\"emitter\":\"0x0000000000000000000000009f452b7cc24e6e6fa690fe77cf5dd2ba3dbf1ed9\",\"chainId\":2,\"sequence\":\"97275\",\"nonce\":\"0x00000000000000000000000000000000000000000000000068cfa27000017bfb\",\"payload\":\"0x01000100001f636c69656e747c3631653034313030373833336437356237343436303963350400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000002c546f776e5374617224536b696e244d6972616e6475734661726d486f757365536b696e24556e636f6d6d6f6e00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000002c546f776e5374617224536b696e244d6972616e6475735061766564526f6164536b696e24556e636f6d6d6f6e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000029546f776e5374617224536b696e244d6972616e64757342616b657279536b696e24556e636f6d6d6f6e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000002f546f776e5374617224536b696e244d6972616e647573457870726573734465706f74536b696e24556e636f6d6d6f6e\",\"signatures\":[{\"v\":27,\"r\":\"0xb2137f9ec6245aaa5a43a80c33513a8455ad709b2a97ac2518be6479f3ed938f\",\"s\":\"0x4936be868551312168006c79a697f2f0f055f15f3f3462138b26ed01b09516d5\",\"index\":0}]}],\"uniqueKey\":\"1758397530170\",\"signature\":\"3cbgOSCQanJFLYyh13FgV+1dSAD1KHxO1MuzLyC8lok8wZvLTXLDXiDBqd0qHFZ8owVb+VlrwtLuVGSlh6lTthw=\",\"trace\":{\"traceId\":\"8636878290990490447\",\"spanId\":\"421653170908274292\"}}"
+                    ],
+                    "chaincode": {
+                        "name": "basic-asset",
+                        "version": "50527314"
+                    },
+                    "chaincodeResponse": {
+                        "status": 200,
+                        "message": "",
+                        "payload": "{\"Status\":1}"
+                    },
+                    "endorserMsps": [
+                        "CuratorOrg"
+                    ],
+                    "reads": [
+                        {
+                            "key": "namespaces/fields/basic-asset/Sequence"
+                        },
+                        {
+                            "key": "/GCFE/client|bridge-admin/"
+                        },
+                        {
+                            "key": "/GCFTU/BatchBridgeTokenIn/client|bridge-admin/"
+                        },
+                        {
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusBakerySkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusBakerySkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTI/TownStar/Skin/MirandusBakerySkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTI/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTI/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTI/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/"
+                        },
+                        {
+                            "key": "/GCTX/EthereumBridge/TownStar$Skin$MirandusBakerySkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTX/EthereumBridge/TownStar$Skin$MirandusExpressDepotSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTX/EthereumBridge/TownStar$Skin$MirandusFarmHouseSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTX/EthereumBridge/TownStar$Skin$MirandusPavedRoadSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTXM/2/TownStar$Skin$MirandusBakerySkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTXM/2/TownStar$Skin$MirandusExpressDepotSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTXM/2/TownStar$Skin$MirandusFarmHouseSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTXM/2/TownStar$Skin$MirandusPavedRoadSkin$Uncommon/"
+                        },
+                        {
+                            "key": "/GCTX|nonce/0x00000000000000000000000000000000000000000000000068cfa27000017bfb/"
+                        },
+                        {
+                            "key": "/GCUP/14F1548AaBa1f0586c1402f1640eD8Ca0162C4AF/"
+                        },
+                        {
+                            "key": "/GCVS/"
+                        },
+                        {
+                            "key": "/UNTX/1758397530170/"
+                        },
+                        {
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/0/4/client|ops-admin/1675093394775/"
+                        },
+                        {
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/0/4/client|ops-admin/1675093661974/"
+                        },
+                        {
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusBakerySkin/Uncommon/0/4/client|ops-admin/1675093493133/"
+                        },
+                        {
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/0/4/client|ops-admin/1675093638408/"
+                        }
+                    ],
+                    "writes": [
+                        {
+                            "isDelete": false,
+                            "key": "/GCFTU/BatchBridgeTokenIn/client|bridge-admin/",
+                            "value": "{\"cumulativeFeeQuantity\":\"0\",\"cumulativeUses\":\"24862\",\"feeCode\":\"BatchBridgeTokenIn\",\"user\":\"client|bridge-admin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusBakerySkin/Uncommon/0/4/client|ops-admin/1675093493133/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"allowanceType\":4,\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1675093493133,\"expires\":0,\"grantedBy\":\"client|ops-admin\",\"grantedTo\":\"EthereumBridge\",\"instance\":\"0\",\"quantity\":\"2569\",\"quantitySpent\":\"118\",\"type\":\"MirandusBakerySkin\",\"uses\":\"9007199254740991\",\"usesSpent\":\"58\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/0/4/client|ops-admin/1675093638408/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"allowanceType\":4,\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1675093638408,\"expires\":0,\"grantedBy\":\"client|ops-admin\",\"grantedTo\":\"EthereumBridge\",\"instance\":\"0\",\"quantity\":\"2569\",\"quantitySpent\":\"110\",\"type\":\"MirandusExpressDepotSkin\",\"uses\":\"9007199254740991\",\"usesSpent\":\"58\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/0/4/client|ops-admin/1675093394775/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"allowanceType\":4,\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1675093394775,\"expires\":0,\"grantedBy\":\"client|ops-admin\",\"grantedTo\":\"EthereumBridge\",\"instance\":\"0\",\"quantity\":\"2557\",\"quantitySpent\":\"173\",\"type\":\"MirandusFarmHouseSkin\",\"uses\":\"9007199254740991\",\"usesSpent\":\"63\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTA/EthereumBridge/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/0/4/client|ops-admin/1675093661974/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"allowanceType\":4,\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1675093661974,\"expires\":0,\"grantedBy\":\"client|ops-admin\",\"grantedTo\":\"EthereumBridge\",\"instance\":\"0\",\"quantity\":\"2506\",\"quantitySpent\":\"458\",\"type\":\"MirandusPavedRoadSkin\",\"uses\":\"9007199254740991\",\"usesSpent\":\"78\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusBakerySkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"EthereumBridge\",\"quantity\":\"0\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"EthereumBridge\",\"quantity\":\"0\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"EthereumBridge\",\"quantity\":\"0\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/EthereumBridge/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[],\"lockedHolds\":[],\"owner\":\"EthereumBridge\",\"quantity\":\"0\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusBakerySkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[\"123\",\"124\",\"125\"],\"lockedHolds\":[],\"owner\":\"client|61e041007833d75b744609c5\",\"quantity\":\"3\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[\"112\"],\"lockedHolds\":[],\"owner\":\"client|61e041007833d75b744609c5\",\"quantity\":\"1\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[\"182\",\"183\"],\"lockedHolds\":[],\"owner\":\"client|61e041007833d75b744609c5\",\"quantity\":\"2\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTB/client|61e041007833d75b744609c5/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"inUseHolds\":[],\"instanceIds\":[\"459\",\"461\",\"462\",\"463\"],\"lockedHolds\":[],\"owner\":\"client|61e041007833d75b744609c5\",\"quantity\":\"4\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTC/EthereumBridge/TownStar/Skin/MirandusBakerySkin/Uncommon/0/4/client|ops-admin/1675093493133/58/",
+                            "value": "{\"action\":4,\"additionalKey\":\"Uncommon\",\"allowanceCreated\":1675093493133,\"category\":\"Skin\",\"claimSequence\":\"58\",\"collection\":\"TownStar\",\"created\":1758397530258,\"instance\":\"0\",\"issuerKey\":\"client|ops-admin\",\"ownerKey\":\"EthereumBridge\",\"quantity\":\"1\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTC/EthereumBridge/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/0/4/client|ops-admin/1675093638408/58/",
+                            "value": "{\"action\":4,\"additionalKey\":\"Uncommon\",\"allowanceCreated\":1675093638408,\"category\":\"Skin\",\"claimSequence\":\"58\",\"collection\":\"TownStar\",\"created\":1758397530258,\"instance\":\"0\",\"issuerKey\":\"client|ops-admin\",\"ownerKey\":\"EthereumBridge\",\"quantity\":\"1\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTC/EthereumBridge/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/0/4/client|ops-admin/1675093394775/63/",
+                            "value": "{\"action\":4,\"additionalKey\":\"Uncommon\",\"allowanceCreated\":1675093394775,\"category\":\"Skin\",\"claimSequence\":\"63\",\"collection\":\"TownStar\",\"created\":1758397530258,\"instance\":\"0\",\"issuerKey\":\"client|ops-admin\",\"ownerKey\":\"EthereumBridge\",\"quantity\":\"1\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTC/EthereumBridge/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/0/4/client|ops-admin/1675093661974/78/",
+                            "value": "{\"action\":4,\"additionalKey\":\"Uncommon\",\"allowanceCreated\":1675093661974,\"category\":\"Skin\",\"claimSequence\":\"78\",\"collection\":\"TownStar\",\"created\":1758397530258,\"instance\":\"0\",\"issuerKey\":\"client|ops-admin\",\"ownerKey\":\"EthereumBridge\",\"quantity\":\"3\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI/TownStar/Skin/MirandusBakerySkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"authorities\":[\"client|ops-admin\"],\"category\":\"Skin\",\"collection\":\"TownStar\",\"decimals\":0,\"description\":\"Changes the look of your Bakery to be Mirandus themed!\",\"image\":\"https://tokens.gala.games/images/sandbox-games/town-star/skins/mirandus-bakery-skin.png\",\"isNonFungible\":true,\"maxCapacity\":\"Infinity\",\"maxSupply\":\"2569\",\"name\":\"TownStarSkinMirandusBakerySkinUncommon\",\"network\":\"GC\",\"symbol\":\"TownStarSkinMirandus\",\"totalBurned\":\"0\",\"totalMintAllowance\":\"0\",\"totalSupply\":\"125\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"authorities\":[\"client|ops-admin\"],\"category\":\"Skin\",\"collection\":\"TownStar\",\"decimals\":0,\"description\":\"Changes the look of your Express Depot to be Mirandus themed!\",\"image\":\"https://tokens.gala.games/images/sandbox-games/town-star/skins/mirandus-express-depot-skin.png\",\"isNonFungible\":true,\"maxCapacity\":\"Infinity\",\"maxSupply\":\"2569\",\"name\":\"TownStarSkinMirandusExpressDepotSkinUncommon\",\"network\":\"GC\",\"symbol\":\"TownStarSkinMirandus\",\"totalBurned\":\"0\",\"totalMintAllowance\":\"0\",\"totalSupply\":\"112\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"authorities\":[\"client|ops-admin\"],\"category\":\"Skin\",\"collection\":\"TownStar\",\"decimals\":0,\"description\":\"Changes the look of your Farm House to be Mirandus themed!\",\"image\":\"https://tokens.gala.games/images/sandbox-games/town-star/skins/mirandus-farm-house-skin.png\",\"isNonFungible\":true,\"maxCapacity\":\"Infinity\",\"maxSupply\":\"2557\",\"name\":\"TownStarSkinMirandusFarmHouseSkinUncommon\",\"network\":\"GC\",\"symbol\":\"TownStarSkinMirandus\",\"totalBurned\":\"0\",\"totalMintAllowance\":\"0\",\"totalSupply\":\"183\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"authorities\":[\"client|ops-admin\"],\"category\":\"Skin\",\"collection\":\"TownStar\",\"decimals\":0,\"description\":\"Changes the look of your Paved Roads to be Mirandus themed!\",\"image\":\"https://tokens.gala.games/images/sandbox-games/town-star/storage/mirandus-paved-road-skin.png\",\"isNonFungible\":true,\"maxCapacity\":\"Infinity\",\"maxSupply\":\"2506\",\"name\":\"TownStarSkinMirandusPavedRoadSkinUncommon\",\"network\":\"GC\",\"symbol\":\"TownStarSkinMirandus\",\"totalBurned\":\"0\",\"totalMintAllowance\":\"0\",\"totalSupply\":\"463\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusBakerySkin/Uncommon/125/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"125\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/112/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"112\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/183/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"183\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/461/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"461\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/462/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"462\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTI2/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/463/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"instance\":\"463\",\"isNonFungible\":true,\"owner\":\"client|61e041007833d75b744609c5\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTMF/TownStar/Skin/MirandusBakerySkin/Uncommon/EthereumBridge/1758397530258/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"id\":\"TownStar$Skin$MirandusBakerySkin$Uncommon$124$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestCreated\":1758397530258,\"requestor\":\"EthereumBridge\",\"state\":1,\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTMF/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/EthereumBridge/1758397530258/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"id\":\"TownStar$Skin$MirandusExpressDepotSkin$Uncommon$111$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestCreated\":1758397530258,\"requestor\":\"EthereumBridge\",\"state\":1,\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTMF/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/EthereumBridge/1758397530258/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"id\":\"TownStar$Skin$MirandusFarmHouseSkin$Uncommon$182$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestCreated\":1758397530258,\"requestor\":\"EthereumBridge\",\"state\":1,\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTMF/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/EthereumBridge/1758397530258/",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"id\":\"TownStar$Skin$MirandusPavedRoadSkin$Uncommon$460$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"3\",\"requestCreated\":1758397530258,\"requestor\":\"EthereumBridge\",\"state\":1,\"type\":\"MirandusPavedRoadSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/GCTX|nonce/0x00000000000000000000000000000000000000000000000068cfa27000017bfb/",
+                            "value": "84f38d87d43ac4369c5c3a36d1a887c89b5626fc659d3ceca4582d269dc2ad9d"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "/UNTX/1758397530170/",
+                            "value": "{\"created\":1758397530258,\"transactionId\":\"84f38d87d43ac4369c5c3a36d1a887c89b5626fc659d3ceca4582d269dc2ad9d\",\"uniqueKey\":\"1758397530170\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTMR/TownStar/Skin/MirandusBakerySkin/Uncommon/0141911998241602469742/EthereumBridge",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"epoch\":\"0000000000000000000NaN\",\"id\":\"TownStar$Skin$MirandusBakerySkin$Uncommon$124$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestor\":\"EthereumBridge\",\"state\":0,\"timeKey\":\"0141911998241602469742\",\"totalKnownMintsCount\":\"124\",\"type\":\"MirandusBakerySkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTMR/TownStar/Skin/MirandusExpressDepotSkin/Uncommon/0141911998241602469742/EthereumBridge",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"epoch\":\"0000000000000000000NaN\",\"id\":\"TownStar$Skin$MirandusExpressDepotSkin$Uncommon$111$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestor\":\"EthereumBridge\",\"state\":0,\"timeKey\":\"0141911998241602469742\",\"totalKnownMintsCount\":\"111\",\"type\":\"MirandusExpressDepotSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTMR/TownStar/Skin/MirandusFarmHouseSkin/Uncommon/0141911998241602469742/EthereumBridge",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"epoch\":\"0000000000000000000NaN\",\"id\":\"TownStar$Skin$MirandusFarmHouseSkin$Uncommon$182$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"1\",\"requestor\":\"EthereumBridge\",\"state\":0,\"timeKey\":\"0141911998241602469742\",\"totalKnownMintsCount\":\"182\",\"type\":\"MirandusFarmHouseSkin\"}"
+                        },
+                        {
+                            "isDelete": false,
+                            "key": "GCTMR/TownStar/Skin/MirandusPavedRoadSkin/Uncommon/0141911998241602469742/EthereumBridge",
+                            "value": "{\"additionalKey\":\"Uncommon\",\"category\":\"Skin\",\"collection\":\"TownStar\",\"created\":1758397530258,\"epoch\":\"0000000000000000000NaN\",\"id\":\"TownStar$Skin$MirandusPavedRoadSkin$Uncommon$460$EthereumBridge$EthereumBridge$1758397530258\",\"owner\":\"EthereumBridge\",\"quantity\":\"3\",\"requestor\":\"EthereumBridge\",\"state\":0,\"timeKey\":\"0141911998241602469742\",\"totalKnownMintsCount\":\"460\",\"type\":\"MirandusPavedRoadSkin\"}"
+                        }
+                    ]
+                }
+            ],
+            "creator": {
+                "mspId": "CuratorOrg",
+                "name": "Client|bridge"
+            },
+            "id": "84f38d87d43ac4369c5c3a36d1a887c89b5626fc659d3ceca4582d269dc2ad9d",
+            "type": "ENDORSER_TRANSACTION",
+            "validationCode": {
+                "transactionId": "84f38d87d43ac4369c5c3a36d1a887c89b5626fc659d3ceca4582d269dc2ad9d",
+                "validationCode": 0,
+                "validationEnum": "VALID"
+            }
+        }
+    ]
+}

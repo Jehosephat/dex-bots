@@ -16,6 +16,7 @@ import { HealthCheckSystem } from './utils/healthCheck';
 import { WebSocketManager } from './websocket/websocketManager';
 import { WalletMonitor } from './monitoring/walletMonitor';
 import { TradeAnalyzer } from './analysis/tradeAnalyzer';
+import { PositionTracker } from './positions/positionTracker';
 import { logger } from './utils/logger';
 
 // Load environment variables
@@ -63,6 +64,11 @@ async function initializeBot(): Promise<void> {
     logger.info('🔍 Initializing trade analyzer...');
     const tradeAnalyzer = TradeAnalyzer.getInstance();
     await tradeAnalyzer.initialize();
+    
+    // Initialize position tracker
+    logger.info('📊 Initializing position tracker...');
+    const positionTracker = PositionTracker.getInstance();
+    await positionTracker.initialize();
     
     // Get configurations
     const envConfig = configManager.getEnvironmentConfig();
@@ -134,10 +140,17 @@ async function initializeBot(): Promise<void> {
       logger.info(`   Action: ${analysis.recommendedAction.action}`);
     });
     
-    tradeAnalyzer.on('tradeApproved', (analysis) => {
+    tradeAnalyzer.on('tradeApproved', async (analysis) => {
       logger.info(`✅ Trade approved for execution: ${analysis.id}`);
       logger.info(`   Trade: ${analysis.calculatedTrade.amountIn} ${analysis.calculatedTrade.tokenIn} → ${analysis.calculatedTrade.amountOut} ${analysis.calculatedTrade.tokenOut}`);
       logger.info(`   Copy Mode: ${analysis.calculatedTrade.copyMode}`);
+      
+      // Create position from approved trade
+      const position = await positionTracker.createPositionFromTrade(analysis);
+      if (position) {
+        logger.info(`📊 Position created for approved trade: ${position.id}`);
+      }
+      
       // TODO: Send to trade execution engine
     });
     
@@ -146,6 +159,37 @@ async function initializeBot(): Promise<void> {
       logger.warn(`   Reason: ${analysis.rejectionReason || 'Unknown'}`);
       logger.warn(`   Risk Score: ${analysis.riskScore.toFixed(2)}`);
       // TODO: Log rejection for analysis
+    });
+    
+    // Setup position tracker event handlers
+    positionTracker.on('positionCreated', (position) => {
+      logger.info(`📊 Position created: ${position.id}`);
+      logger.info(`   Pool: ${position.token0}/${position.token1}`);
+      logger.info(`   Liquidity: ${position.liquidity}`);
+      logger.info(`   Ticks: ${position.tickLower} to ${position.tickUpper}`);
+      logger.info(`   Original Wallet: ${position.originalWallet}`);
+    });
+    
+    positionTracker.on('positionUpdated', (position) => {
+      logger.info(`📊 Position updated: ${position.id}`);
+      logger.info(`   Status: ${position.status}`);
+      logger.info(`   Liquidity: ${position.liquidity}`);
+      logger.info(`   Return: ${position.performance.returnPercentage.toFixed(2)}%`);
+    });
+    
+    positionTracker.on('positionClosed', (position) => {
+      logger.info(`📊 Position closed: ${position.id}`);
+      logger.info(`   Final Return: ${position.performance.returnPercentage.toFixed(2)}%`);
+      logger.info(`   Total Fees Earned: ${position.performance.totalFeesEarned.toFixed(2)}`);
+      logger.info(`   Duration: ${(position.performance.duration / (1000 * 60 * 60 * 24)).toFixed(1)} days`);
+    });
+    
+    positionTracker.on('positionAlert', (alert) => {
+      logger.warn(`🚨 Position Alert [${alert.severity.toUpperCase()}]: ${alert.message}`);
+      logger.warn(`   Position: ${alert.positionId}`);
+      logger.warn(`   Type: ${alert.type}`);
+      logger.warn(`   Threshold: ${alert.threshold}`);
+      // TODO: Implement alert handling (notifications, etc.)
     });
     
     wsManager.on('connected', () => {
@@ -213,6 +257,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // Shutdown trade analyzer
     const tradeAnalyzer = TradeAnalyzer.getInstance();
     await tradeAnalyzer.shutdown();
+    
+    // Shutdown position tracker
+    const positionTracker = PositionTracker.getInstance();
+    await positionTracker.shutdown();
     
     // Shutdown state manager
     const stateManager = StateManager.getInstance();
