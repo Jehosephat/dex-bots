@@ -6,7 +6,18 @@
   "main": "buy-sell-periodic.mjs",
   "scripts": {
     "start": "node buy-sell-periodic.mjs",
-    "dev": "node --inspect buy-sell-periodic.mjs"
+    "dev": "node --inspect buy-sell-periodic.mjs",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start:prod": "pm2 start ecosystem.config.js --env production",
+    "pm2:start:dev": "pm2 start ecosystem.config.js --env development",
+    "pm2:stop": "pm2 stop buy-sell-periodic-bot",
+    "pm2:restart": "pm2 restart buy-sell-periodic-bot",
+    "pm2:reload": "pm2 reload buy-sell-periodic-bot",
+    "pm2:delete": "pm2 delete buy-sell-periodic-bot",
+    "pm2:status": "pm2 status",
+    "pm2:logs": "pm2 logs buy-sell-periodic-bot",
+    "pm2:logs:follow": "pm2 logs buy-sell-periodic-bot --follow",
+    "pm2:monit": "pm2 monit"
   },
   "dependencies": {
     "@gala-chain/gswap-sdk": "^0.0.7",
