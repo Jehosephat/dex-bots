@@ -176,8 +176,8 @@ export class WalletMonitor extends EventEmitter {
       successRate: 0,
       totalVolume: 0,
       averageTradeSize: 0,
-      lastActivity: 0,
-      lastTradeTime: 0,
+      lastActivity: Date.now(),
+      lastTradeTime: Date.now(),
       activePositions: 0,
       totalProfit: 0,
       winRate: 0,
@@ -535,7 +535,9 @@ export class WalletMonitor extends EventEmitter {
         
         // Check for inactive wallet alert
         const hoursSinceLastActivity = (Date.now() - stats.lastActivity) / (1000 * 60 * 60);
-        if (hoursSinceLastActivity > 24 && stats.totalTrades > 0) {
+        // Only alert if wallet has had actual activity and has been inactive for more than 24 hours
+        if (hoursSinceLastActivity > 72 && stats.totalTrades > 0 && stats.lastActivity > 0) {
+          logger.debug(`🔍 Inactive wallet check: ${walletAddress} - Last activity: ${new Date(stats.lastActivity).toISOString()}, Hours since: ${hoursSinceLastActivity.toFixed(1)}`);
           newAlerts.push({
             id: `inactive_${walletAddress}_${Date.now()}`,
             walletAddress,
