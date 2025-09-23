@@ -329,23 +329,12 @@ export class TransactionMonitor extends EventEmitter {
       let amountOut = '0';
       
       if (method === 'Swap') {
-        // Log the full transaction structure to understand the data (using info level for visibility)
-        logger.info('🔍 Swap transaction data:', {
-          dto: dto,
-          chaincodeResponse: transaction.chaincodeResponse,
-          zeroForOne: zeroForOne
-        });
-        
-        // Log all available fields in the dto to understand the structure
-        logger.info('🔍 Available dto fields:', Object.keys(dto));
-        logger.info('🔍 dto field values:', {
+        // Log key transaction details for debugging
+        logger.info('🔍 Swap transaction details:', {
           amount: dto.amount,
           amountInMaximum: dto.amountInMaximum,
           amountOutMinimum: dto.amountOutMinimum,
-          amount0: dto.amount0,
-          amount1: dto.amount1,
-          amount0Desired: dto.amount0Desired,
-          amount1Desired: dto.amount1Desired
+          zeroForOne: zeroForOne
         });
         
         // Try to extract from chaincodeResponse payload first
@@ -353,11 +342,11 @@ export class TransactionMonitor extends EventEmitter {
           const chaincodeResponse = transaction.chaincodeResponse;
           if (chaincodeResponse && chaincodeResponse.payload) {
             const payload = JSON.parse(chaincodeResponse.payload);
-            logger.info('🔍 ChaincodeResponse payload:', payload);
+            logger.debug('🔍 ChaincodeResponse payload:', payload);
             
             if (payload.Data && payload.Data[0] && payload.Data[0].Data) {
               const swapData = payload.Data[0].Data;
-              logger.info('🔍 Swap data from payload:', swapData);
+              logger.debug('🔍 Swap data from payload:', swapData);
               
               const amount0 = parseFloat(swapData.amount0 || '0');
               const amount1 = parseFloat(swapData.amount1 || '0');
@@ -380,7 +369,7 @@ export class TransactionMonitor extends EventEmitter {
         
         // Fallback to dto fields if chaincodeResponse parsing failed or amounts are still 0
         if (amountIn === '0' && amountOut === '0') {
-          logger.info('🔍 Using dto fallback for amounts');
+          logger.debug('🔍 Using dto fallback for amounts');
           
           // For swaps, use the correct fields based on zeroForOne
           if (zeroForOne) {
@@ -400,7 +389,7 @@ export class TransactionMonitor extends EventEmitter {
         
         // If amountIn is still 0, try alternative parsing methods
         if (amountIn === '0') {
-          logger.info('🔍 amountIn is still 0, trying alternative parsing');
+          logger.debug('🔍 amountIn is still 0, trying alternative parsing');
           
           // Check if we can derive amountIn from other fields
           if (dto.amount && dto.amount !== '0') {
@@ -425,7 +414,7 @@ export class TransactionMonitor extends EventEmitter {
         
         // Additional fallback: try to get amounts from dto directly if they exist
         if (amountIn === '0' && amountOut === '0') {
-          logger.info('🔍 Trying additional dto fields for amounts');
+          logger.debug('🔍 Trying additional dto fields for amounts');
           // Check if dto has amount0/amount1 fields
           if (dto.amount0 && dto.amount1) {
             if (zeroForOne) {
@@ -515,13 +504,11 @@ export class TransactionMonitor extends EventEmitter {
       };
       
       // Log final amounts being used
-      logger.info(`🔍 Final amounts extracted:`, {
+      logger.debug(`🔍 Final amounts extracted:`, {
         amountIn: galaSwapTransaction.amountIn,
         amountOut: galaSwapTransaction.amountOut,
         tokenIn: galaSwapTransaction.tokenIn,
-        tokenOut: galaSwapTransaction.tokenOut,
-        method: galaSwapTransaction.method,
-        zeroForOne: zeroForOne
+        tokenOut: galaSwapTransaction.tokenOut
       });
 
       // Apply filters

@@ -28,10 +28,19 @@ const consoleFormat = winston.format.combine(
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
     let logMessage = `${timestamp} [${level}]: ${message}`;
     
-    // Add metadata if present
-    if (Object.keys(meta).length > 0) {
-      logMessage += ` ${JSON.stringify(meta)}`;
-    }
+      // Add metadata if present, but filter out verbose service info
+      if (Object.keys(meta).length > 0) {
+        const filteredMeta = { ...meta };
+        // Remove verbose service metadata
+        delete filteredMeta['service'];
+        delete filteredMeta['version'];
+        delete filteredMeta['environment'];
+        
+        // Only add metadata if there's something meaningful left
+        if (Object.keys(filteredMeta).length > 0) {
+          logMessage += ` ${JSON.stringify(filteredMeta)}`;
+        }
+      }
     
     return logMessage;
   })

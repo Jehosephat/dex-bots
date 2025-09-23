@@ -121,10 +121,7 @@ async function initializeBot(): Promise<void> {
     
     // Setup wallet monitor event handlers
     walletMonitor.on('walletActivity', async (data) => {
-      logger.info(`👥 Wallet activity updated: ${data.wallet.name} - ${data.activity.activityType}`);
-      logger.info(`   Performance Score: ${data.wallet.performanceScore.toFixed(2)}`);
-      logger.info(`   Risk Score: ${data.wallet.riskScore.toFixed(2)}`);
-      logger.info(`   Total Trades: ${data.wallet.totalTrades}`);
+      logger.info(`👥 Wallet activity: ${data.wallet.name} - ${data.activity.activityType} (Perf: ${data.wallet.performanceScore.toFixed(1)}, Risk: ${data.wallet.riskScore.toFixed(1)}, Trades: ${data.wallet.totalTrades})`);
       
       // Analyze the wallet activity for potential trade copying
       await tradeAnalyzer.analyzeWalletActivity(data.activity);
@@ -139,17 +136,11 @@ async function initializeBot(): Promise<void> {
     
     // Setup trade analyzer event handlers
     tradeAnalyzer.on('tradeAnalysis', (analysis) => {
-      logger.info(`🔍 Trade analysis completed: ${analysis.analysisResult}`);
-      logger.info(`   Wallet: ${analysis.targetWallet.name}`);
-      logger.info(`   Risk Score: ${analysis.riskScore.toFixed(2)}`);
-      logger.info(`   Confidence Score: ${analysis.confidenceScore.toFixed(2)}`);
-      logger.info(`   Action: ${analysis.recommendedAction.action}`);
+      logger.info(`🔍 Trade analysis: ${analysis.analysisResult} - ${analysis.targetWallet.name} (Risk: ${analysis.riskScore.toFixed(1)}, Conf: ${analysis.confidenceScore.toFixed(1)}, Action: ${analysis.recommendedAction.action})`);
     });
     
     tradeAnalyzer.on('tradeApproved', async (analysis) => {
-      logger.info(`✅ Trade approved for execution: ${analysis.id}`);
-      logger.info(`   Trade: ${analysis.calculatedTrade.amountIn} ${analysis.calculatedTrade.tokenIn} → ${analysis.calculatedTrade.amountOut} ${analysis.calculatedTrade.tokenOut}`);
-      logger.info(`   Copy Mode: ${analysis.calculatedTrade.copyMode}`);
+      logger.info(`✅ Trade approved: ${analysis.calculatedTrade.amountIn} ${analysis.calculatedTrade.tokenIn} → ${analysis.calculatedTrade.amountOut} ${analysis.calculatedTrade.tokenOut} (${analysis.calculatedTrade.copyMode})`);
       
       // Create position from approved trade
       const position = await positionTracker.createPositionFromTrade(analysis);
@@ -163,10 +154,7 @@ async function initializeBot(): Promise<void> {
     });
     
     tradeAnalyzer.on('tradeRejected', (analysis) => {
-      logger.warn(`❌ Trade rejected: ${analysis.id}`);
-      logger.warn(`   Reason: ${analysis.rejectionReason || 'Unknown'}`);
-      logger.warn(`   Risk Score: ${analysis.riskScore.toFixed(2)}`);
-      // TODO: Log rejection for analysis
+      logger.warn(`❌ Trade rejected: ${analysis.rejectionReason || 'Unknown'} (Risk: ${analysis.riskScore.toFixed(1)})`);
     });
     
     // Setup position tracker event handlers
