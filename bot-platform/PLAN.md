@@ -112,6 +112,14 @@ trades (id, transaction_id, strategy_id, token_in, token_out, amount_in, amount_
 strategies (id, name, type, config, enabled, created_at, updated_at)
 wallet_activities (id, wallet_address, transaction_id, activity_type, detected_at, processed)
 
+-- Transaction confirmation tracking (NEW)
+transaction_confirmations (
+  id, transaction_id, status, block_number, confirmations, required_confirmations,
+  actual_amount_in, actual_amount_out, expected_amount_in, expected_amount_out,
+  gas_used, gas_price, error_message, retry_count, max_retries,
+  submitted_at, confirmed_at, failed_at, created_at, updated_at
+)
+
 -- Analytics and monitoring
 trade_analytics (id, trade_id, risk_score, confidence_score, market_conditions, created_at)
 execution_metrics (id, strategy_id, total_trades, successful_trades, failed_trades, avg_execution_time, created_at)
@@ -130,7 +138,52 @@ target_wallets (id, address, name, max_copy_amount, enabled, priority, type, cre
 
 ### Phase 2: Trading Engine & Analysis (Weeks 4-6)
 
-#### 2.1 Transaction Monitoring System
+#### 2.1 Transaction Confirmation System (NEW - Critical)
+**Tasks:**
+- [ ] Utilize modules that monitor or read GalaChain (e.g. websocket)
+- [ ] Implement transaction confirmation waiting logic (1-3 blocks)
+- [ ] Add transaction receipt validation and parsing
+- [ ] Create actual vs expected amount verification
+- [ ] Implement transaction failure detection and handling
+- [ ] Add transaction retry logic with exponential backoff
+- [ ] Create transaction status lifecycle management
+- [ ] Add blockchain network monitoring and health checks
+
+**Technical Implementation:**
+```typescript
+interface TransactionConfirmation {
+  transactionId: string;
+  status: 'pending' | 'confirming' | 'confirmed' | 'failed' | 'reverted';
+  blockNumber?: number;
+  confirmations: number;
+  requiredConfirmations: number;
+  actualAmountIn?: number;
+  actualAmountOut?: number;
+  expectedAmountIn: number;
+  expectedAmountOut: number;
+  gasUsed?: number;
+  gasPrice?: number;
+  error?: string;
+  retryCount: number;
+  maxRetries: number;
+}
+
+class TransactionConfirmationService {
+  async waitForConfirmation(transactionId: string, expectedAmounts: ExpectedAmounts): Promise<TransactionConfirmation>
+  async validateTransactionReceipt(receipt: TransactionReceipt): Promise<ValidationResult>
+  async retryFailedTransaction(transaction: FailedTransaction): Promise<RetryResult>
+  async monitorTransactionStatus(transactionId: string): Promise<TransactionStatus>
+}
+```
+
+**Deliverables:**
+- Blockchain RPC client service
+- Transaction confirmation system
+- Amount verification and validation
+- Transaction retry and failure handling
+- Comprehensive transaction status tracking
+
+#### 2.2 Transaction Monitoring System
 **Tasks:**
 - [ ] Migrate TransactionMonitor to NestJS service
 - [ ] Enhance block processing with database persistence
@@ -173,10 +226,23 @@ target_wallets (id, address, name, max_copy_amount, enabled, priority, type, cre
 #### 2.3 Trade Execution Engine
 **Tasks:**
 - [ ] Migrate TradeExecutor to NestJS service
+- [ ] Implement blockchain confirmation system
+- [ ] Add transaction validation and verification
+- [ ] Create transaction retry logic with exponential backoff
+- [ ] Implement transaction status tracking and lifecycle management
+- [ ] Add blockchain RPC client for transaction queries
 - [ ] Enhance execution strategies and algorithms
 - [ ] Implement advanced slippage protection
 - [ ] Add execution monitoring and metrics
 - [ ] Create execution queue management
+
+**Critical Enhancements (Addressing Current Bot Limitations):**
+- **Blockchain Confirmation**: Wait for 1-3 block confirmations before marking trades successful
+- **Transaction Validation**: Query blockchain RPC to verify transaction status and receipt
+- **Amount Verification**: Compare actual on-chain amounts with expected values from GSwap SDK
+- **Failure Detection**: Handle transaction failures, reversals, and network issues
+- **Retry Logic**: Intelligent retry mechanisms for failed transactions
+- **Status Tracking**: Comprehensive transaction lifecycle from submission to final confirmation
 
 **Enhancements from existing code:**
 - Add multiple execution strategies
@@ -185,7 +251,10 @@ target_wallets (id, address, name, max_copy_amount, enabled, priority, type, cre
 - Create execution queue prioritization
 
 **Deliverables:**
-- Enhanced trade execution service
+- Enhanced trade execution service with blockchain confirmation
+- Transaction validation and verification system
+- Intelligent retry logic for failed transactions
+- Comprehensive transaction status tracking
 - Multiple execution strategies
 - Advanced slippage protection
 - Execution performance monitoring
@@ -486,6 +555,8 @@ target_wallets (id, address, name, max_copy_amount, enabled, priority, type, cre
 - **WebSocket reliability** - Implement reconnection logic and error handling
 - **API scalability** - Design for horizontal scaling from the start
 - **Data consistency** - Use database transactions and proper error handling
+- **Transaction confirmation failures** - Implement robust blockchain confirmation system with retry logic
+- **False positive trade success** - Add comprehensive transaction validation and amount verification
 
 ### Business Risks
 - **Strategy performance** - Implement comprehensive backtesting

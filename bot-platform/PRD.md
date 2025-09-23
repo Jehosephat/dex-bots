@@ -28,6 +28,7 @@ The development will focus on:
 - **Activity Summarization**: Generate insights about DEX activity patterns, volume, and trends
 - **Data Storage**: Store critical data from blocks and operations in a minimal way, keeping important details without the extra block data
 - **Historical Analysis**: Maintain time-series data for backtesting and strategy development
+- **Transaction Verification**: Cross-reference on-chain data with expected outcomes to ensure trade accuracy
 
 ### **GalaChain API Integration**
 - **Chain Data Access**: Retrieve information about Pools, Balances, and Tokens from the GalaChain mainnet gateway
@@ -38,8 +39,11 @@ The development will focus on:
 ### **Trade Execution**
 - **DEX Operations**: Execute swaps, add liquidity, and remove liquidity operations
 - **Transaction Management**: Handle transaction signing, broadcasting, and confirmation tracking
+- **Blockchain Confirmation**: Wait for multiple block confirmations and verify transaction status on-chain
+- **Transaction Validation**: Verify actual vs expected amounts from on-chain data and handle transaction failures
 - **Slippage Protection**: Implement safeguards against unfavorable price movements
 - **Gas Optimization**: Manage transaction fees and timing for optimal execution
+- **Retry Logic**: Handle failed transactions with intelligent retry mechanisms
 
 ### **Strategy Integration**
 - **Plugin Architecture**: Enable easy integration of strategy modules that work seamlessly with other platform components
@@ -64,6 +68,26 @@ The development will focus on:
 - **Developer Guides**: Clear setup instructions and development workflows
 - **Strategy Examples**: Sample strategies and implementation patterns
 - **Troubleshooting**: Common issues and resolution guides
+
+## Critical Issues Addressed
+
+### Transaction Confirmation Gap
+**Problem**: Current bots assume trade success based solely on GSwap SDK response without proper blockchain validation.
+
+**Current Bot Behavior**:
+- Accept GSwap SDK response as final confirmation
+- No waiting for blockchain confirmation blocks
+- No verification of actual vs expected amounts
+- No handling of transaction failures or reversals
+- No retry logic for failed transactions
+
+**Bot Platform Solution**:
+- **Blockchain Confirmation**: Wait for 1-3 block confirmations before marking trades as successful
+- **Transaction Validation**: Query blockchain RPC to verify transaction status and receipt
+- **Amount Verification**: Compare actual on-chain amounts with expected values
+- **Failure Handling**: Detect and handle transaction failures, reversals, and network issues
+- **Retry Logic**: Intelligent retry mechanisms for failed transactions with exponential backoff
+- **Status Tracking**: Comprehensive transaction lifecycle management from submission to final confirmation
 
 ## Tech Stack
 
