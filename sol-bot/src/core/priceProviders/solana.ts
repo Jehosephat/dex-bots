@@ -11,6 +11,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
   private jupiterApiUrl = 'https://lite-api.jup.ag/swap/v1';
   private coinGeckoApiUrl = 'https://api.coingecko.com/api/v3';
   private solUSDPrice: number = 0;
+  private solUSDPriceLastUpdate: number = 0;
+  private solUSDPriceCacheDuration: number = 60000; // Cache for 60 seconds to avoid rate limits
 
   async initialize(): Promise<void> {
     // Fetch initial SOL/USD price
@@ -80,6 +82,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
   }
 
   private async updateSOLUSDPrice(): Promise<void> {
+    // Check if cached price is still valid
+    const now = Date.now();
+    if (this.solUSDPrice > 0 && (now - this.solUSDPriceLastUpdate) < this.solUSDPriceCacheDuration) {
+      logger.debug(`Using cached SOL/USD price: $${this.solUSDPrice.toFixed(2)} (age: ${((now - this.solUSDPriceLastUpdate) / 1000).toFixed(0)}s)`);
+      return;
+    }
+
     try {
       // Fetch SOL/USD price from CoinGecko
       const response = await axios.get(`${this.coinGeckoApiUrl}/simple/price`, {
@@ -92,6 +101,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
       if (response.data?.solana?.usd) {
         this.solUSDPrice = response.data.solana.usd;
+        this.solUSDPriceLastUpdate = now;
         logger.info(`SOL/USD price: $${this.solUSDPrice.toFixed(2)}`);
         
         // Store SOL as a "Solana price" with price of 1 SOL = 1 SOL
@@ -108,9 +118,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
       logger.error('Failed to fetch SOL/USD price from CoinGecko', {
         error: error.message || error
       });
-      // Use fallback price
-      this.solUSDPrice = 225; // Approximate fallback
-      logger.warn(`Using fallback SOL/USD price: $${this.solUSDPrice}`);
+      // Use fallback price if we don't have a cached one
+      if (this.solUSDPrice === 0) {
+        this.solUSDPrice = 225; // Approximate fallback
+        logger.warn(`Using fallback SOL/USD price: $${this.solUSDPrice}`);
+      } else {
+        logger.warn(`Continuing with last cached SOL/USD price: $${this.solUSDPrice.toFixed(2)}`);
+      }
     }
   }
 

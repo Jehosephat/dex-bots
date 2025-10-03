@@ -24,6 +24,7 @@ export interface TokensConfig {
 
 // Trading configuration types
 export interface TradingConfig {
+  dryRun: boolean;
   minEdgeThreshold: number;
   maxPriceImpact: number;
   maxConcurrentTrades: number;

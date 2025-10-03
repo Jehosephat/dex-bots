@@ -54,10 +54,8 @@ export class RiskManager {
    */
   private saveState(): void {
     try {
-      stateManager.updateState({
-        circuitBreakerActive: this.circuitBreakerActive,
-        recentFailures: this.consecutiveFailures,
-      });
+      stateManager.setCircuitBreaker(this.circuitBreakerActive);
+      // StateManager automatically tracks failures through recordFailure()
     } catch (error) {
       logger.error('Failed to save risk manager state', { error });
     }

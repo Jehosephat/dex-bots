@@ -106,10 +106,7 @@ export class ArbitrageBot {
       logger.info(this.getBotInfo());
 
       // Update state
-      stateManager.updateState({
-        isRunning: true,
-        startTime: this.startTime
-      });
+      stateManager.setRunning(true);
 
       // Start main trading loop
       const updateInterval = config.getTradingConfig().priceUpdateInterval;
@@ -240,7 +237,51 @@ export class ArbitrageBot {
         riskScore: validation.riskScore
       });
 
-      // Execute the arbitrage trade
+      // Check if we're in dry run mode
+      const tradingConfig = config.getTradingConfig();
+      if (tradingConfig.dryRun) {
+        // DRY RUN MODE - Show what would be executed but don't actually trade
+        this.opportunitiesFound++;
+        
+        logger.info('🔍 DRY RUN - Would execute arbitrage trade:', {
+          token: opportunity.token,
+          size: opportunity.recommendedSize,
+          expectedProfit: `${(opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2)} GALA`,
+          netEdge: `${(opportunity.netEdge * 100).toFixed(2)}%`,
+          plan: {
+            step1: `GalaChain: Sell ${opportunity.recommendedSize} ${opportunity.token} → Receive ~${(opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2)} GALA`,
+            step2: `Solana: Spend ~${(opportunity.recommendedSize * opportunity.solBuyPrice).toFixed(4)} SOL → Buy ${opportunity.recommendedSize} ${opportunity.token}`,
+            step3: `Net Profit: ${(opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2)} GALA (after bridge costs)`,
+            gcPrice: `${opportunity.gcSellPrice.toFixed(6)} GALA per ${opportunity.token}`,
+            solPrice: `${opportunity.solBuyPrice.toFixed(6)} SOL per ${opportunity.token}`,
+            bridgeCost: `${opportunity.bridgeCostGALA.toFixed(2)} GALA`
+          }
+        });
+        
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`🔍 DRY RUN - ARBITRAGE OPPORTUNITY FOUND`);
+        console.log(`${'='.repeat(80)}`);
+        console.log(`Token: ${opportunity.token}`);
+        console.log(`Trade Size: ${opportunity.recommendedSize}`);
+        console.log(`Net Edge: ${(opportunity.netEdge * 100).toFixed(2)}%`);
+        console.log(`\n📤 STEP 1: GalaChain (SELL)`);
+        console.log(`  Action: Sell ${opportunity.recommendedSize} ${opportunity.token}`);
+        console.log(`  Price: ${opportunity.gcSellPrice.toFixed(6)} GALA per token`);
+        console.log(`  Expected: ~${(opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2)} GALA`);
+        console.log(`\n📥 STEP 2: Solana (BUY)`);
+        console.log(`  Action: Buy ${opportunity.recommendedSize} ${opportunity.token}`);
+        console.log(`  Price: ${opportunity.solBuyPrice.toFixed(6)} SOL per token`);
+        console.log(`  Cost: ~${(opportunity.recommendedSize * opportunity.solBuyPrice).toFixed(4)} SOL`);
+        console.log(`\n💰 EXPECTED PROFIT:`);
+        console.log(`  Gross Profit: ${(opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice + opportunity.bridgeCostGALA).toFixed(2)} GALA`);
+        console.log(`  Bridge Cost: ${opportunity.bridgeCostGALA.toFixed(2)} GALA`);
+        console.log(`  Net Profit: ${(opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2)} GALA`);
+        console.log(`${'='.repeat(80)}\n`);
+        
+        return;
+      }
+
+      // LIVE MODE - Actually execute the trade
       logger.info('🚀 Executing arbitrage trade...', {
         token: opportunity.token,
         expectedProfit: (opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2) + ' GALA'
@@ -267,10 +308,7 @@ export class ArbitrageBot {
         });
 
         // Update state
-        stateManager.updateState({
-          totalPnL: this.totalPnL,
-          tradeCount: this.tradesExecuted
-        });
+        stateManager.recordTrade(result.realizedPnL);
       } else {
         logger.error('❌ Trade execution failed', {
           token: opportunity.token,
@@ -293,8 +331,8 @@ export class ArbitrageBot {
     try {
       const pendingBridges = this.bridgeMonitor.getPendingBridges();
       
-      if (pendingBridges.size > 0) {
-        logger.info(`Monitoring ${pendingBridges.size} pending bridge(s)`);
+      if (pendingBridges.length > 0) {
+        logger.info(`Monitoring ${pendingBridges.length} pending bridge(s)`);
         
         // Log details of pending bridges
         pendingBridges.forEach(bridge => {
@@ -328,7 +366,7 @@ export class ArbitrageBot {
     }
 
     this.isPaused = true;
-    stateManager.updateState({ isPaused: true });
+    stateManager.setPaused(true);
     logger.warn('⏸️  Bot paused - monitoring continues, trading stopped');
   }
 
@@ -342,7 +380,7 @@ export class ArbitrageBot {
     }
 
     this.isPaused = false;
-    stateManager.updateState({ isPaused: false });
+    stateManager.setPaused(false);
     logger.info('▶️  Bot resumed');
   }
 
@@ -376,10 +414,8 @@ export class ArbitrageBot {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Update state
-    stateManager.updateState({ 
-      isRunning: false,
-      isPaused: false
-    });
+    stateManager.setRunning(false);
+    stateManager.setPaused(false);
 
     this.logFinalStatus();
     logger.info('✅ Bot stopped successfully');
@@ -391,12 +427,15 @@ export class ArbitrageBot {
   private getBotInfo(): string {
     const riskConfig = config.getRiskConfig();
     const tradingConfig = config.getTradingConfig();
+    const mode = tradingConfig.dryRun ? '🔍 DRY RUN MODE' : '💰 LIVE TRADING MODE';
     
     return `
 ╔════════════════════════════════════════════════════════════╗
 ║        GalaChain-Solana Arbitrage Bot v1.0.0              ║
+║                  ${mode}                  ║
 ╚════════════════════════════════════════════════════════════╝
 
+${tradingConfig.dryRun ? '⚠️  DRY RUN: Will show opportunities but NOT execute trades\n' : ''}
 📊 Configuration:
   • Enabled Tokens: ${config.getEnabledTokens().map(t => t.symbol).join(', ')}
   • Min Edge Threshold: ${(tradingConfig.minEdgeThreshold * 100).toFixed(1)}%
@@ -413,7 +452,7 @@ export class ArbitrageBot {
   • Bridge Cost: ${config.getBridgingConfig().bridgeCostUSD} USD
   • Max Bridge Delay: ${config.getBridgingConfig().maxBridgeDelay / 60000}min
 
-Ready to find arbitrage opportunities! 🚀
+Ready to ${tradingConfig.dryRun ? 'analyze' : 'execute'} arbitrage opportunities! 🚀
 `;
   }
 
