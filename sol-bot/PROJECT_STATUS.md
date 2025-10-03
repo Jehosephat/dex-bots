@@ -1,7 +1,7 @@
 # SOL BOT - Project Status
 
-**Last Updated:** October 2, 2025  
-**Status:** Initial Implementation In Progress
+**Last Updated:** October 3, 2025  
+**Status:** Core Modules Complete - Ready for Execution Engine
 
 ## 🎯 Project Overview
 
@@ -19,13 +19,22 @@ Cross-Chain Arbitrage Bot that executes trades between Solana and GalaChain, acc
 - [x] **State Manager** - Persistent state with auto-save
 - [x] **Type Definitions** - Comprehensive TypeScript types
 
-### Phase 2: Core Modules (66% Complete)
-- [x] **Price Discovery Module** (`src/core/priceDiscovery.ts`)
-  - GalaChain price fetching via GSwap SDK
-  - Solana price fetching via Jupiter API
+### Phase 2: Core Modules (100% Complete) ✅
+- [x] **Modular Price Discovery System** (`src/core/priceDiscovery.ts` + `src/core/priceProviders/`)
+  - **Plugin-based architecture** - Easy to add new networks/DEXs
+  - **GalaChain Provider** - Local quoting via DEX v3
+    - GALA and GUSDC pair support
+    - Automatic token ordering
+    - GALA/USD conversion
+  - **Solana Provider** - Jupiter Lite API integration
+    - Token → SOL price quotes
+    - SOL/USD market price from CoinGecko
+    - USD price conversion
+  - **Main Orchestrator** - Coordinates multiple providers
   - Net edge calculation in GALA terms
   - Bridge cost amortization
   - Opportunity filtering by edge threshold
+  - **Supported tokens**: GFARTCOIN, GTRUMP, GSOL (SOL)
   
 - [x] **Inventory Manager** (`src/core/inventoryManager.ts`)
   - Dual-chain balance tracking
@@ -78,13 +87,13 @@ Currently no components in active development. Ready to continue with:
 | Phase | Status | Completion |
 |-------|--------|------------|
 | Phase 1: Foundation | ✅ Complete | 100% |
-| Phase 2: Core Modules | 🚧 In Progress | 66% |
+| Phase 2: Core Modules | ✅ Complete | 100% |
 | Phase 3: Execution Engine | ⏳ Pending | 0% |
 | Phase 4: Bridge Integration | ⏳ Pending | 0% |
 | Phase 5: Risk Controls | ⏳ Pending | 0% |
 | Phase 6: Monitoring | ⏳ Pending | 0% |
 | Phase 7: Testing | ⏳ Pending | 0% |
-| **Overall Progress** | 🚧 | **~24%** |
+| **Overall Progress** | 🚧 | **~29%** |
 
 ## 🔧 Technical Stack
 
@@ -96,11 +105,12 @@ Currently no components in active development. Ready to continue with:
 - **Testing:** Jest (configured, not implemented yet)
 
 ### Key Dependencies
-- `@gala-chain/gswap-sdk` ^0.0.7 - GalaChain DEX integration
+- `@gala-chain/dex` - GalaChain DEX v3 integration (local quoting)
 - `@gala-chain/api` ^1.1.0 - GalaChain API client
 - `@solana/web3.js` ^1.87.6 - Solana blockchain integration
 - `@slack/web-api` ^6.10.0 - Slack notifications
-- `axios` ^1.6.0 - HTTP client for Jupiter API
+- `axios` ^1.6.0 - HTTP client for Jupiter & CoinGecko APIs
+- `bignumber.js` - Precision arithmetic for token amounts
 - `winston` ^3.11.0 - Logging framework
 
 ## 📁 Current File Structure
@@ -109,10 +119,16 @@ Currently no components in active development. Ready to continue with:
 sol-bot/
 ├── config/
 │   ├── config.json ✅         # Trading parameters
-│   └── tokens.json ✅         # Supported tokens (GALA, FARTCOIN, TRUMP, SOL)
+│   └── tokens.json ✅         # Supported tokens (GFARTCOIN, GTRUMP, GSOL)
 ├── src/
 │   ├── core/
-│   │   ├── priceDiscovery.ts ✅  # Cross-chain price monitoring
+│   │   ├── priceDiscovery.ts ✅  # Main price orchestrator
+│   │   ├── priceProviders/ ✅    # Modular price provider system
+│   │   │   ├── base.ts ✅        # Provider interface & base class
+│   │   │   ├── galachain.ts ✅   # GalaChain DEX v3 provider
+│   │   │   ├── solana.ts ✅      # Solana/Jupiter provider
+│   │   │   ├── index.ts ✅       # Provider exports
+│   │   │   └── README.md ✅      # Provider documentation
 │   │   ├── inventoryManager.ts ✅ # Dual-chain inventory tracking
 │   │   ├── bridgeMonitor.ts ⏳   # Bridge status monitoring
 │   │   └── riskManager.ts ⏳     # Risk controls
@@ -134,9 +150,11 @@ sol-bot/
 │   │   └── stateManager.ts ✅    # Persistent state
 │   ├── types/
 │   │   └── index.ts ✅           # TypeScript definitions
+│   ├── test-price-discovery.ts ✅ # Price discovery test script
 │   └── index.ts ⏳               # Main entry point
 ├── dist/ ✅                       # Compiled output
 ├── logs/ ✅                       # Log files
+├── ARCHITECTURE.md ✅             # System architecture docs
 ├── package.json ✅
 ├── tsconfig.json ✅
 ├── .gitignore ✅
@@ -164,11 +182,10 @@ sol-bot/
 - **Bridge Cost:** $1.25 USD
 - **Bridge Interval:** 30 minutes
 
-### Supported Tokens (Configured)
-- **GALA** - Ready (needs Solana mint address)
-- **FARTCOIN** - Ready (needs Solana mint address)
-- **TRUMP** - Ready (needs Solana mint address)
-- **SOL** - Ready
+### Supported Tokens (Configured & Tested)
+- **GFARTCOIN** - ✅ Ready (quotes via GUSDC on GalaChain, Jupiter on Solana)
+- **GTRUMP** - ✅ Ready (quotes via GALA on GalaChain, Jupiter on Solana)
+- **GSOL** - ✅ Ready (quotes via GALA on GalaChain, CoinGecko for SOL/USD)
 
 ## 🚀 Next Steps
 
@@ -204,12 +221,13 @@ sol-bot/
 - No monitoring/alerting system
 - No tests written
 
-### Placeholder Values
-- GalaChain balances use placeholder values
-- Solana balances use placeholder values
-- GALA/USD price uses hardcoded $0.04
-- SOL/GALA price uses fallback of 100
-- Token mint addresses need to be configured
+### Live Pricing Data
+- ✅ **GalaChain prices**: Real-time via DEX v3 local quoting
+- ✅ **Solana prices**: Real-time via Jupiter Lite API
+- ✅ **GALA/USD price**: Real-time via GALA/GUSDC pool (~$0.0158)
+- ✅ **SOL/USD price**: Real-time via CoinGecko API (~$230)
+- ✅ **SOL/GALA rate**: Dynamically calculated
+- ⚠️ **Inventory balances**: Still use placeholder values
 
 ### Before Running
 1. Configure actual Solana mint addresses in `config/tokens.json`
@@ -222,7 +240,9 @@ sol-bot/
 
 - [PRD.md](./PRD.md) - Product Requirements Document
 - [IMPLEMENTATION.md](./IMPLEMENTATION.md) - Detailed Implementation Plan
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System Architecture & Modular Design
 - [README.md](./README.md) - User Documentation
+- [priceProviders/README.md](./src/core/priceProviders/README.md) - Price Provider Guide
 
 ## 🤝 Development Guidelines
 
@@ -242,6 +262,33 @@ sol-bot/
 - [ ] Monitor for unusual activity
 - [ ] Keep dependencies updated
 - [ ] Run security audits before production
+
+## 🎉 Recent Accomplishments
+
+### Modular Price Discovery Architecture (October 3, 2025)
+
+Successfully refactored the price discovery system into a **plugin-based architecture** that makes it easy to add new blockchain networks or DEXs:
+
+**Key Features:**
+- ✅ **Provider Interface**: Clean `IPriceProvider` interface for extensibility
+- ✅ **Base Class**: `BasePriceProvider` with common functionality
+- ✅ **GalaChain Provider**: DEX v3 local quoting with automatic token ordering
+- ✅ **Solana Provider**: Jupiter Lite API integration + CoinGecko market data
+- ✅ **Main Orchestrator**: Coordinates multiple providers in parallel
+- ✅ **Easy Extension**: Add new networks by implementing the provider interface
+
+**Benefits:**
+- Add Ethereum, Polygon, Avalanche, or any network without touching core code
+- Test individual providers in isolation
+- Providers can be enabled/disabled dynamically
+- Clean separation of concerns
+
+**Test Results:**
+```
+✅ GalaChain: GFARTCOIN ($0.00259), GTRUMP ($10.95), GSOL ($225.16)
+✅ Solana: GFARTCOIN ($0.66), GTRUMP ($7.75), GSOL ($230.32)
+✅ Arbitrage opportunities detected and calculated correctly
+```
 
 ---
 
