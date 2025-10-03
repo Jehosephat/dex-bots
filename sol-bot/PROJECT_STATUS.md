@@ -19,7 +19,7 @@ Cross-Chain Arbitrage Bot that executes trades between Solana and GalaChain, acc
 - [x] **State Manager** - Persistent state with auto-save
 - [x] **Type Definitions** - Comprehensive TypeScript types
 
-### Phase 2: Core Modules (100% Complete) ✅
+### Phase 2: Core Modules & Orchestration (100% Complete) ✅
 - [x] **Modular Price Discovery System** (`src/core/priceDiscovery.ts` + `src/core/priceProviders/`)
   - **Plugin-based architecture** - Easy to add new networks/DEXs
   - **GalaChain Provider** - Local quoting via DEX v3
@@ -66,11 +66,23 @@ Cross-Chain Arbitrage Bot that executes trades between Solana and GalaChain, acc
   - Bridge health validation
   - Risk scoring system
 
+- [x] **Main Entry Point** (`src/index.ts`)
+  - Bot initialization and startup
+  - Main trading loop orchestration
+  - Module coordination (Price Discovery, Inventory, Bridge, Risk)
+  - Opportunity evaluation pipeline
+  - Graceful shutdown handling
+  - Pause/resume functionality
+  - Performance tracking (cycles, opportunities, trades)
+  - Status reporting and logging
+  - Signal handling (SIGINT, SIGTERM)
+  - Error handling and recovery
+
 ## 🚧 In Progress
 
 Currently no components in active development. Ready to continue with:
-- Main Entry Point (orchestrator)
-- Execution Engine development
+- Execution Engine (GalaChain & Solana executors)
+- Bridge integration for cross-chain asset movement
 
 ## ⏳ Pending Components
 
@@ -170,10 +182,12 @@ sol-bot/
 │   │   └── stateManager.ts ✅    # Persistent state
 │   ├── types/
 │   │   └── index.ts ✅           # TypeScript definitions
-│   ├── test-price-discovery.ts ✅ # Price discovery test script
-│   ├── test-bridge-monitor.ts ✅  # Bridge monitor test script
-│   ├── test-risk-manager.ts ✅    # Risk manager test script
-│   └── index.ts ⏳               # Main entry point
+│   ├── test-price-discovery.ts ✅  # Price discovery test script
+│   ├── test-bridge-monitor.ts ✅   # Bridge monitor test script
+│   ├── test-risk-manager.ts ✅     # Risk manager test script
+│   ├── test-bot-dry-run.ts ✅      # Bot orchestration dry run test
+│   ├── test-bot.ts ✅              # Full bot integration test
+│   └── index.ts ✅                 # Main entry point (orchestrator)
 ├── dist/ ✅                       # Compiled output
 ├── logs/ ✅                       # Log files
 ├── ARCHITECTURE.md ✅             # System architecture docs
@@ -212,11 +226,12 @@ sol-bot/
 ## 🚀 Next Steps
 
 ### Immediate (Next Session)
-1. **Create Main Entry Point** - Orchestrate all modules into a cohesive bot
-2. **Begin Execution Engine** - Build trade execution capability
-   - GalaChain Executor (GSwap SDK integration)
-   - Solana Executor (Jupiter integration)
-   - Dual-Leg Executor (coordinate both chains)
+1. **Execution Engine** - Build actual trade execution capability
+   - GalaChain Executor - Use GSwap SDK to execute swaps on GalaChain
+   - Solana Executor - Use Jupiter API to execute swaps on Solana
+   - Dual-Leg Executor - Coordinate execution on both chains atomically
+2. **Integration Testing** - Test complete arbitrage flow end-to-end
+3. **Performance Optimization** - Optimize for speed and efficiency
 
 ### Short Term (Following Sessions)
 4. **GalaChain Executor** - Implement GC trading via GSwap SDK
@@ -238,12 +253,11 @@ sol-bot/
 ## 📝 Important Notes
 
 ### Current Limitations
-- Bridge Monitor not yet implemented
-- Risk Manager not yet implemented
-- No execution engine (cannot place trades yet)
-- No actual bridge integration
-- No monitoring/alerting system
-- No tests written
+- No execution engine yet (cannot place real trades)
+- No actual bridge integration for cross-chain transfers
+- Inventory tracking uses placeholder data (needs live API integration for GalaChain)
+- No monitoring dashboard or Slack alerts yet
+- Integration tests needed for full end-to-end flow
 
 ### Live Pricing Data
 - ✅ **GalaChain prices**: Real-time via DEX v3 local quoting
@@ -288,6 +302,42 @@ sol-bot/
 - [ ] Run security audits before production
 
 ## 🎉 Recent Accomplishments
+
+### Main Entry Point & Orchestration (October 3, 2025)
+
+Completed the main bot orchestrator that brings all modules together into a cohesive trading system:
+
+**Key Features:**
+- ✅ **Module Initialization**: Coordinates startup of all core modules
+- ✅ **Main Trading Loop**: Runs at configurable intervals (default 10s)
+- ✅ **Opportunity Pipeline**: Price discovery → Risk validation → Execution
+- ✅ **Inventory Monitoring**: Tracks balances on both chains
+- ✅ **Bridge Status Monitoring**: Checks pending bridge transactions
+- ✅ **Graceful Shutdown**: Handles SIGINT/SIGTERM signals properly
+- ✅ **Pause/Resume**: Ability to temporarily stop trading without full shutdown
+- ✅ **Performance Tracking**: Counts cycles, opportunities, and trades
+- ✅ **Status Reporting**: Periodic logging of bot health and activity
+- ✅ **Error Handling**: Robust error recovery in main cycle
+- ✅ **State Persistence**: Saves state between runs
+
+**Test Results:**
+```
+✅ All modules import successfully
+✅ Configuration loads correctly  
+✅ Risk manager operational
+✅ Opportunity validation works
+✅ Main entry point structure valid
+✅ Bot instance created successfully
+✅ All methods available: initialize, start, stop, pause, resume, getStatus
+```
+
+**Bot Capabilities:**
+- Discovers arbitrage opportunities every 10 seconds
+- Validates each opportunity against 8+ risk parameters
+- Checks bridge health before cross-chain trades
+- Enforces circuit breakers and emergency stops
+- Logs all activities with structured logging
+- Ready for execution engine integration
 
 ### Risk Manager Implementation (October 3, 2025)
 
