@@ -20,13 +20,21 @@ async function testPriceDiscovery() {
     // Discover opportunities (this will fetch prices)
     const opportunities = await priceDiscovery.discoverOpportunities();
 
+    // Get and display base GALA/USD price
+    const galaUSDPrice = await priceDiscovery.getGalaUSDPrice();
+    console.log('💵 Base Exchange Rate:');
+    console.log(`   1 GALA = $${galaUSDPrice.toFixed(6)} USD (via GALA/GUSDC pool)`);
+    console.log(`   1 USD = ${(1/galaUSDPrice).toFixed(2)} GALA\n`);
+
     // Display all prices
     const allPrices = priceDiscovery.getAllPrices();
     
-    console.log('🔵 GalaChain Prices (token → GALA):');
+    console.log('🔵 GalaChain Prices:');
     if (allPrices.galaChain.length > 0) {
       allPrices.galaChain.forEach(([symbol, price]) => {
-        console.log(`  ${symbol}: ${price.price.toFixed(6)} GALA per token`);
+        console.log(`  ${symbol}:`);
+        console.log(`    ${price.price.toFixed(6)} GALA per token`);
+        console.log(`    $${price.priceUSD.toFixed(6)} USD per token`);
         console.log(`    Last updated: ${new Date(price.timestamp).toLocaleTimeString()}`);
       });
     } else {
@@ -67,7 +75,7 @@ async function testPriceDiscovery() {
       
       console.log(`\n  ${token.symbol}:`);
       if (gcPrice) {
-        console.log(`    ✓ GalaChain price available: ${gcPrice.price.toFixed(6)} GALA`);
+        console.log(`    ✓ GalaChain price available: ${gcPrice.price.toFixed(6)} GALA ($${gcPrice.priceUSD.toFixed(6)} USD)`);
       } else {
         console.log(`    ✗ GalaChain price not available`);
       }

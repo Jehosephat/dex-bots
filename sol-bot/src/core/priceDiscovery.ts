@@ -550,4 +550,8 @@ export class PriceDiscovery {
       lastUpdate: this.lastUpdate
     };
   }
+
+  async getGalaUSDPrice(): Promise<number> {
+    return await this.getGALAUSDPrice();
+  }
 }
