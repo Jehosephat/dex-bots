@@ -10,6 +10,7 @@ import { PriceDiscovery } from './core/priceDiscovery';
 import { InventoryManager } from './core/inventoryManager';
 import { BridgeMonitor } from './core/bridgeMonitor';
 import { riskManager } from './core/riskManager';
+import { DualLegExecutor } from './execution';
 import { config } from './utils/config';
 import { logger } from './utils/logger';
 import { stateManager } from './utils/stateManager';
@@ -19,6 +20,7 @@ export class ArbitrageBot {
   private priceDiscovery: PriceDiscovery;
   private inventoryManager: InventoryManager;
   private bridgeMonitor: BridgeMonitor;
+  private dualLegExecutor: DualLegExecutor;
   private isRunning: boolean = false;
   private isPaused: boolean = false;
   private mainLoopInterval: NodeJS.Timeout | null = null;
@@ -29,11 +31,13 @@ export class ArbitrageBot {
   private opportunitiesFound: number = 0;
   private tradesExecuted: number = 0;
   private startTime: number = 0;
+  private totalPnL: number = 0;
 
   constructor() {
     this.priceDiscovery = new PriceDiscovery();
     this.inventoryManager = new InventoryManager();
     this.bridgeMonitor = new BridgeMonitor();
+    this.dualLegExecutor = new DualLegExecutor();
   }
 
   /**
@@ -236,17 +240,44 @@ export class ArbitrageBot {
         riskScore: validation.riskScore
       });
 
-      // TODO: Execute the trade when execution engine is ready
-      // For now, just log what would happen
-      logger.info('🔄 Trade execution not yet implemented', {
+      // Execute the arbitrage trade
+      logger.info('🚀 Executing arbitrage trade...', {
         token: opportunity.token,
-        action: 'Would sell on GalaChain, buy on Solana',
         expectedProfit: (opportunity.netEdge * opportunity.recommendedSize * opportunity.gcSellPrice).toFixed(2) + ' GALA'
       });
 
-      // Simulate trade tracking
-      // const tradeId = `trade-${Date.now()}-${opportunity.token}`;
-      // riskManager.startTrade(opportunity.token, tradeId);
+      const tokenConfig = config.getToken(opportunity.token);
+      if (!tokenConfig) {
+        logger.error(`Token configuration not found for ${opportunity.token}`);
+        return;
+      }
+
+      const result = await this.dualLegExecutor.executeArbitrage(opportunity, tokenConfig);
+
+      if (result.success) {
+        this.tradesExecuted++;
+        this.totalPnL += result.realizedPnL;
+        
+        logger.info('💰 Trade executed successfully!', {
+          token: opportunity.token,
+          realizedPnL: `${result.realizedPnL.toFixed(2)} GALA`,
+          netEdge: `${(result.netEdge * 100).toFixed(2)}%`,
+          totalPnL: `${this.totalPnL.toFixed(2)} GALA`,
+          totalTrades: this.tradesExecuted
+        });
+
+        // Update state
+        stateManager.updateState({
+          totalPnL: this.totalPnL,
+          tradeCount: this.tradesExecuted
+        });
+      } else {
+        logger.error('❌ Trade execution failed', {
+          token: opportunity.token,
+          gcError: result.gcResult.error,
+          solError: result.solResult.error
+        });
+      }
       
     } catch (error: any) {
       logger.error(`Failed to evaluate opportunity for ${opportunity.token}`, {
@@ -402,6 +433,7 @@ Ready to find arbitrage opportunities! 🚀
       cycles: this.cycleCount,
       opportunitiesFound: this.opportunitiesFound,
       tradesExecuted: this.tradesExecuted,
+      totalPnL: `${this.totalPnL.toFixed(2)} GALA`,
       activeTrades: riskStatus.activeTrades,
       dailyLoss: riskStatus.dailyLossGALA.toFixed(2) + ' GALA',
       circuitBreaker: riskStatus.circuitBreakerActive ? '⚠️ ACTIVE' : '✅ Inactive',
