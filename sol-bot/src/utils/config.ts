@@ -85,6 +85,22 @@ export class ConfigManager {
     return this.tokensConfig;
   }
 
+  getTradingConfig() {
+    return this.botConfig.trading;
+  }
+
+  getRiskConfig() {
+    return this.botConfig.risk;
+  }
+
+  getBridgingConfig() {
+    return this.botConfig.bridging;
+  }
+
+  getMonitoringConfig() {
+    return this.botConfig.monitoring;
+  }
+
   getEnabledTokens() {
     return this.tokensConfig.supportedTokens.filter(t => t.enabled);
   }
