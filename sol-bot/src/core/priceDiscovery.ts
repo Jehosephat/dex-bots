@@ -15,11 +15,13 @@ import { config } from '../utils/config';
 import { logger } from '../utils/logger';
 
 export class PriceDiscovery {
-  private jupiterApiUrl = 'https://quote-api.jup.ag/v6';
+  private jupiterApiUrl = 'https://lite-api.jup.ag/swap/v1';
   private galaChainApiUrl = 'https://gateway-mainnet.galachain.com/api/asset/dexv3-contract/GetCompositePool';
   private dexBackendUrl = 'https://dex-backend-prod1.defi.gala.com';
+  private coinGeckoApiUrl = 'https://api.coingecko.com/api/v3';
   private galaChainPrices: Map<string, TokenPrice> = new Map();
   private solanaPrices: Map<string, TokenPrice> = new Map();
+  private solUSDPrice: number = 0;
   private lastUpdate: number = 0;
 
   constructor() {
@@ -371,20 +373,66 @@ export class PriceDiscovery {
     return 63.3; // 1 GUSDC = 63.3 GALA (based on ~$0.0158 per GALA)
   }
 
+  private async updateSOLUSDPrice(): Promise<void> {
+    try {
+      // Fetch SOL/USD price from CoinGecko
+      const response = await axios.get(`${this.coinGeckoApiUrl}/simple/price`, {
+        params: {
+          ids: 'solana',
+          vs_currencies: 'usd'
+        },
+        timeout: 10000
+      });
+
+      if (response.data?.solana?.usd) {
+        this.solUSDPrice = response.data.solana.usd;
+        logger.info(`SOL/USD price: $${this.solUSDPrice.toFixed(2)}`);
+        
+        // Store SOL as a "Solana price" with price of 1 SOL = 1 SOL
+        this.solanaPrices.set('GSOL', {
+          token: 'GSOL',
+          price: 1, // 1 SOL = 1 SOL
+          priceUSD: this.solUSDPrice,
+          liquidity: 0,
+          timestamp: Date.now(),
+          source: 'solana'
+        });
+      }
+    } catch (error: any) {
+      logger.error('Failed to fetch SOL/USD price from CoinGecko', {
+        error: error.message || error
+      });
+      // Use fallback price
+      this.solUSDPrice = 225; // Approximate fallback
+      logger.warn(`Using fallback SOL/USD price: $${this.solUSDPrice}`);
+    }
+  }
+
   private async updateSolanaPrices(tokens: TokenConfig[]): Promise<void> {
+    // First, get SOL/USD price
+    await this.updateSOLUSDPrice();
+
     for (const tokenConfig of tokens) {
       try {
         if (!tokenConfig.solanaMint) {
           continue;
         }
 
-        // Use Jupiter API to get quote
+        const solMint = 'So11111111111111111111111111111111111111112';
+        
+        // Skip if this token IS SOL (already handled by updateSOLUSDPrice)
+        if (tokenConfig.solanaMint === solMint) {
+          logger.debug(`Skipping Jupiter quote for ${tokenConfig.symbol} (it is SOL itself, using market price)`);
+          continue;
+        }
+
+        // Use Jupiter API to get quote (token → SOL)
         const quoteAmount = tokenConfig.minTradeSize * Math.pow(10, tokenConfig.decimals);
         
         const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
           params: {
             inputMint: tokenConfig.solanaMint,
-            outputMint: 'So11111111111111111111111111111111111111112', // SOL
+            outputMint: solMint,
             amount: Math.floor(quoteAmount),
             slippageBps: 50
           },
@@ -393,18 +441,19 @@ export class PriceDiscovery {
 
         if (response.data && response.data.outAmount) {
           const solReceived = response.data.outAmount / 1e9;
-          const price = solReceived / tokenConfig.minTradeSize;
+          const priceInSOL = solReceived / tokenConfig.minTradeSize;
+          const priceInUSD = priceInSOL * this.solUSDPrice;
 
           this.solanaPrices.set(tokenConfig.symbol, {
             token: tokenConfig.symbol,
-            price,
-            priceUSD: 0,
+            price: priceInSOL,
+            priceUSD: priceInUSD,
             liquidity: 0,
             timestamp: Date.now(),
             source: 'solana'
           });
 
-          logger.debug(`Solana price for ${tokenConfig.symbol}: ${price.toFixed(9)} SOL`);
+          logger.debug(`Solana price for ${tokenConfig.symbol}: ${priceInSOL.toFixed(9)} SOL ($${priceInUSD.toFixed(6)} USD)`);
         }
       } catch (error: any) {
         logger.error(`Failed to fetch Solana price for ${tokenConfig.symbol}`, {

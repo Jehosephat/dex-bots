@@ -41,10 +41,18 @@ async function testPriceDiscovery() {
       console.log('  ⚠️  No GalaChain prices fetched');
     }
 
-    console.log('\n🟣 Solana Prices (token → SOL):');
+    console.log('\n🟣 Solana Prices:');
     if (allPrices.solana.length > 0) {
       allPrices.solana.forEach(([symbol, price]) => {
-        console.log(`  ${symbol}: ${price.price.toFixed(6)} SOL per token`);
+        console.log(`  ${symbol}:`);
+        if (symbol === 'GSOL') {
+          console.log(`    $${price.priceUSD.toFixed(2)} USD (SOL market price)`);
+        } else {
+          console.log(`    ${price.price.toFixed(6)} SOL per token`);
+          if (price.priceUSD) {
+            console.log(`    $${price.priceUSD.toFixed(6)} USD per token`);
+          }
+        }
         console.log(`    Last updated: ${new Date(price.timestamp).toLocaleTimeString()}`);
       });
     } else {
@@ -81,7 +89,11 @@ async function testPriceDiscovery() {
       }
       
       if (solPrice) {
-        console.log(`    ✓ Solana price available: ${solPrice.price.toFixed(6)} SOL`);
+        if (token.symbol === 'GSOL') {
+          console.log(`    ✓ Solana price available: $${solPrice.priceUSD.toFixed(2)} USD (market price)`);
+        } else {
+          console.log(`    ✓ Solana price available: ${solPrice.price.toFixed(6)} SOL ($${solPrice.priceUSD.toFixed(6)} USD)`);
+        }
       } else {
         console.log(`    ✗ Solana price not available`);
         if (token.solanaMint.includes('ADDRESS_HERE')) {
