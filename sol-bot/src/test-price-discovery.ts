@@ -12,6 +12,8 @@ async function testPriceDiscovery() {
 
   try {
     const priceDiscovery = new PriceDiscovery();
+    await priceDiscovery.initialize();
+    
     const tokens = config.getEnabledTokens();
 
     console.log('📊 Fetching prices from GalaChain and Solana...');
