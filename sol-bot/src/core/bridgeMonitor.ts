@@ -108,10 +108,15 @@ export class BridgeMonitor {
   private async loadBridgeConfigurations(): Promise<void> {
     try {
       const tokens = config.getEnabledTokens();
+      logger.info(`🌐 Loading bridge configurations via REAL API calls to ${this.bridgeApiUrl}`);
+      logger.info(`   Checking ${tokens.length} enabled tokens...`);
       
       for (const token of tokens) {
         try {
-          const response = await axios.get(`${this.bridgeApiUrl}/v1/connect/bridge-configurations`, {
+          const apiUrl = `${this.bridgeApiUrl}/v1/connect/bridge-configurations`;
+          logger.debug(`📡 GET ${apiUrl}?searchprefix=${token.symbol}`);
+          
+          const response = await axios.get(apiUrl, {
             params: { searchprefix: token.symbol },
             timeout: 10000
           });
@@ -134,19 +139,24 @@ export class BridgeMonitor {
                 maxAmount: token.maxTradeSize
               });
 
-              logger.debug(`Loaded bridge config for ${token.symbol}`, {
-                canBridgeTo
+              logger.info(`✅ Loaded bridge config for ${token.symbol}`, {
+                canBridgeTo,
+                verified: tokenConfig.verified
               });
+            } else {
+              logger.warn(`⚠️  ${token.symbol} not found in API response or not verified`);
             }
+          } else {
+            logger.warn(`⚠️  No tokens data in API response for ${token.symbol}`);
           }
         } catch (error: any) {
-          logger.warn(`Failed to load bridge config for ${token.symbol}`, {
+          logger.warn(`❌ Failed to load bridge config for ${token.symbol}`, {
             error: error.message
           });
         }
       }
 
-      logger.info(`Loaded bridge configurations for ${this.bridgeConfigurations.size} tokens`);
+      logger.info(`✅ Loaded bridge configurations for ${this.bridgeConfigurations.size}/${tokens.length} tokens`);
     } catch (error) {
       logger.error('Failed to load bridge configurations', { error });
     }
@@ -243,6 +253,8 @@ export class BridgeMonitor {
     error?: string;
   } | null> {
     try {
+      logger.debug(`📡 POST ${this.bridgeApiUrl}/v1/connect/bridge/status`, { hash: hash.substring(0, 20) + '...' });
+      
       const response = await axios.post(
         `${this.bridgeApiUrl}/v1/connect/bridge/status`,
         { hash },
@@ -253,6 +265,10 @@ export class BridgeMonitor {
       );
 
       if (response.data?.data) {
+        logger.debug(`✅ Bridge status received for ${hash.substring(0, 20)}...`, {
+          status: response.data.data.statusDescription
+        });
+        
         return {
           status: response.data.data.status,
           statusDescription: response.data.data.statusDescription,
@@ -268,7 +284,7 @@ export class BridgeMonitor {
       return null;
     } catch (error: any) {
       logger.error('Failed to get bridge status', {
-        hash,
+        hash: hash.substring(0, 20) + '...',
         error: error.message
       });
       return null;
