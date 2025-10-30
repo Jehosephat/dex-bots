@@ -140,7 +140,8 @@ async function tryEdgeCalculator() {
         decimals: 6,
         tradeSize: scenario.tradeSize,
         enabled: true,
-        gcQuoteVia: 'GALA'
+        gcQuoteVia: 'GALA',
+        solQuoteVia: 'SOL'
       };
       
       // Calculate edge

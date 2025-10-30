@@ -32,7 +32,7 @@ async function testPriceDiscovery() {
     logger.info('🔍 Testing individual quotes...');
     const enabledTokens = getEnabledTokens();
     
-    for (const token of enabledTokens.slice(0, 2)) { // Test first 2 tokens
+    for (const token of enabledTokens) { // Test all enabled tokens
       logger.info(`📈 Testing quotes for ${token.symbol}...`);
       
       try {
