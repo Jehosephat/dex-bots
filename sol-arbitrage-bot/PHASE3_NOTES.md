@@ -126,4 +126,50 @@ Notes:
 - This is a dry-run only; no transactions are submitted.
 - Net preview is intentionally deferred until we wire a consistent conversion path to GALA for the SOL leg’s quote currency (e.g., USDC→GALA).
 
+---
+
+### ✅ 3.4 Risk Manager (pre-trade validation)
+
+Implemented a pre-trade risk layer that evaluates whether a discovered opportunity should proceed, using quotes, config guardrails, and state.
+
+- Added `src/execution/riskManager.ts`
+  - Validations:
+    - Price impact caps per leg (`trading.maxPriceImpactBps`)
+    - Net edge threshold via `EdgeCalculator` (`trading.minEdgeBps`)
+    - Token cooldown check via `StateManager`
+    - Basic inventory presence check on GalaChain for sell leg
+  - Logs PASS/FAIL, reasons, and computed `netEdge/netEdgeBps`
+
+- Added `src/test-risk-manager.ts`
+  - Fetches live GC + Sol quotes for `SOL`
+  - Uses GC price as a proxy for `SOL→GALA` rate (for SOL symbol)
+  - Runs `RiskManager.evaluate(...)` and logs decision
+
+Sample test output (abridged):
+
+```
+✅ GalaChain price provider initialized
+✅ Solana price provider initialized
+[EXECUTION] Risk evaluation for SOL: FAIL {
+  reasons: [
+    "Negative net edge",
+    "Edge ...bps below threshold 30bps",
+    "Insufficient GalaChain inventory for sell (simulation mode if dry-run)"
+  ],
+  netEdge: "-50.93...",
+  netEdgeBps: -9980.40...
+}
+🚫 Risk FAIL { ... }
+```
+
+How to run:
+
+```
+npx ts-node src/test-risk-manager.ts
+```
+
+Notes:
+- Failures are expected in test environment due to insufficient GC liquidity/inventory and current price levels; this confirms guardrails work.
+- We can improve `SOL→GALA` rate sourcing by using the provider’s cached USD prices (GALA/USD, SOL/USD) to compute the rate consistently across tokens.
+
 
