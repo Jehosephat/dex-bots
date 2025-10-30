@@ -124,6 +124,12 @@ export class BridgeManager {
       additionalKey: token.additionalKey,
     };
   }
+
+  async getBridgeStatus(hash: string): Promise<unknown> {
+    if (!this.client) throw new Error('BridgeManager not initialized');
+    const status = await this.client.getBridgeStatus(hash);
+    return status;
+  }
 }
 
 

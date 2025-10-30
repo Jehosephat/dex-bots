@@ -70,8 +70,28 @@ Tracks simple per-symbol balances across GalaChain and Solana in `state.json` an
 
 ### Next Steps (Phase 4 live wiring)
 
-- Replace mocked fee in `BridgeManager.estimateFee()` with real calls via a lightweight GalaConnect client (reuse shapes from `bridge_round_trip`).
-- Add status polling and timeout handling (mirroring the RoundTrip runner) once we enable real submissions.
-- Connect InventoryTracker to real balance reads when available.
+### 4.4 Bridge Status Polling
+
+Added a simple status fetch using GalaConnect to inspect bridge status by hash.
+
+- Updated `src/bridging/galaConnectClient.ts` with `getBridgeStatus()` (path configurable via `GALA_STATUS_PATH`, default `/v1/bridge/status` on `GALA_CONNECT_BASE_URL`).
+- Exposed `BridgeManager.getBridgeStatus(hash)`.
+
+- Verification
+  - Set an environment variable with a known bridge hash: `BRIDGE_STATUS_HASH=...`
+  - Run:
+    ```
+    npx ts-node src/test-bridge-status.ts
+    ```
+  - Expected output: normalized JSON payload from the Gala service for the provided hash.
+
+Pending validation:
+- We still need to test against known recent bridge hashes to confirm host/path/method combinations in production consistently return status (some gateways may require GET vs POST or differ by base URL). Once validated, we will lock paths in config and document exact requirements.
+
+---
+
+Next steps:
+- Add timeout/retry wrapper and normalization similar to `bridge_round_trip` once we submit real bridges.
+- Connect InventoryTracker to live balance reads when available.
 
 

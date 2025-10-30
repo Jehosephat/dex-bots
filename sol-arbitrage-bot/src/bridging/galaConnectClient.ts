@@ -67,6 +67,18 @@ export class GalaConnectClient {
     return this.postJson(path, payload, this.galachainBaseUrl);
   }
 
+  async getBridgeStatus(hash: string): Promise<unknown> {
+    const path = process.env.GALA_STATUS_PATH || '/v1/bridge/status';
+    const url = new URL(path, this.galachainBaseUrl);
+    url.searchParams.set('hash', hash);
+    const fullUrl = url.toString();
+    const res = await this.request(fullUrl, { method: 'GET' });
+    const text = await res.text();
+    const parsed = this.tryParse(text);
+    if (!res.ok) throw new GalaConnectHttpError(res.status, url.pathname + url.search, parsed ?? text, fullUrl);
+    return parsed as unknown;
+  }
+
   private async postJson<T>(path: string, body: unknown, baseUrl = this.baseUrl): Promise<T> {
     const url = new URL(path, baseUrl);
     const fullUrl = url.toString();
