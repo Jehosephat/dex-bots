@@ -193,7 +193,7 @@ export class ConfigurationManager {
       logFile: process.env['LOG_FILE'] || '/var/log/follow-bot.log',
       
       // GalaChain API Configuration
-      galachainRpcUrl: process.env['GALACHAIN_RPC_URL'] || 'https://rpc.galachain.io',
+      galachainRpcUrl: process.env['GALACHAIN_RPC_URL'] || 'https://gateway-mainnet.galachain.com/api',
       galachainWebsocketUrl: process.env['GALACHAIN_WEBSOCKET_URL'] || 'wss://explorer.galachain.io/ws',
       
       // Optional
