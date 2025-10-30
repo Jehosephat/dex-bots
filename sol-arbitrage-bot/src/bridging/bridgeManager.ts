@@ -2,6 +2,7 @@ import BigNumber from 'bignumber.js';
 import { ConfigManager } from '../config/configManager';
 import logger from '../utils/logger';
 import { GalaConnectClient, BridgeTokenDescriptor } from './galaConnectClient';
+import { resolveGalaEndpoints } from './galaEndpoints';
 
 export interface BridgeFeeEstimate {
   chain: 'Solana';
@@ -34,8 +35,9 @@ export class BridgeManager {
       solRpc: networks.solana.rpcUrl,
     });
 
-    const baseUrl = process.env.GALA_CONNECT_BASE_URL || 'https://connect.gala.com';
-    const galachainApi = process.env.GALACHAIN_API_BASE_URL || 'https://gateway-mainnet.galachain.com/';
+    const ep = resolveGalaEndpoints();
+    const baseUrl = ep.connectBaseUrl;
+    const galachainApi = ep.dexApiBaseUrl;
     const wallet = process.env.GALACHAIN_WALLET_ADDRESS || '';
     this.client = new GalaConnectClient(baseUrl, galachainApi, wallet);
     logger.info('GalaConnect client ready', { baseUrl, galachainApi, walletPresent: Boolean(wallet) });
@@ -46,9 +48,8 @@ export class BridgeManager {
     const descriptor = await this.resolveBridgeTokenDescriptor(symbol);
     const fee = await this.client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: descriptor });
     const totalGala = new BigNumber(fee.estimatedTotalTxFeeInGala);
-    const galachainApi = process.env.GALACHAIN_API_BASE_URL || 'https://api.galachain.io';
-    const feePath = process.env.GALA_FEE_PATH || '/v1/bridge/fee';
-    const feeUrl = new URL(feePath, galachainApi).toString();
+    const ep2 = resolveGalaEndpoints();
+    const feeUrl = new URL(ep2.pathBridgeFee, ep2.dexApiBaseUrl).toString();
     return {
       chain: 'Solana',
       feeToken: 'GALA',

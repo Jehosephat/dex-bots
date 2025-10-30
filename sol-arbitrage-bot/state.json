@@ -1,27 +1,9 @@
 {
-  "inventory": {
-    "galaChain": {
-      "tokens": {},
-      "native": "0",
-      "totalValueUsd": "0",
-      "lastUpdated": 1761783844314
-    },
-    "solana": {
-      "tokens": {},
-      "native": "0",
-      "totalValueUsd": "0",
-      "lastUpdated": 1761783844314
-    },
-    "lastUpdated": 1761783844314,
-    "version": 1
+  "galaChain": {
+    "SOL": "95"
   },
-  "pendingBridges": [],
-  "recentTrades": [],
-  "tokenCooldowns": {},
-  "dailyTradeCounts": {},
-  "lastBridgeTimes": {},
-  "status": "running",
-  "lastHeartbeat": 1761784491721,
-  "version": 3,
-  "lastSaved": 1761784521731
+  "solana": {
+    "SOL": "5"
+  },
+  "updatedAtMs": 1761838143481
 }

@@ -44,7 +44,8 @@ export class InventoryTracker {
     const snap = this.load();
     const fromMap = { ...snap[params.from] };
     const toMap = { ...snap[params.to] };
-    const fromBal = new BigNumber(fromMap[params.symbol] ?? 0).minus(amt).max(0);
+    const tentativeFrom = new BigNumber(fromMap[params.symbol] ?? 0).minus(amt);
+    const fromBal = BigNumber.maximum(tentativeFrom, new BigNumber(0));
     const toBal = new BigNumber(toMap[params.symbol] ?? 0).plus(amt);
     fromMap[params.symbol] = fromBal.toString();
     toMap[params.symbol] = toBal.toString();

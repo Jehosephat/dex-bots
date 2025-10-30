@@ -1,3 +1,5 @@
+import { resolveGalaEndpoints } from './galaEndpoints';
+
 export interface BridgeTokenDescriptor {
   collection: string;
   category: string;
@@ -48,7 +50,8 @@ export class GalaConnectClient {
   ) {}
 
   async getBridgeConfigurations(searchPrefix: string): Promise<BridgeConfigurationToken[]> {
-    const url = new URL('/v1/connect/bridge-configurations', this.baseUrl);
+    const ep = resolveGalaEndpoints();
+    const url = new URL(ep.pathBridgeConfigs, this.baseUrl);
     url.searchParams.set('searchprefix', searchPrefix);
     const fullUrl = url.toString();
     const res = await this.request(fullUrl, { method: 'GET' });
@@ -63,13 +66,26 @@ export class GalaConnectClient {
   }
 
   async fetchBridgeFee(payload: { chainId: string; bridgeToken: BridgeTokenDescriptor }): Promise<BridgeFeeResponse> {
-    const path = process.env.GALA_FEE_PATH || '/v1/bridge/fee';
-    return this.postJson(path, payload, this.galachainBaseUrl);
+    const ep = resolveGalaEndpoints();
+    if (ep.urlBridgeFee) {
+      const u = new URL(ep.urlBridgeFee);
+      return this.postJson(u.pathname + u.search, payload, `${u.protocol}//${u.host}`);
+    }
+    return this.postJson(ep.pathBridgeFee, payload, ep.dexApiBaseUrl);
   }
 
   async getBridgeStatus(hash: string): Promise<unknown> {
-    const path = process.env.GALA_STATUS_PATH || '/v1/bridge/status';
-    const url = new URL(path, this.galachainBaseUrl);
+    const ep = resolveGalaEndpoints();
+    if (ep.urlBridgeStatus) {
+      const u = new URL(ep.urlBridgeStatus);
+      u.searchParams.set('hash', hash);
+      const res = await this.request(u.toString(), { method: 'GET' });
+      const text = await res.text();
+      const parsed = this.tryParse(text);
+      if (!res.ok) throw new GalaConnectHttpError(res.status, u.pathname + u.search, parsed ?? text, u.toString());
+      return parsed as unknown;
+    }
+    const url = new URL(ep.pathBridgeStatus, ep.dexApiBaseUrl);
     url.searchParams.set('hash', hash);
     const fullUrl = url.toString();
     const res = await this.request(fullUrl, { method: 'GET' });
@@ -77,6 +93,19 @@ export class GalaConnectClient {
     const parsed = this.tryParse(text);
     if (!res.ok) throw new GalaConnectHttpError(res.status, url.pathname + url.search, parsed ?? text, fullUrl);
     return parsed as unknown;
+  }
+
+  async fetchBalances(): Promise<unknown> {
+    const ep = resolveGalaEndpoints();
+    const fullUrlOverride = ep.urlFetchBalances;
+    const path = ep.pathFetchBalances;
+    const baseForBalances = process.env.GC_BALANCES_BASE_URL || ep.dexBaseUrl;
+    const body = { owner: this.walletAddress } as const;
+    if (fullUrlOverride) {
+      const url = new URL(fullUrlOverride);
+      return this.postJson(url.pathname + url.search, body, `${url.protocol}//${url.host}`);
+    }
+    return this.postJson(path, body, baseForBalances);
   }
 
   private async postJson<T>(path: string, body: unknown, baseUrl = this.baseUrl): Promise<T> {

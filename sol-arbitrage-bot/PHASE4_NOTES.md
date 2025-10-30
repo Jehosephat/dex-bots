@@ -88,6 +88,21 @@ Added a simple status fetch using GalaConnect to inspect bridge status by hash.
 Pending validation:
 - We still need to test against known recent bridge hashes to confirm host/path/method combinations in production consistently return status (some gateways may require GET vs POST or differ by base URL). Once validated, we will lock paths in config and document exact requirements.
 
+### 4.5 On-chain Inventory Fetchers
+
+Goal: view live balances on each chain to know when bridging is needed and validate execution results.
+
+- GalaChain: use FetchBalances for the configured wallet (via the existing GalaConnect/GalaChain client).
+- Solana: read native SOL balance and SPL token balances for wallet ATAs.
+
+Planned verification:
+- Scripts added:
+  - `src/test-gc-balances.ts`
+    - Usage: `npx ts-node src/test-gc-balances.ts`
+    - Prints GC balances for `GALACHAIN_WALLET_ADDRESS`
+  - `src/test-sol-balances.ts`
+    - Usage: `npx ts-node src/test-sol-balances.ts`
+    - Prints SOL balance and SPL token balances for `SOLANA_WALLET_ADDRESS`
 ---
 
 Next steps:

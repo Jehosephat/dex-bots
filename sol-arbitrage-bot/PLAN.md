@@ -104,6 +104,16 @@ Based on the PRD and analysis of existing codebase components, here's a detailed
 - Update inventory after successful bridges
 - Handle bridge failures and retries
 
+### 4.4 Bridge Status Polling (added)
+- Add endpoint integration to fetch bridge status by hash (GET with `?hash=`)
+- Normalize and log status codes/descriptions
+- Expose simple status utility and test harness
+
+### 4.5 On-chain Inventory Fetchers (added)
+- GalaChain balances: integrate FetchBalances API for wallet
+- Solana balances: fetch native SOL and SPL token ATAs for wallet
+- Provide CLI scripts to print balances for both chains and persist snapshots
+
 **Reusable Components:**
 - Complete bridging infrastructure from `bridge_round_trip`
 - GalaConnect client for bridge operations
