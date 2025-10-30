@@ -13,6 +13,7 @@ This document tracks the last mile to a fully working live arbitrage bot (bridgi
 - Inventory: 🚧 In progress
   - GC balances: ✅ via Connect API (multiple response shapes supported)
   - Solana balances: 🚧 native SOL via RPC; SPL balances via RPC decode or indexer fallback (Helius/Solscan)
+  - Alerts: ✅ Slack/Discord webhooks wired; tested Slack successfully (`src/test-alerts.ts`)
 
 ### Remaining Todos
 1) Upgrade Dual-Leg execution (pending)
@@ -61,7 +62,7 @@ This document tracks the last mile to a fully working live arbitrage bot (bridgi
 2) Risk and safety wiring from env (including notional caps and pause/window)
 3) Main loop single-iteration runner → then interval runner
 4) Alerts + inventory pre/post checks
-5) Finalize Solana SPL balance retrieval (prefer Helius if available, otherwise Solscan fallback)
+5) Finalize Solana SPL balance retrieval (prefer Helius if available, otherwise Solscan fallback) — partially working; needs provider selection + cadence tuning
 6) Add `test-live-smoke.ts` and finalize docs
 
 
