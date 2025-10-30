@@ -1,7 +1,9 @@
 import BigNumber from 'bignumber.js';
+import axios from 'axios';
+import bs58 from 'bs58';
+import { Connection, VersionedTransaction, Keypair } from '@solana/web3.js';
 import { SolanaQuote } from '../types/core';
-import { getTradingConfig } from '../config';
-import { calculateMinOutput } from '../utils/calculations';
+import { getTradingConfig, getTokenConfig, getQuoteTokenConfig, initializeConfig } from '../config';
 import logger from '../utils/logger';
 
 export interface SolanaExecutionParams {
@@ -24,6 +26,11 @@ export interface SolanaExecutionResult {
 export class SolanaExecutor {
   private readonly maxSlippageBps: number;
   private readonly defaultDeadlineSeconds = 60;
+  private readonly jupiterApiBases = [
+    process.env.JUPITER_API_BASE || 'https://lite-api.jup.ag/swap/v1'
+  ];
+  private connection?: Connection;
+  private wallet?: Keypair;
 
   constructor() {
     const trading = getTradingConfig();
@@ -76,6 +83,110 @@ export class SolanaExecutor {
         },
         error: errorMessage
       };
+    }
+  }
+
+  /**
+   * Execute a live buy on Solana using Jupiter based on a prior SolanaQuote.
+   * Uses ExactOut mode to purchase "tradeSize" amount of the output token.
+   */
+  async executeFromQuoteLive(symbol: string, tradeSize: number, quote: SolanaQuote): Promise<SolanaExecutionResult> {
+    // Ensure config is initialized in case caller didn't
+    try { initializeConfig(); } catch {}
+
+    const params: SolanaExecutionParams = {
+      symbol,
+      tradeSize,
+      quoteCurrency: quote.currency,
+      expectedCostInQuote: quote.price.multipliedBy(tradeSize),
+      maxCostInQuote: quote.price.multipliedBy(tradeSize).multipliedBy(new BigNumber(1).plus(this.maxSlippageBps / 10000)),
+      route: quote.jupiterRoute,
+      deadlineMs: Date.now() + this.defaultDeadlineSeconds * 1000
+    };
+
+    try {
+      // Setup connection and wallet
+      const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      const priv = process.env.SOLANA_PRIVATE_KEY;
+      if (!priv) {
+        throw new Error('SOLANA_PRIVATE_KEY not set');
+      }
+      this.connection = new Connection(rpcUrl, 'confirmed');
+      const secret = bs58.decode(priv);
+      this.wallet = Keypair.fromSecretKey(secret);
+
+      // Determine mints and decimals
+      const tokenCfg = getTokenConfig(symbol);
+      if (!tokenCfg?.solanaMint) throw new Error(`No Solana mint for token ${symbol}`);
+      const quoteCfg = getQuoteTokenConfig(tokenCfg.solQuoteVia);
+      if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${tokenCfg.solQuoteVia}`);
+
+      const inputMint = quote.jupiterRoute?.inputMint || quoteCfg.solanaMint; // quote currency
+      const outputMint = quote.jupiterRoute?.outputMint || tokenCfg.solanaMint; // target token
+
+      // Use ExactOut: request to buy "tradeSize" output tokens
+      const outAmountRaw = new BigNumber(tradeSize).multipliedBy(new BigNumber(10).pow(tokenCfg.decimals)).integerValue(BigNumber.ROUND_DOWN).toString();
+
+      // Fresh quote (ExactOut) with fallback hosts
+      let quoteRes: any;
+      let lastErr: any;
+      for (const base of this.jupiterApiBases) {
+        try {
+          quoteRes = await axios.get(`${base}/quote`, {
+            params: {
+              inputMint,
+              outputMint,
+              amount: outAmountRaw,
+              slippageBps: this.maxSlippageBps,
+              swapMode: 'ExactOut'
+            },
+            timeout: 15000
+          });
+          logger.debug('Jupiter /quote OK', { base });
+          break;
+        } catch (e) {
+          lastErr = e;
+          logger.warn('Jupiter /quote failed on host', { base, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      if (!quoteRes?.data) throw (lastErr || new Error('All Jupiter /quote hosts failed'));
+
+      // Build swap transaction (fallback hosts)
+      let swapRes: any;
+      for (const base of this.jupiterApiBases) {
+        try {
+          swapRes = await axios.post(`${base}/swap`, {
+            quoteResponse: quoteRes.data,
+            userPublicKey: this.wallet.publicKey.toBase58(),
+            wrapAndUnwrapSol: true,
+            dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: 'auto'
+          }, { timeout: 20000 });
+          logger.debug('Jupiter /swap OK', { base });
+          break;
+        } catch (e) {
+          lastErr = e;
+          logger.warn('Jupiter /swap failed on host', { base, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      if (!swapRes?.data) throw (lastErr || new Error('All Jupiter /swap hosts failed'));
+
+      const swapTxB64 = swapRes.data?.swapTransaction;
+      if (!swapTxB64) throw new Error('No swapTransaction returned by Jupiter');
+
+      // Deserialize, sign, send
+      const tx = VersionedTransaction.deserialize(Buffer.from(swapTxB64, 'base64'));
+      tx.sign([this.wallet]);
+      const sig = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const conf = await this.connection.confirmTransaction(sig, 'confirmed');
+      if (conf.value.err) throw new Error(`Transaction failed: ${JSON.stringify(conf.value.err)}`);
+
+      logger.execution('✅ Solana swap executed', { symbol, signature: sig, rpcUrl });
+      return { success: true, params, txSig: sig };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('❌ Solana live execution failed', { symbol, error: message });
+      return { success: false, params, error: message };
     }
   }
 }
