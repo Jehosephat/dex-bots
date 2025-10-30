@@ -116,6 +116,23 @@ export class DualLegCoordinator {
       throw new Error(`Token not configured: ${symbol}`);
     }
 
+    // Global safety toggles
+    if ((process.env.PAUSE || '').toLowerCase() === 'true') {
+      throw new Error('Trading is paused via PAUSE env');
+    }
+    const start = process.env.TRADE_WINDOW_START || '00:00';
+    const end = process.env.TRADE_WINDOW_END || '23:59';
+    const nowUtc = new Date();
+    const toMinutes = (hhmm: string) => {
+      const [h, m] = hhmm.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const curMin = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
+    const inWindow = curMin >= toMinutes(start) && curMin <= toMinutes(end);
+    if (!inWindow) {
+      throw new Error(`Outside TRADE_WINDOW (${start}-${end} UTC)`);
+    }
+
     await this.gcProvider.initialize();
     await this.solProvider.initialize();
 
@@ -129,6 +146,25 @@ export class DualLegCoordinator {
 
     const gcQuote = gcQuoteGeneric as GalaChainQuote;
     const solQuote = solQuoteGeneric as SolanaQuote;
+
+    // Notional cap per trade (USD)
+    const capStr = process.env.MAX_NOTIONAL_PER_TRADE;
+    if (capStr) {
+      const cap = Number(capStr);
+      if (!Number.isNaN(cap) && cap > 0) {
+        let notionalUsd = 0;
+        if (solQuote.currency === 'USDC') {
+          notionalUsd = solQuote.price.multipliedBy(token.tradeSize).toNumber();
+        } else if (solQuote.currency === 'SOL') {
+          const solUsd = this.solProvider.getSOLUSDPrice();
+          const costSol = solQuote.price.multipliedBy(token.tradeSize).toNumber();
+          notionalUsd = costSol * solUsd;
+        }
+        if (notionalUsd > cap) {
+          throw new Error(`Per-trade notional ${notionalUsd.toFixed(2)} exceeds cap ${cap}`);
+        }
+      }
+    }
 
     // Fire both legs nearly concurrently
     const [gcRes, solRes] = await Promise.allSettled([
