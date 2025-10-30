@@ -7,6 +7,7 @@
 
 import logger from './utils/logger';
 import { initializeConfig, validateConfig, getEnabledTokens, getConfig } from './config';
+import { StateManager } from './core/stateManager';
 
 async function main() {
   try {
@@ -42,6 +43,20 @@ async function main() {
         intervalMinutes: config.bridging.intervalMinutes,
         thresholdUsd: config.bridging.thresholdUsd
       }
+    });
+    
+    // Initialize state manager
+    logger.info('📊 Initializing state manager...');
+    const stateManager = new StateManager();
+    stateManager.updateStatus('running');
+    
+    // Log initial state
+    const initialState = stateManager.getState();
+    logger.info('📊 Initial state loaded', {
+      status: initialState.status,
+      inventoryVersion: initialState.inventory.version,
+      pendingBridges: initialState.pendingBridges.length,
+      recentTrades: initialState.recentTrades.length
     });
     
     // TODO: Initialize price providers

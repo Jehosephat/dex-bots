@@ -1,0 +1,135 @@
+{
+  "inventory": {
+    "galaChain": {
+      "tokens": {
+        "FARTCOIN": {
+          "symbol": "FARTCOIN",
+          "mint": "FARTCOIN|Unit|none|none",
+          "rawBalance": "1000000000",
+          "balance": "1000",
+          "decimals": 6,
+          "valueUsd": "100",
+          "lastUpdated": 1761784530347
+        }
+      },
+      "native": "0",
+      "totalValueUsd": "0",
+      "lastUpdated": 1761784530347
+    },
+    "solana": {
+      "tokens": {},
+      "native": "0",
+      "totalValueUsd": "0",
+      "lastUpdated": 1761783836661
+    },
+    "lastUpdated": 1761784530347,
+    "version": 4
+  },
+  "pendingBridges": [
+    {
+      "id": "test-bridge-1",
+      "tokenSymbol": "FARTCOIN",
+      "amount": "1000",
+      "sourceChain": "solana",
+      "destinationChain": "galachain",
+      "status": "pending",
+      "bridgeFee": "1.25",
+      "submittedAt": 1761783836665,
+      "retryCount": 0,
+      "maxRetries": 3
+    },
+    {
+      "id": "test-bridge-1",
+      "tokenSymbol": "FARTCOIN",
+      "amount": "1000",
+      "sourceChain": "solana",
+      "destinationChain": "galachain",
+      "status": "pending",
+      "bridgeFee": "1.25",
+      "submittedAt": 1761784485249,
+      "retryCount": 0,
+      "maxRetries": 3
+    },
+    {
+      "id": "test-bridge-1",
+      "tokenSymbol": "FARTCOIN",
+      "amount": "1000",
+      "sourceChain": "solana",
+      "destinationChain": "galachain",
+      "status": "pending",
+      "bridgeFee": "1.25",
+      "submittedAt": 1761784530349,
+      "retryCount": 0,
+      "maxRetries": 3
+    }
+  ],
+  "recentTrades": [
+    {
+      "id": "test-exec-1",
+      "tokenSymbol": "FARTCOIN",
+      "tradeSize": 1000,
+      "success": true,
+      "actualGalaChainProceeds": "50",
+      "actualSolanaCost": "0.1",
+      "actualSolanaCostGala": "45",
+      "actualNetEdge": "5",
+      "actualNetEdgeBps": 1000,
+      "galaChainSlippageBps": 10,
+      "solanaSlippageBps": 20,
+      "totalFees": "1",
+      "startTimestamp": 1761784525348,
+      "endTimestamp": 1761784530348,
+      "durationMs": 5000
+    },
+    {
+      "id": "test-exec-1",
+      "tokenSymbol": "FARTCOIN",
+      "tradeSize": 1000,
+      "success": true,
+      "actualGalaChainProceeds": "50",
+      "actualSolanaCost": "0.1",
+      "actualSolanaCostGala": "45",
+      "actualNetEdge": "5",
+      "actualNetEdgeBps": 1000,
+      "galaChainSlippageBps": 10,
+      "solanaSlippageBps": 20,
+      "totalFees": "1",
+      "startTimestamp": 1761784480249,
+      "endTimestamp": 1761784485249,
+      "durationMs": 5000
+    },
+    {
+      "id": "test-exec-1",
+      "tokenSymbol": "FARTCOIN",
+      "tradeSize": 1000,
+      "success": true,
+      "actualGalaChainProceeds": "50",
+      "actualSolanaCost": "0.1",
+      "actualSolanaCostGala": "45",
+      "actualNetEdge": "5",
+      "actualNetEdgeBps": 1000,
+      "galaChainSlippageBps": 10,
+      "solanaSlippageBps": 20,
+      "totalFees": "1",
+      "startTimestamp": 1761783831664,
+      "endTimestamp": 1761783836664,
+      "durationMs": 5000
+    }
+  ],
+  "tokenCooldowns": {
+    "FARTCOIN": {
+      "isInCooldown": true,
+      "cooldownEndsAt": 1761784830350,
+      "remainingSeconds": 300,
+      "reason": "test cooldown"
+    }
+  },
+  "dailyTradeCounts": {
+    "2025-10-30": 3
+  },
+  "lastBridgeTimes": {},
+  "status": "stopped",
+  "lastHeartbeat": 1761783836661,
+  "version": 4,
+  "lastSaved": 1761784530355
+}
