@@ -85,4 +85,45 @@ After both executors are ready, we will proceed to:
 - 3.3 Dual-Leg Coordinator (near-simultaneous GC sell + SOL buy)
 - 3.4 Risk Manager (pre-trade validation and recovery)
 
+---
+
+### ✅ 3.3 Dual-Leg Coordinator (dry-run)
+
+Implemented a coordinator that prepares both legs (GalaChain sell + Solana buy) as a single dry-run, ensuring timing alignment.
+
+- Added `src/execution/dualLegCoordinator.ts`
+  - Initializes both price providers
+  - Fetches quotes for the configured `tradeSize`
+  - Builds GC and SOL dry-run params using the existing executors
+  - Checks deadlines align within a small window (default 30s)
+  - Returns a combined result; includes a placeholder `previewNetGala` for future net estimation
+
+- Added `src/test-dual-leg.ts`
+  - Runs a dual-leg dry-run for `SOL`
+  - Logs:
+    - GC expected/min proceeds (GALA)
+    - SOL expected/max cost (quote currency, e.g., USDC)
+    - Both deadlines and whether timing is OK
+
+Sample test output (abridged):
+
+```
+✅ GalaChain price provider initialized
+✅ Solana price provider initialized
+[EXECUTION] Prepared GC execution params for SOL { expectedProceedsGala: "0.1", minProceedsGala: "0.0995", ... }
+[EXECUTION] Prepared SOL execution params for SOL { quoteCurrency: "USDC", expectedCostInQuote: "1.9696...", maxCostInQuote: "1.9795...", ... }
+[EXECUTION] Prepared dual-leg dry-run { timingOk: true }
+✅ Dual-leg dry-run built { gc_deadline: <ts>, sol_deadline: <ts> }
+```
+
+How to run:
+
+```
+npx ts-node src/test-dual-leg.ts
+```
+
+Notes:
+- This is a dry-run only; no transactions are submitted.
+- Net preview is intentionally deferred until we wire a consistent conversion path to GALA for the SOL leg’s quote currency (e.g., USDC→GALA).
+
 
