@@ -108,6 +108,23 @@ export class GalaConnectClient {
     return this.postJson(path, body, baseForBalances);
   }
 
+  async requestBridgeOut(payload: Record<string, unknown>): Promise<unknown> {
+    const ep = resolveGalaEndpoints();
+    return this.postJson(ep.pathRequestBridgeOut, payload, ep.connectBaseUrl);
+  }
+
+  async bridgeTokenOut(payload: Record<string, unknown>): Promise<unknown> {
+    const ep = resolveGalaEndpoints();
+    return this.postJson(ep.pathBridgeTokenOut, payload, ep.connectBaseUrl);
+  }
+
+  async registerBridgeTransaction(payload: Record<string, unknown>): Promise<unknown> {
+    const ep = resolveGalaEndpoints();
+    // Some deployments expose registration on connect base
+    const path = '/v1/bridge/transaction';
+    return this.postJson(path, payload, ep.connectBaseUrl);
+  }
+
   private async postJson<T>(path: string, body: unknown, baseUrl = this.baseUrl): Promise<T> {
     const url = new URL(path, baseUrl);
     const fullUrl = url.toString();

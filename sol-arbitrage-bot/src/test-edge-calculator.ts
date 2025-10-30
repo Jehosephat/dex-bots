@@ -203,7 +203,8 @@ async function testWithSimulatedData(edgeCalculator: EdgeCalculator) {
     decimals: 6,
     tradeSize: 1000,
     enabled: true,
-    gcQuoteVia: 'GALA'
+    gcQuoteVia: 'GALA',
+    solQuoteVia: 'USDC'
   };
   
   const solToGalaRate = new BigNumber(20000); // 1 SOL = 20,000 GALA
@@ -304,7 +305,8 @@ async function testEdgeScenarios(edgeCalculator: EdgeCalculator) {
       decimals: 6,
       tradeSize: 1000,
       enabled: true,
-      gcQuoteVia: 'GALA'
+      gcQuoteVia: 'GALA',
+      solQuoteVia: 'USDC'
     };
     
     const edgeResult = edgeCalculator.calculateEdge(

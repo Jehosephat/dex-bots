@@ -32,6 +32,24 @@ Notes:
 
 ---
 
+### 4.6 Real Bridge Test (GALA → Solana)
+
+Added a test that performs a real GalaChain → Solana bridge of 10 GALA via signed GalaConnect requests, then polls status until completion or timeout.
+
+- Script: `src/test-bridge-roundtrip.ts`
+- Requires env:
+  - `GALACHAIN_WALLET_ADDRESS` (identity string, e.g., `eth|...`)
+  - `BRIDGE_PRIVATE_KEY` (Ethereum EOA private key for signing the typed payload)
+  - `SOLANA_WALLET_ADDRESS` (recipient on Solana)
+  - GC endpoints as configured in env.example (GC_*). Fee/status must be reachable.
+- Run:
+  ```
+  npx ts-node src/test-bridge-roundtrip.ts
+  ```
+- Output: shows request/bridge responses and status polling updates. Stops when status ≥ 5 or after 30 min timeout.
+
+Note: The inbound Solana → GalaChain return leg is not automated here. Use your Solana wallet to initiate the return bridge, or extend this test to include the Solana bridge program call.
+
 ### 4.2 Bridge Scheduler (time/threshold rules)
 
 Implements decision logic for when to bridge based on a time interval and an inventory USD threshold.
@@ -49,6 +67,23 @@ Implements decision logic for when to bridge based on a time interval and an inv
   - Expected output: two decisions showing (a) low-inventory -> shouldBridge=false; (b) high-inventory with interval elapsed -> shouldBridge=true
 
 ---
+
+### 4.7 Real Bridge (Solana → GalaChain, native SOL)
+
+Implements native SOL bridge-out to GalaChain via Gala bridge program, with registration.
+
+- Script: `src/test-sol-bridge-out.ts`
+- Requires env:
+  - `SOLANA_PRIVATE_KEY` (base58)
+  - `SOLANA_WALLET_ADDRESS`
+  - `GC_SOL_BRIDGE_PROGRAM` (Gala bridge program id)
+  - `GALACHAIN_WALLET_ADDRESS` (GC identity string, used as recipient)
+  - Optional: `SOL_BRIDGE_AMOUNT_SOL` (default 0.001)
+- Run:
+  ```
+  npx ts-node src/test-sol-bridge-out.ts
+  ```
+- Output: Solana transaction signature, optional registration status URL. Use the existing status test to poll the signature.
 
 ### 4.3 Inventory Reconciliation
 

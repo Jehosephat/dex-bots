@@ -3,7 +3,7 @@ import { BridgeManager } from './bridging/bridgeManager';
 import { ConfigManager } from './config/configManager';
 
 async function main() {
-  const hash = process.env.BRIDGE_STATUS_HASH || '0x159ae617db2bc67c1cef659ce3571b3de1236980c3a551e17ebae0674af60188';
+  const hash = process.env.BRIDGE_STATUS_HASH || '2ag3mQk9hbeEjAYa7rzqBfMgzsnUe4EYoWHYSV9t69ENmfPsFHijyb6fqspZXymBdoXZwPYC3p5YeQuCcLXLu9M9';
   if (!hash) {
     console.error('Set BRIDGE_STATUS_HASH in env to query status');
     process.exit(1);
