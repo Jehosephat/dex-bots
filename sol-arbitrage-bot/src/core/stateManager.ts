@@ -430,4 +430,29 @@ export class StateManager {
     this.saveState();
     logger.info('🛑 State manager destroyed');
   }
+
+  /**
+   * Reset inventory structure to defaults (tokens cleared, balances zeroed)
+   */
+  resetInventory(): void {
+    this.state.inventory = {
+      galaChain: {
+        tokens: {},
+        native: new BigNumber(0),
+        totalValueUsd: new BigNumber(0),
+        lastUpdated: Date.now()
+      },
+      solana: {
+        tokens: {},
+        native: new BigNumber(0),
+        totalValueUsd: new BigNumber(0),
+        lastUpdated: Date.now()
+      },
+      lastUpdated: Date.now(),
+      version: 1
+    };
+    this.markDirty();
+    this.forceSave();
+    logger.info('🧹 Inventory reset to default structure');
+  }
 }

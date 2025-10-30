@@ -5,5 +5,60 @@
   "solana": {
     "SOL": "5"
   },
-  "updatedAtMs": 1761838143481
+  "updatedAtMs": 1761838143481,
+  "inventory": {
+    "galaChain": {
+      "tokens": {
+        "FARTCOIN": {
+          "symbol": "FARTCOIN",
+          "mint": "GFARTCOIN|Unit|none|none",
+          "rawBalance": "0",
+          "balance": "0",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1761852522303
+        },
+        "TRUMP": {
+          "symbol": "TRUMP",
+          "mint": "GTRUMP|Unit|none|none",
+          "rawBalance": "0",
+          "balance": "0",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1761852522303
+        },
+        "SOL": {
+          "symbol": "SOL",
+          "mint": "GSOL|Unit|none|none",
+          "rawBalance": "1.142145203",
+          "balance": "1.142145203",
+          "decimals": 9,
+          "valueUsd": "0",
+          "lastUpdated": 1761852522303
+        },
+        "GALA": {
+          "symbol": "GALA",
+          "mint": "GALA|Unit|none|none",
+          "rawBalance": "23223.2070369",
+          "balance": "23223.2070369",
+          "decimals": 8,
+          "valueUsd": "0",
+          "lastUpdated": 1761852522303
+        }
+      },
+      "native": "0",
+      "totalValueUsd": "0",
+      "lastUpdated": 1761852522303
+    },
+    "solana": {
+      "tokens": {},
+      "native": "1.004407606",
+      "totalValueUsd": "0",
+      "lastUpdated": 1761852522788
+    },
+    "lastUpdated": 1761852522788,
+    "version": 10
+  },
+  "lastSaved": 1761852522789,
+  "version": 7
 }

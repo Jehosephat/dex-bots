@@ -10,6 +10,9 @@ This document tracks the last mile to a fully working live arbitrage bot (bridgi
   - File: `src/execution/galaChainExecutor.ts`
   - Test: `src/test-gc-exec-live.ts`
 - Bridging: ⏸ Deferred (manual for now)
+- Inventory: 🚧 In progress
+  - GC balances: ✅ via Connect API (multiple response shapes supported)
+  - Solana balances: 🚧 native SOL via RPC; SPL balances via RPC decode or indexer fallback (Helius/Solscan)
 
 ### Remaining Todos
 1) Upgrade Dual-Leg execution (pending)
@@ -31,7 +34,7 @@ This document tracks the last mile to a fully working live arbitrage bot (bridgi
    - Optional Slack/Discord webhook for alerts
 
 5) Inventory checks and state (pending)
-   - Pre-trade on-chain balance checks (GC + SOL)
+   - Pre-trade on-chain balance checks (GC ✅, SOL: native ✅, SPL 🚧 fallback in place)
    - Post-trade updates to `state.json` and simple PnL tallies
 
 6) Validation tests (pending)
@@ -51,12 +54,14 @@ This document tracks the last mile to a fully working live arbitrage bot (bridgi
 ### Environment Expectations
 - Notional caps are interpreted in USD by default (no units needed)
 - Jupiter API base can be overridden via `JUPITER_API_BASE` (defaults to `https://lite-api.jup.ag/swap/v1`)
+ - Optional: `HELIUS_API_KEY` enables reliable Solana SPL balance fallback
 
 ### Near-Term Implementation Order (suggested)
 1) Dual-Leg live coordinator with deadlines and failure handling
 2) Risk and safety wiring from env (including notional caps and pause/window)
 3) Main loop single-iteration runner → then interval runner
 4) Alerts + inventory pre/post checks
-5) Add `test-live-smoke.ts` and finalize docs
+5) Finalize Solana SPL balance retrieval (prefer Helius if available, otherwise Solscan fallback)
+6) Add `test-live-smoke.ts` and finalize docs
 
 
