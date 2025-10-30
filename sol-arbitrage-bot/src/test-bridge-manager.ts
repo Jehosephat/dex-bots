@@ -17,6 +17,7 @@ async function main() {
     destination: params.destination,
     recipient: params.recipient,
     feeGala: params.fee.estimatedTotalFeeGala.toString(),
+    feeDetails: params.fee.details,
     deadlineMs: params.deadlineMs,
   });
 }

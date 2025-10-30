@@ -46,11 +46,24 @@ export class BridgeManager {
     const descriptor = await this.resolveBridgeTokenDescriptor(symbol);
     const fee = await this.client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: descriptor });
     const totalGala = new BigNumber(fee.estimatedTotalTxFeeInGala);
+    const galachainApi = process.env.GALACHAIN_API_BASE_URL || 'https://api.galachain.io';
+    const feePath = process.env.GALA_FEE_PATH || '/v1/bridge/fee';
+    const feeUrl = new URL(feePath, galachainApi).toString();
     return {
       chain: 'Solana',
       feeToken: 'GALA',
       estimatedTotalFeeGala: totalGala,
-      details: { units: fee.estimatedTxFeeUnitsTotal, pricePerUnit: fee.estimatedPricePerTxFeeUnit, timestamp: fee.timestamp },
+      details: {
+        chainId: 'Solana',
+        descriptor: `${descriptor.collection}|${descriptor.category}|${descriptor.type}|${descriptor.additionalKey}`,
+        units: fee.estimatedTxFeeUnitsTotal,
+        pricePerUnit: fee.estimatedPricePerTxFeeUnit,
+        totalGala: fee.estimatedTotalTxFeeInGala,
+        galaDecimals: fee.galaDecimals,
+        timestamp: fee.timestamp,
+        signingIdentity: fee.signingIdentity,
+        feeUrl,
+      },
     };
   }
 
@@ -74,6 +87,7 @@ export class BridgeManager {
       recipient,
       deadlineMs,
       feeGala: fee.estimatedTotalFeeGala.toString(),
+      feeDetails: fee.details,
       galaRpc: networks.galaChain.rpcUrl,
     });
     return result;
