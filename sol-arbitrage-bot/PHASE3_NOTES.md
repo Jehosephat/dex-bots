@@ -53,10 +53,33 @@ Notes:
 
 ### 🔜 Next: 3.2 Solana Executor (skeleton + dry-run)
 
-Plan to implement a Solana executor skeleton that:
-- Builds params from a `SolanaQuote` (respecting dynamic quote currency via `solQuoteVia`, e.g., USDC)
-- Applies slippage and deadline similarly to GalaChain
-- Includes a focused test (`src/test-sol-executor.ts`) to fetch a Solana quote for `SOL` and validate the params
+Implemented a Solana executor skeleton with dry-run preparation of params from a `SolanaQuote`.
+
+- Added `src/execution/solanaExecutor.ts`
+  - Builds params from `SolanaQuote` (respects dynamic quote currency via `solQuoteVia`, e.g., USDC)
+  - Computes `expectedCostInQuote = price * tradeSize`
+  - Computes `maxCostInQuote = expected * (1 + slippageBps)`
+  - Includes route (Jupiter), and short `deadlineMs`
+
+- Added `src/test-sol-executor.ts`
+  - Initializes config
+  - Fetches a Solana quote for `SOL` via Jupiter (USDC-quoted)
+  - Runs `SolanaExecutor.dryRunFromQuote(...)` and logs params
+
+Sample test output (abridged):
+
+```
+✅ Solana price provider initialized
+[EXECUTION] Prepared SOL execution params for SOL {
+  symbol: "SOL",
+  tradeSize: 0.01,
+  quoteCurrency: "USDC",
+  expectedCostInQuote: "1.97...",
+  maxCostInQuote: "1.98...",
+  deadline: <timestamp>
+}
+✅ Solana dry-run params built { ... }
+```
 
 After both executors are ready, we will proceed to:
 - 3.3 Dual-Leg Coordinator (near-simultaneous GC sell + SOL buy)
