@@ -6,6 +6,7 @@ import { SolanaPriceProvider } from './core/priceProviders/solana';
 import { RiskManager } from './execution/riskManager';
 import { DualLegCoordinator } from './execution/dualLegCoordinator';
 import { GalaChainQuote, SolanaQuote } from './types/core';
+import { sendAlert } from './utils/alerts';
 
 export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Promise<boolean> {
   initializeConfig();
@@ -57,7 +58,11 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
 
       if (runMode === 'live') {
         const { gc, sol } = await coord.executeLive(token.symbol);
-        anyExecuted = anyExecuted || (gc.success && sol.success);
+        if (gc.success && sol.success) {
+          anyExecuted = true;
+        } else if (!gc.success && !sol.success) {
+          sendAlert('Dual-leg trade failed', { token: token.symbol, gcError: gc.error, solError: sol.error }, 'error').catch(() => {});
+        }
       } else {
         await coord.dryRun(token.symbol);
       }

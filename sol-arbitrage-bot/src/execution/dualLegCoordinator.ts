@@ -6,6 +6,7 @@ import { GalaChainExecutor, GalaChainExecutionResult } from './galaChainExecutor
 import { SolanaExecutor, SolanaExecutionResult } from './solanaExecutor';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import logger from '../utils/logger';
+import { sendAlert } from '../utils/alerts';
 
 export interface DualLegDryRunResult {
   symbol: string;
@@ -200,12 +201,15 @@ export class DualLegCoordinator {
     // Simple failure handling: if one leg failed and the other succeeded, log and caller can cooldown
     if (gc.success && !sol.success) {
       logger.warn('⚠️ Dual-leg: GC succeeded but SOL failed - consider cooldown', { symbol, gcTx: gc.txHash, solError: sol.error });
+      sendAlert('Dual-leg partial success: SOL failed', { symbol, gcTx: gc.txHash, solError: sol.error }, 'warn').catch(() => {});
     } else if (!gc.success && sol.success) {
       logger.warn('⚠️ Dual-leg: SOL succeeded but GC failed - consider cooldown', { symbol, solTx: sol.txSig, gcError: gc.error });
+      sendAlert('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, 'warn').catch(() => {});
     }
 
     if (gc.success && sol.success) {
       logger.execution('✅ Dual-leg live execution complete', { symbol, gcTx: gc.txHash, solTx: sol.txSig });
+      sendAlert('Dual-leg trade executed', { symbol, gcTx: gc.txHash, solTx: sol.txSig }, 'success').catch(() => {});
     }
 
     return { gc, sol };
