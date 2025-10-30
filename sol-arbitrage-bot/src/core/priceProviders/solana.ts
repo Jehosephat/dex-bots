@@ -76,9 +76,10 @@ export class SolanaPriceProvider extends BasePriceProvider {
       }
 
       // Calculate price and price impact
-      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), 9); // SOL has 9 decimals
+      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
+      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), quoteTokenConfig?.decimals || 9);
       const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), tokenConfig.decimals);
-      const price = inputAmount.div(outputAmount); // SOL per token
+      const price = inputAmount.div(outputAmount); // QuoteToken per token
       const spotPrice = await this.getSpotPrice(symbol);
       const priceImpactBps = calculatePriceImpactBps(
         outputAmount,
@@ -92,7 +93,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
       const solanaQuote: SolanaQuote = {
         symbol,
         price,
-        currency: 'SOL',
+        currency: tokenConfig.solQuoteVia,
         tradeSize: amount,
         priceImpactBps,
         minOutput: outputAmount.multipliedBy(0.99), // 1% slippage protection
@@ -107,7 +108,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
       this.updateTimestamp();
       this.clearError();
 
-      logger.debug(`📊 Solana quote for ${symbol}: ${price.toString()} SOL (impact: ${priceImpactBps}bps)`);
+      logger.debug(`📊 Solana quote for ${symbol}: ${price.toString()} ${tokenConfig.solQuoteVia} (impact: ${priceImpactBps}bps)`);
       return solanaQuote;
 
     } catch (error) {
@@ -137,16 +138,23 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error(`No Solana mint for token ${tokenSymbol}`);
       }
 
-      const solMint = 'So11111111111111111111111111111111111111112';
+      // Get the quote token configuration
+      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
+      if (!quoteTokenConfig?.solanaMint) {
+        throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
+      }
+
+      const inputMint = quoteTokenConfig.solanaMint;
+      const outputMint = tokenConfig.solanaMint;
       
       // Convert amount to raw amount for the token
       const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals);
 
-      // Get quote from Jupiter (SOL → Token)
+      // Get quote from Jupiter (QuoteToken → Token)
       const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
         params: {
-          inputMint: solMint,
-          outputMint: tokenConfig.solanaMint,
+          inputMint: inputMint,
+          outputMint: outputMint,
           amount: rawAmount.toString(),
           slippageBps: 50 // 0.5% slippage
         },
@@ -163,8 +171,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
         priceImpact: response.data.priceImpactPct || 0,
         route: response.data.routePlan ? {
           routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
-          inputMint: solMint,
-          outputMint: tokenConfig.solanaMint,
+          inputMint: inputMint,
+          outputMint: outputMint,
           steps: response.data.routePlan || [],
           totalPriceImpact: response.data.priceImpactPct || 0,
           totalFee: response.data.platformFee?.amount || 0
@@ -193,7 +201,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
       }
 
       const tokenConfig = getTokenConfig(tokenSymbol);
-      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), 9); // SOL has 9 decimals
+      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig?.solQuoteVia || 'SOL');
+      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), quoteTokenConfig?.decimals || 9);
       const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), tokenConfig?.decimals || 6);
 
       return inputAmount.div(outputAmount);

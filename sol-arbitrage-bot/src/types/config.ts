@@ -13,6 +13,7 @@ export interface TokenConfig {
   tradeSize: number;
   enabled: boolean;
   gcQuoteVia: string;
+  solQuoteVia: string;
 }
 
 export interface QuoteTokenConfig {

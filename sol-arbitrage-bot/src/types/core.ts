@@ -279,7 +279,7 @@ export interface GalaChainQuote extends PriceQuote {
 
 export interface SolanaQuote extends PriceQuote {
   /** Solana specific fields */
-  currency: 'SOL';
+  currency: string; // Can be SOL, USDC, etc.
   
   /** Priority fee estimate */
   priorityFee: BigNumber;
