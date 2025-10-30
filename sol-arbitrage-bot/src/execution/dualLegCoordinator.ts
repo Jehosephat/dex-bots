@@ -101,4 +101,77 @@ export class DualLegCoordinator {
       previewNetGala
     };
   }
+
+  /**
+   * Execute both legs live with simple failure handling.
+   * GC sell and SOL buy are launched near-simultaneously.
+   */
+  async executeLive(symbol: string): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
+    initializeConfig();
+    if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
+    if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
+
+    const token = getTokenConfig(symbol);
+    if (!token) {
+      throw new Error(`Token not configured: ${symbol}`);
+    }
+
+    await this.gcProvider.initialize();
+    await this.solProvider.initialize();
+
+    // Fetch fresh quotes for the configured trade size
+    const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
+      this.gcProvider.getQuote(symbol, token.tradeSize),
+      this.solProvider.getQuote(symbol, token.tradeSize)
+    ]);
+    if (!gcQuoteGeneric) throw new Error('Missing GalaChain quote');
+    if (!solQuoteGeneric) throw new Error('Missing Solana quote');
+
+    const gcQuote = gcQuoteGeneric as GalaChainQuote;
+    const solQuote = solQuoteGeneric as SolanaQuote;
+
+    // Fire both legs nearly concurrently
+    const [gcRes, solRes] = await Promise.allSettled([
+      this.gcExecutor.executeFromQuoteLive(symbol, token.tradeSize, gcQuote),
+      this.solExecutor.executeFromQuoteLive(symbol, token.tradeSize, solQuote)
+    ]);
+
+    const gc: GalaChainExecutionResult = gcRes.status === 'fulfilled' ? gcRes.value : {
+      success: false,
+      params: {
+        symbol,
+        tradeSize: token.tradeSize,
+        expectedProceedsGala: new BigNumber(0),
+        minProceedsGala: new BigNumber(0),
+        deadlineMs: Date.now() + 60_000
+      },
+      error: (gcRes as PromiseRejectedResult).reason?.message || String((gcRes as PromiseRejectedResult).reason)
+    };
+
+    const sol: SolanaExecutionResult = solRes.status === 'fulfilled' ? solRes.value : {
+      success: false,
+      params: {
+        symbol,
+        tradeSize: token.tradeSize,
+        quoteCurrency: solQuote.currency,
+        expectedCostInQuote: new BigNumber(0),
+        maxCostInQuote: new BigNumber(0),
+        deadlineMs: Date.now() + 60_000
+      },
+      error: (solRes as PromiseRejectedResult).reason?.message || String((solRes as PromiseRejectedResult).reason)
+    } as SolanaExecutionResult;
+
+    // Simple failure handling: if one leg failed and the other succeeded, log and caller can cooldown
+    if (gc.success && !sol.success) {
+      logger.warn('⚠️ Dual-leg: GC succeeded but SOL failed - consider cooldown', { symbol, gcTx: gc.txHash, solError: sol.error });
+    } else if (!gc.success && sol.success) {
+      logger.warn('⚠️ Dual-leg: SOL succeeded but GC failed - consider cooldown', { symbol, solTx: sol.txSig, gcError: gc.error });
+    }
+
+    if (gc.success && sol.success) {
+      logger.execution('✅ Dual-leg live execution complete', { symbol, gcTx: gc.txHash, solTx: sol.txSig });
+    }
+
+    return { gc, sol };
+  }
 }
