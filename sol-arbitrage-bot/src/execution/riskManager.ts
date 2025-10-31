@@ -60,10 +60,9 @@ export class RiskManager {
     }
 
     // 4) Inventory check (best-effort; warn if absent)
-    const gcTokens = this.stateManager.getState().inventory.galaChain && (this.stateManager.getState().inventory.galaChain as any).tokens
-      ? (this.stateManager.getState().inventory.galaChain as any).tokens
-      : {} as Record<string, any>;
-    const gcToken = gcTokens[token.symbol];
+    const state = this.stateManager.getState() as any;
+    const gcTokens = state?.inventory?.galaChain?.tokens || {};
+    const gcToken = gcTokens ? gcTokens[token.symbol] : undefined;
     if (!gcToken || !gcToken.balance || gcToken.balance.isLessThan(token.tradeSize)) {
       reasons.push('Insufficient GalaChain inventory for sell (simulation mode if dry-run)');
     }

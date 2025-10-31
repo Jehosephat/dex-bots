@@ -25,7 +25,7 @@ import {
  * Fetches size-aware quotes from Solana DEXs via Jupiter
  */
 export class SolanaPriceProvider extends BasePriceProvider {
-  private jupiterApiUrl = 'https://lite-api.jup.ag/swap/v1';
+  private jupiterApiUrl = process.env.JUPITER_API_BASE || 'https://lite-api.jup.ag/swap/v1';
   private coinGeckoApiUrl = 'https://api.coingecko.com/api/v3';
   private solUsdPrice: number = 0;
   private solUsdPriceLastUpdate: number = 0;
@@ -144,19 +144,20 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
       }
 
-      const inputMint = quoteTokenConfig.solanaMint;
-      const outputMint = tokenConfig.solanaMint;
-      
-      // Convert amount to raw amount for the token
-      const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals);
+      const inputMint = quoteTokenConfig.solanaMint; // e.g., USDC
+      const outputMint = tokenConfig.solanaMint;     // target token (e.g., SOL or other)
 
-      // Get quote from Jupiter (QuoteToken → Token)
+      // We request ExactOut: amount is in output token units
+      const rawAmountOut = toRawAmount(new BigNumber(amount), tokenConfig.decimals);
+
+      // Get quote from Jupiter (QuoteToken → Token) using ExactOut
       const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
         params: {
-          inputMint: inputMint,
-          outputMint: outputMint,
-          amount: rawAmount.toString(),
-          slippageBps: 50 // 0.5% slippage
+          inputMint,
+          outputMint,
+          amount: rawAmountOut.toString(),
+          slippageBps: 50, // 0.5% slippage
+          swapMode: 'ExactOut'
         },
         timeout: 10000
       });
@@ -181,11 +182,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('❌ Jupiter quote failed', { 
-        tokenSymbol, 
-        amount,
-        error: errorMessage 
-      });
+      logger.warn('⚠️ Jupiter quote failed', { tokenSymbol, amount, error: errorMessage });
       return null;
     }
   }
@@ -245,7 +242,11 @@ export class SolanaPriceProvider extends BasePriceProvider {
         logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)}`);
       }
     } catch (error) {
-      logger.warn('⚠️ Failed to fetch SOL/USD price, using fallback', { error });
+      // Keep this quiet to avoid noisy stack traces (e.g., CG 429). Use concise message and fallback once.
+      const msg = (error instanceof Error && (error as any).response?.status === 429)
+        ? 'Coingecko rate limited (429)'
+        : (error instanceof Error ? error.message : String(error));
+      logger.warn('⚠️ Failed to fetch SOL/USD price, using fallback', { reason: msg });
       if (this.solUsdPrice === 0) {
         this.solUsdPrice = 225; // Fallback price
         logger.warn(`Using fallback SOL/USD price: $${this.solUsdPrice}`);

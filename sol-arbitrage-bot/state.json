@@ -16,7 +16,7 @@
           "balance": "0",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1761852522303
+          "lastUpdated": 1761856142120
         },
         "TRUMP": {
           "symbol": "TRUMP",
@@ -25,7 +25,7 @@
           "balance": "0",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1761852522303
+          "lastUpdated": 1761856142120
         },
         "SOL": {
           "symbol": "SOL",
@@ -34,7 +34,7 @@
           "balance": "1.142145203",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1761852522303
+          "lastUpdated": 1761856142120
         },
         "GALA": {
           "symbol": "GALA",
@@ -43,22 +43,22 @@
           "balance": "23223.2070369",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1761852522303
+          "lastUpdated": 1761856142120
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1761852522303
+      "lastUpdated": 1761856142120
     },
     "solana": {
       "tokens": {},
-      "native": "1.004407606",
+      "native": "1.005402078",
       "totalValueUsd": "0",
-      "lastUpdated": 1761852522788
+      "lastUpdated": 1761856142767
     },
-    "lastUpdated": 1761852522788,
-    "version": 10
+    "lastUpdated": 1761856142767,
+    "version": 26
   },
-  "lastSaved": 1761852522789,
-  "version": 7
+  "lastSaved": 1761856142767,
+  "version": 15
 }
