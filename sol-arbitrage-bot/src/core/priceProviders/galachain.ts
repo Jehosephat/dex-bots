@@ -24,8 +24,6 @@ import { getTokenConfig, getQuoteTokenConfig } from '../../config';
 import logger from '../../utils/logger';
 import { 
   calculatePriceImpactBps, 
-  toRawAmount, 
-  toTokenAmount,
   isValidPrice,
   isValidTokenAmount 
 } from '../../utils/calculations';
@@ -38,7 +36,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   private galaChainApiUrl = 'https://gateway-mainnet.galachain.com/api/asset/dexv3-contract/GetCompositePool';
   private galaUsdPrice: number = 0;
   private galaUsdPriceLastUpdate: number = 0;
-  private galaUsdPriceCacheDuration: number = 60000; // Cache for 60 seconds
+  private galaUsdPriceCacheDuration: number = 300000; // Cache for 5 minutes (300 seconds)
 
   async initialize(): Promise<void> {
     try {
@@ -81,14 +79,11 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         throw new Error(`Quote token ${quoteVia} not configured`);
       }
 
-      // Convert amount to raw amount
-      const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals);
-
-      // Get the quote
+      // Get the quote - pass amount directly (e.g., 0.01 SOL)
       const quote = await this.getLocalQuote(
         symbol,
         quoteVia,
-        rawAmount,
+        new BigNumber(amount),
         DexFeePercentageTypes.FEE_1_PERCENT
       );
 
@@ -97,7 +92,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       }
 
       // Calculate price and price impact
-      const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), quoteTokenConfig.decimals);
+      const outputAmount = new BigNumber(quote.outputAmount);
       const price = outputAmount.div(amount);
       const spotPrice = await this.getSpotPrice(symbol, quoteVia);
       const priceImpactBps = calculatePriceImpactBps(
@@ -154,10 +149,19 @@ export class GalaChainPriceProvider extends BasePriceProvider {
     poolAddress: string;
     route?: string[];
   } | null> {
+    // Declare variables outside try block for use in catch block
+    let tokenConfig: TokenConfig | undefined;
+    let quoteTokenConfig: any;
+    let isToken0Quote: boolean = false;
+    let zeroForOne: boolean = false;
+    let token0Key: TokenClassKey | undefined;
+    let token1Key: TokenClassKey | undefined;
+    let compositePoolData: CompositePoolDto | undefined;
+    
     try {
       // Parse token mints
-      const tokenConfig = getTokenConfig(tokenSymbol);
-      const quoteTokenConfig = getQuoteTokenConfig(quoteVia);
+      tokenConfig = getTokenConfig(tokenSymbol);
+      quoteTokenConfig = getQuoteTokenConfig(quoteVia);
       
       if (!tokenConfig || !quoteTokenConfig) {
         throw new Error('Token configuration not found');
@@ -168,12 +172,30 @@ export class GalaChainPriceProvider extends BasePriceProvider {
 
       // Determine token ordering (GalaChain requires token0 < token1)
       const comparison = this.compareTokenKeys(quoteKey, tokenKey);
-      const isToken0Quote = comparison < 0;
+      isToken0Quote = comparison < 0;
+      
+      // Based on working code in sol-bot: when selling tokenSymbol for quoteVia
+      // If quoteKey < tokenKey (GALA < GSOL): pool is GALA/GSOL, selling GSOL (token1) for GALA (token0)
+      // If quoteKey > tokenKey: pool is TOKEN/GALA, selling TOKEN (token0) for GALA (token1)
+      
+      if (isToken0Quote) {
+        // Pool is GALA/TOKEN (e.g., GALA/GSOL when selling SOL)
+        // token0 = GALA, token1 = TOKEN (e.g., GSOL)
+        token0Key = quoteKey; // GALA
+        token1Key = tokenKey;  // TOKEN (e.g., GSOL)
+        zeroForOne = false; // Selling token1 (SOL) for token0 (GALA)
+      } else {
+        // Pool is TOKEN/GALA (e.g., TRUMP/GALA when selling TRUMP)
+        // token0 = TOKEN, token1 = GALA
+        token0Key = tokenKey;  // TOKEN
+        token1Key = quoteKey;  // GALA
+        zeroForOne = true; // Selling token0 (TOKEN) for token1 (GALA)
+      }
 
       // Get composite pool data
       const getCompositePoolDto = new GetCompositePoolDto(
-        isToken0Quote ? quoteKey : tokenKey,
-        isToken0Quote ? tokenKey : quoteKey,
+        token0Key,
+        token1Key,
         fee
       );
       
@@ -187,31 +209,106 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       }
 
       // Convert response to CompositePoolDto
-      const compositePoolData = this.createCompositePoolDtoFromResponse(response.data.Data);
+      compositePoolData = this.createCompositePoolDtoFromResponse(response.data.Data);
 
-      // Perform local quote
+      const token0Str = token0Key.collection || `${token0Key.category}|${token0Key.type}|${token0Key.additionalKey}`;
+      const token1Str = token1Key.collection || `${token1Key.category}|${token1Key.type}|${token1Key.additionalKey}`;
+      
+      // Perform direct quote
+      logger.info('🔍 Quote Parameters:', {
+        tokenSymbol,
+        quoteVia,
+        token0: token0Str,
+        token1: token1Str,
+        amount: amount.toString(),
+        zeroForOne,
+        sellingToken: zeroForOne ? 'token0' : 'token1',
+        receivingToken: zeroForOne ? 'token1' : 'token0'
+      });
+
       const quoteDto = new QuoteExactAmountDto(
-        isToken0Quote ? quoteKey : tokenKey,
-        isToken0Quote ? tokenKey : quoteKey,
+        token0Key,
+        token1Key,
         fee,
         amount,
-        isToken0Quote, // zeroForOne: true if selling token0 for token1
+        zeroForOne,
         compositePoolData
       );
 
       const quoteResult: any = await quoteExactAmount(null as any, quoteDto);
       
-      // Extract output amount based on token ordering
-      const outputAmount = isToken0Quote ? quoteResult.amount0 : quoteResult.amount1;
+      // Extract output
+      // When zeroForOne = false (selling token1): amount0 is output (positive), amount1 is input (negative)
+      // When zeroForOne = true (selling token0): amount1 is output (positive), amount0 is input (negative)
+      let outputAmount: BigNumber;
+      if (zeroForOne) {
+        // Selling token0, receiving token1
+        outputAmount = new BigNumber(quoteResult.amount1 || '0');
+      } else {
+        // Selling token1, receiving token0
+        outputAmount = new BigNumber(quoteResult.amount0 || '0');
+      }
       
       return {
         outputAmount: outputAmount.toString(),
-        poolAddress: 'unknown', // Pool address not available in current API
-        route: [tokenSymbol, quoteVia] // Simple route for now
+        poolAddress: 'unknown',
+        route: [tokenSymbol, quoteVia]
       };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // If direct quote fails for SOL (selling token1 for token0), try reverse quote as fallback
+      if (tokenConfig && quoteTokenConfig && token0Key && token1Key && compositePoolData &&
+          isToken0Quote && !zeroForOne && errorMessage.includes('liquidity')) {
+        logger.info('🔄 Direct quote failed, attempting reverse quote (GALA → SOL) as fallback...');
+        
+        try {
+          // Estimate GALA needed: ~18,000 GALA per SOL
+          const estimatedGalaNeeded = amount.multipliedBy(18000);
+          
+          logger.info('🔄 Reverse quote calculation:', {
+            solAmount: amount.toString(),
+            estimatedGala: estimatedGalaNeeded.toString()
+          });
+          
+          const reverseQuoteDto = new QuoteExactAmountDto(
+            token0Key,
+            token1Key,
+            fee,
+            estimatedGalaNeeded,
+            true, // zeroForOne=true: selling token0 (GALA) for token1 (SOL)
+            compositePoolData
+          );
+          
+          const reverseQuoteResult: any = await quoteExactAmount(null as any, reverseQuoteDto);
+          const solReceived = new BigNumber(reverseQuoteResult.amount1 || '0');
+          
+          if (solReceived.gt(0)) {
+            // Price per SOL = GALA sold / SOL received
+            const pricePerSol = estimatedGalaNeeded.div(solReceived);
+            const expectedOutput = amount.multipliedBy(pricePerSol);
+            
+            logger.info('✅ Reverse quote succeeded!', {
+              galaIn: estimatedGalaNeeded.toString(),
+              solOut: solReceived.toString(),
+              pricePerSol: pricePerSol.toString(),
+              expectedGalaOutput: expectedOutput.toString()
+            });
+            
+            return {
+              outputAmount: expectedOutput.toString(),
+              poolAddress: 'unknown',
+              route: [tokenSymbol, quoteVia]
+            };
+          }
+        } catch (reverseError: any) {
+          logger.warn('⚠️ Reverse quote also failed:', {
+            error: reverseError.message || reverseError
+          });
+        }
+      }
+      
       logger.error('❌ Local quote failed', { 
         tokenSymbol, 
         quoteVia, 
@@ -225,11 +322,11 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   private async getSpotPrice(tokenSymbol: string, quoteVia: string): Promise<BigNumber> {
     try {
       // Get a small quote to determine spot price
-      const smallAmount = 1; // 1 unit
+      const smallAmount = new BigNumber(1);
       const quote = await this.getLocalQuote(
         tokenSymbol,
         quoteVia,
-        toRawAmount(new BigNumber(smallAmount), getTokenConfig(tokenSymbol)?.decimals || 6),
+        smallAmount,
         DexFeePercentageTypes.FEE_1_PERCENT
       );
 
@@ -237,12 +334,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         return new BigNumber(0);
       }
 
-      const quoteTokenConfig = getQuoteTokenConfig(quoteVia);
-      const outputAmount = toTokenAmount(
-        new BigNumber(quote.outputAmount), 
-        quoteTokenConfig?.decimals || 8
-      );
-
+      const outputAmount = new BigNumber(quote.outputAmount);
       return outputAmount.div(smallAmount);
     } catch (error) {
       logger.warn('⚠️ Failed to get spot price, using fallback', { tokenSymbol, quoteVia });
@@ -343,14 +435,15 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   private async updateGALAUSDPrice(): Promise<void> {
     const now = Date.now();
     
-    // Check if cached price is still valid
-    if (this.galaUsdPrice > 0 && (now - this.galaUsdPriceLastUpdate) < this.galaUsdPriceCacheDuration) {
-      logger.debug(`Using cached GALA/USD price: $${this.galaUsdPrice.toFixed(6)}`);
+    // Check if cached price is still valid (5 minute cache to avoid rate limits)
+    const cacheAge = now - this.galaUsdPriceLastUpdate;
+    if (this.galaUsdPrice > 0 && cacheAge < this.galaUsdPriceCacheDuration) {
+      logger.debug(`Using cached GALA/USD price: $${this.galaUsdPrice.toFixed(6)} (age: ${Math.floor(cacheAge / 1000)}s)`);
       return;
     }
 
+    // Try CoinGecko first
     try {
-      // Get GALA/USD price from CoinGecko
       const response = await axios.get('https://api.coingecko.com/api/v3/simple/price', {
         params: {
           ids: 'gala',
@@ -360,17 +453,29 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       });
 
       if (response.data?.gala?.usd) {
-        this.galaUsdPrice = response.data.gala.usd;
+        const newPrice = response.data.gala.usd;
+        const priceChanged = Math.abs(newPrice - this.galaUsdPrice) > 0.0001;
+        this.galaUsdPrice = newPrice;
         this.galaUsdPriceLastUpdate = now;
-        logger.info(`💰 GALA/USD price: $${this.galaUsdPrice.toFixed(6)}`);
+        logger.info(`💰 GALA/USD price: $${this.galaUsdPrice.toFixed(6)}${priceChanged ? ' (updated)' : ''} [Source: CoinGecko]`);
+        return;
       }
-    } catch (error) {
-      logger.warn('⚠️ Failed to fetch GALA/USD price, using fallback', { error });
-      if (this.galaUsdPrice === 0) {
-        this.galaUsdPrice = 0.04; // Fallback price
-        logger.warn(`Using fallback GALA/USD price: $${this.galaUsdPrice}`);
-      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.status === 429 
+        ? 'CoinGecko rate limited (429)' 
+        : (error instanceof Error ? error.message : String(error));
+      logger.debug(`CoinGecko fetch failed: ${errorMsg}`);
     }
+
+    // If CoinGecko fails and we have a cached price, keep using it
+    if (this.galaUsdPrice > 0) {
+      logger.warn(`⚠️ Failed to refresh GALA/USD price, continuing with cached value: $${this.galaUsdPrice.toFixed(6)} (age: ${Math.floor(cacheAge / 1000)}s)`);
+      return;
+    }
+
+    // Last resort: use fallback if no cached price exists
+    this.galaUsdPrice = 0.01; // Updated fallback closer to current market (~$0.01)
+    logger.warn(`Using fallback GALA/USD price: $${this.galaUsdPrice}`);
   }
 
   /**
