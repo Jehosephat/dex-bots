@@ -7,6 +7,7 @@ import { RiskManager } from './execution/riskManager';
 import { DualLegCoordinator } from './execution/dualLegCoordinator';
 import { GalaChainQuote, SolanaQuote } from './types/core';
 import { sendAlert } from './utils/alerts';
+import { getTradeLogger } from './utils/tradeLogger';
 
 export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Promise<boolean> {
   initializeConfig();
@@ -177,17 +178,57 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
         continue;
       }
 
+      // Get trade logger
+      const tradeLogger = getTradeLogger();
+      const startTime = Date.now();
+
+      // Prepare log entry with expected values
+      const edge = riskResult.edge;
+      const logEntry: any = {
+        timestamp: new Date().toISOString(),
+        mode: runMode,
+        token: token.symbol,
+        tradeSize: token.tradeSize,
+        success: false,
+        expectedGalaChainProceeds: edge ? edge.galaChainProceeds.toNumber() : undefined,
+        expectedSolanaCost: solCost.toNumber(),
+        expectedSolanaCostGala: edge ? edge.solanaCostGala.toNumber() : undefined,
+        expectedNetEdge: edge ? edge.netEdge.toNumber() : undefined,
+        expectedNetEdgeBps: edge ? edge.netEdgeBps : undefined,
+        galaChainPrice: galaQuote.price.toNumber(),
+        galaChainPriceCurrency: galaQuote.currency,
+        solanaPrice: solQuote.price.toNumber(),
+        solanaPriceCurrency: solQuote.currency,
+        priceImpactGcBps: galaQuote.priceImpactBps,
+        priceImpactSolBps: solQuote.priceImpactBps
+      };
+
       if (runMode === 'live') {
         const { gc, sol } = await coord.executeLive(token.symbol);
+        const endTime = Date.now();
+        logEntry.executionDurationMs = endTime - startTime;
+        logEntry.galaChainSuccess = gc.success;
+        logEntry.solanaSuccess = sol.success;
+        logEntry.success = gc.success && sol.success;
+
         if (gc.success && sol.success) {
           anyExecuted = true;
+          logEntry.galaChainTxHash = gc.txHash;
+          logEntry.solanaTxSig = sol.txSig;
+          
           logger.info(`\n🎉 TRADE EXECUTED SUCCESSFULLY`);
           logger.info(`   Token: ${token.symbol}`);
           logger.info(`   🔷 GalaChain (SELL): ✅ Success`);
           logger.info(`      TX Hash: ${gc.txHash}`);
           logger.info(`   🔸 Solana (BUY): ✅ Success`);
           logger.info(`      TX Signature: ${sol.txSig}`);
+          
+          // Note: Actual values would need to be extracted from execution results
+          // For now, we log expected values. Can enhance later if execution results provide actuals.
         } else if (!gc.success && !sol.success) {
+          logEntry.galaChainError = gc.error;
+          logEntry.solanaError = sol.error;
+          
           logger.error(`\n❌ BOTH LEGS FAILED`);
           logger.error(`   Token: ${token.symbol}`);
           logger.error(`   🔷 GalaChain (SELL): ❌ Failed`);
@@ -196,6 +237,11 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
           logger.error(`      Error: ${sol.error}`);
           sendAlert('Dual-leg trade failed', { token: token.symbol, gcError: gc.error, solError: sol.error }, 'error').catch(() => {});
         } else {
+          logEntry.galaChainTxHash = gc.success ? gc.txHash : undefined;
+          logEntry.solanaTxSig = sol.success ? sol.txSig : undefined;
+          logEntry.galaChainError = !gc.success ? gc.error : undefined;
+          logEntry.solanaError = !sol.success ? sol.error : undefined;
+          
           logger.warn(`\n⚠️ PARTIAL SUCCESS`);
           logger.warn(`   Token: ${token.symbol}`);
           logger.warn(`   🔷 GalaChain (SELL): ${gc.success ? '✅ Success' : '❌ Failed'}`);
@@ -213,13 +259,22 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
             logger.warn(`      Error: ${sol.error}`);
           }
         }
+        
+        // Log the trade
+        tradeLogger.logTrade(logEntry);
+        
       } else {
         await coord.dryRun(token.symbol);
+        logEntry.executionDurationMs = Date.now() - startTime;
+        
         logger.info(`🧪 DRY-RUN completed`, {
           token: token.symbol,
           note: 'No actual trades executed - simulation only',
           strategy: `Would SELL on GalaChain and BUY on Solana`
         });
+        
+        // Log dry-run trades too
+        tradeLogger.logTrade(logEntry);
       }
 
       logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
