@@ -249,6 +249,9 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         outputAmount = new BigNumber(quoteResult.amount0 || '0');
       }
       
+      // Take absolute value to handle negative values from quoteExactAmount
+      outputAmount = outputAmount.abs();
+      
       return {
         outputAmount: outputAmount.toString(),
         poolAddress: 'unknown',
@@ -282,7 +285,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
           );
           
           const reverseQuoteResult: any = await quoteExactAmount(null as any, reverseQuoteDto);
-          const solReceived = new BigNumber(reverseQuoteResult.amount1 || '0');
+          const solReceived = new BigNumber(reverseQuoteResult.amount1 || '0').abs();
           
           if (solReceived.gt(0)) {
             // Price per SOL = GALA sold / SOL received
