@@ -36,6 +36,8 @@ export interface BridgingConfig {
   thresholdUsd: number;
   maxRetries: number;
   retryDelayMinutes: number;
+  tradesPerBridge?: number; // Number of trades before needing to bridge (for amortization)
+  bridgeCostUsd?: number; // Bridge cost in USD (default $1.25)
 }
 
 export interface MonitoringConfig {

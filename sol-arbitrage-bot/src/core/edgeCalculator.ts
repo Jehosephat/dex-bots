@@ -95,7 +95,8 @@ export class EdgeCalculator {
     tokenConfig: TokenConfig,
     galaChainQuote: GalaChainQuote,
     solanaQuote: SolanaQuote,
-    solToGalaRate: BigNumber
+    solToGalaRate: BigNumber,
+    galaUsdPrice?: number
   ): EdgeCalculationResult {
     const invalidationReasons: string[] = [];
     
@@ -141,8 +142,8 @@ export class EdgeCalculator {
       const solanaCostGala = solanaCostInQuoteCurrency.multipliedBy(solToGalaRate);
       logger.debug(`🔍 DEBUG: Solana cost converted to GALA: ${solanaCostGala.toString()}`);
       
-      // Calculate bridge cost in GALA
-      const bridgeCost = this.calculateBridgeCost();
+      // Calculate bridge cost in GALA (amortized per trade)
+      const bridgeCost = this.calculateBridgeCost(galaUsdPrice);
       
       // Calculate risk buffer
       const riskBuffer = this.calculateRiskBuffer(galaChainProceeds);
@@ -249,13 +250,32 @@ export class EdgeCalculator {
   }
 
   /**
-   * Calculate bridge cost in GALA
+   * Calculate bridge cost in GALA (amortized per trade)
+   * The bridge cost is amortized across many trades since we don't bridge with every trade
    */
-  private calculateBridgeCost(): BigNumber {
-    // Bridge cost is fixed at $1.25 USD, convert to GALA
-    const bridgeCostUsd = 1.25;
-    const galaUsdPrice = 0.04; // This should be fetched from price provider
-    return new BigNumber(bridgeCostUsd).div(galaUsdPrice);
+  private calculateBridgeCost(galaUsdPrice?: number): BigNumber {
+    // Get bridge cost from config (default $1.25 USD)
+    const bridgeCostUsd = this.bridgingConfig.bridgeCostUsd || 1.25;
+    
+    // Get GALA USD price (use provided value or fallback)
+    const galaPrice = galaUsdPrice || 0.01;
+    
+    // Calculate full bridge cost in GALA
+    const fullBridgeCostGala = new BigNumber(bridgeCostUsd).div(galaPrice);
+    
+    // Amortize across trades (default: 100 trades per bridge)
+    const tradesPerBridge = this.bridgingConfig.tradesPerBridge || 100;
+    const amortizedBridgeCost = fullBridgeCostGala.div(tradesPerBridge);
+    
+    logger.debug(`🔍 Bridge cost calculation:`, {
+      bridgeCostUsd,
+      galaUsdPrice: galaPrice,
+      fullBridgeCostGala: fullBridgeCostGala.toString(),
+      tradesPerBridge,
+      amortizedBridgeCost: amortizedBridgeCost.toString()
+    });
+    
+    return amortizedBridgeCost;
   }
 
   /**

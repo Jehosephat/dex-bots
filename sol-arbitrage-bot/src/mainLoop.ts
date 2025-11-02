@@ -68,27 +68,28 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
 
       // Calculate conversion rate from Solana quote currency to GALA
       let quoteToGalaRate = new BigNumber(0);
+      let galaUsdPrice = 0.01; // Default fallback, will be updated below
       try {
         if (solQuote.currency === 'SOL') {
           const solUsd = solProvider.getSOLUSDPrice();
-          const galaUsd = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01; // fallback
-          if (solUsd > 0 && galaUsd > 0) {
+          galaUsdPrice = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01; // fallback
+          if (solUsd > 0 && galaUsdPrice > 0) {
             // SOL to GALA: SOL_USD / GALA_USD
-            quoteToGalaRate = new BigNumber(solUsd).div(galaUsd);
+            quoteToGalaRate = new BigNumber(solUsd).div(galaUsdPrice);
             logger.info(`\n💱 EXCHANGE RATE`);
             logger.info(`   1 SOL = ${quoteToGalaRate.toFixed(4)} GALA`);
             logger.info(`   1 SOL = $${solUsd.toFixed(4)} USD`);
-            logger.info(`   1 GALA = $${galaUsd.toFixed(4)} USD`);
+            logger.info(`   1 GALA = $${galaUsdPrice.toFixed(4)} USD`);
           }
         } else if (solQuote.currency === 'USDC') {
           // For USDC: 1 USDC ≈ $1 USD, so USDC to GALA = 1 / GALA_USD
-          const galaUsd = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01; // fallback
-          if (galaUsd > 0) {
-            quoteToGalaRate = new BigNumber(1).div(galaUsd);
+          galaUsdPrice = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01; // fallback
+          if (galaUsdPrice > 0) {
+            quoteToGalaRate = new BigNumber(1).div(galaUsdPrice);
             logger.info(`\n💱 EXCHANGE RATE`);
             logger.info(`   1 USDC = ${quoteToGalaRate.toFixed(4)} GALA`);
             logger.info(`   (Assumption: 1 USDC = $1 USD)`);
-            logger.info(`   1 GALA = $${galaUsd.toFixed(4)} USD`);
+            logger.info(`   1 GALA = $${galaUsdPrice.toFixed(4)} USD`);
           }
         } else {
           logger.warn(`⚠️ Unknown quote currency: ${solQuote.currency}, using zero rate`);
@@ -111,7 +112,7 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
       // Note: passing quoteToGalaRate which handles both SOL and USDC conversions
       let riskResult;
       try {
-        riskResult = risk.evaluate(token, galaQuote, solQuote, quoteToGalaRate);
+        riskResult = risk.evaluate(token, galaQuote, solQuote, quoteToGalaRate, galaUsdPrice);
       } catch (evalError) {
         logger.error(`❌ ERROR in risk.evaluate() for ${token.symbol}`, {
           error: evalError instanceof Error ? evalError.message : String(evalError),
@@ -137,7 +138,7 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
         logger.info(`      🔷 GalaChain Proceeds:  ${edge.galaChainProceeds.toFixed(8)} GALA`);
         logger.info(`   📤 COSTS:`);
         logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
-        logger.info(`      🌉 Bridge Cost:         ${edge.bridgeCost.toFixed(8)} GALA`);
+        logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
         logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
         logger.info(`      ────────────────────────────`);
         logger.info(`      💰 Total Cost:         ${edge.totalCost.toFixed(8)} GALA`);

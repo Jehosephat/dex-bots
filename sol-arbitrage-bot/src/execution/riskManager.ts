@@ -30,7 +30,8 @@ export class RiskManager {
     token: TokenConfig,
     galaChainQuote: GalaChainQuote,
     solanaQuote: SolanaQuote,
-    solToGalaRate: BigNumber
+    solToGalaRate: BigNumber,
+    galaUsdPrice?: number
   ): RiskCheckResult {
     const reasons: string[] = [];
 
@@ -56,7 +57,7 @@ export class RiskManager {
         solQuoteCurrency: solanaQuote.currency,
         solToGalaRate: solToGalaRate.toString()
       });
-      edge = this.edgeCalculator.calculateEdge(token, galaChainQuote, solanaQuote, solToGalaRate);
+      edge = this.edgeCalculator.calculateEdge(token, galaChainQuote, solanaQuote, solToGalaRate, galaUsdPrice);
       logger.debug(`🔍 DEBUG: edgeCalculator.calculateEdge() completed`);
     } catch (edgeError) {
       logger.error(`❌ ERROR in edgeCalculator.calculateEdge() for ${token.symbol}`, {
