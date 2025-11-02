@@ -117,6 +117,9 @@ export function getTokenBySymbol(symbol: string): TokenConfig | undefined {
  */
 export function getQuoteTokenBySymbol(symbol: string): QuoteTokenConfig | undefined {
   const config = getConfig();
+  if (!config || !config.quoteTokens) {
+    return undefined;
+  }
   const upperSymbol = symbol.toUpperCase();
   return config.quoteTokens[upperSymbol];
 }

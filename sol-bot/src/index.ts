@@ -443,10 +443,10 @@ ${tradingConfig.dryRun ? '⚠️  DRY RUN: Will show opportunities but NOT execu
   • Cooldown Period: ${tradingConfig.cooldownPeriod / 1000}s
   
 🛡️  Risk Controls:
-  • Circuit Breaker: ${riskConfig.circuitBreakerThreshold} failures
-  • Max Daily Loss: ${riskConfig.maxDailyLossGALA || riskConfig.maxDailyLoss} GALA
-  • Min GALA Balance: ${riskConfig.inventoryMinimums.GALA} GALA
-  • Min SOL Balance: ${riskConfig.inventoryMinimums.SOL} SOL
+  • Circuit Breaker: ${riskConfig.circuitBreakerThreshold || 'N/A'} failures
+  • Max Daily Loss: ${riskConfig.maxDailyLossGALA || riskConfig.maxDailyLoss || 'N/A'} GALA
+  • Min GALA Balance: ${riskConfig.inventoryMinimums?.GALA || 'N/A'} GALA
+  • Min SOL Balance: ${riskConfig.inventoryMinimums?.SOL || 'N/A'} SOL
 
 🌉 Bridge:
   • Bridge Cost: ${config.getBridgingConfig().bridgeCostUSD} USD

@@ -273,6 +273,11 @@ export class InventoryManager {
     const gcBalance = this.gcBalances.get(token) || 0;
     const solBalance = this.solBalances.get('SOL') || 0;
     const botConfig = config.getBotConfig();
+    
+    if (!botConfig || !botConfig.risk) {
+      logger.warn('⚠️ Bot config or risk config not found in canExecuteTrade');
+      return false;
+    }
 
     // Check GC token balance
     if (gcBalance < gcSellAmount) {
@@ -281,7 +286,7 @@ export class InventoryManager {
     }
 
     // Check SOL balance for fees (approximate)
-    const minSOLRequired = botConfig.risk.inventoryMinimums.SOL || 1;
+    const minSOLRequired = (botConfig.risk?.inventoryMinimums?.SOL) || 1;
     if (solBalance < minSOLRequired) {
       logger.warn(`Insufficient SOL balance. Have: ${solBalance}, Need: ${minSOLRequired}`);
       return false;
@@ -332,7 +337,8 @@ export class InventoryManager {
     }
 
     // Check minimum balances
-    Object.entries(botConfig.risk.inventoryMinimums).forEach(([token, minimum]) => {
+    const inventoryMinimums = botConfig.risk?.inventoryMinimums || {};
+    Object.entries(inventoryMinimums).forEach(([token, minimum]) => {
       const gcBalance = this.gcBalances.get(token) || 0;
       const solBalance = this.solBalances.get(token) || 0;
 

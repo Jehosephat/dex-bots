@@ -240,7 +240,7 @@ export class RiskManager {
 
     // Check minimum GALA balance for fees
     const galaBalance = inventory.gcBalances['GALA'] || 0;
-    const minGALA = riskCfg.inventoryMinimums['GALA'] || 100;
+    const minGALA = (riskCfg.inventoryMinimums && riskCfg.inventoryMinimums['GALA']) || 100;
     if (galaBalance < minGALA) {
       return {
         isValid: false,
@@ -251,7 +251,7 @@ export class RiskManager {
 
     // Check minimum SOL balance for Solana transactions
     const solBalance = inventory.solBalances['SOL'] || inventory.solBalances['GSOL'] || 0;
-    const minSOL = riskCfg.inventoryMinimums['SOL'] || 1;
+    const minSOL = (riskCfg.inventoryMinimums && riskCfg.inventoryMinimums['SOL']) || 1;
     if (solBalance < minSOL) {
       return {
         isValid: false,

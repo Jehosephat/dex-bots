@@ -48,7 +48,27 @@ export class RiskManager {
     }
 
     // 3) Edge calculation and threshold
-    const edge = this.edgeCalculator.calculateEdge(token, galaChainQuote, solanaQuote, solToGalaRate);
+    let edge: EdgeCalculationResult;
+    try {
+      logger.debug(`🔍 DEBUG: About to call edgeCalculator.calculateEdge()`, {
+        token: token.symbol,
+        solQuoteVia: token.solQuoteVia,
+        solQuoteCurrency: solanaQuote.currency,
+        solToGalaRate: solToGalaRate.toString()
+      });
+      edge = this.edgeCalculator.calculateEdge(token, galaChainQuote, solanaQuote, solToGalaRate);
+      logger.debug(`🔍 DEBUG: edgeCalculator.calculateEdge() completed`);
+    } catch (edgeError) {
+      logger.error(`❌ ERROR in edgeCalculator.calculateEdge() for ${token.symbol}`, {
+        error: edgeError instanceof Error ? edgeError.message : String(edgeError),
+        stack: edgeError instanceof Error ? edgeError.stack : undefined,
+        token: token.symbol,
+        solQuoteVia: token.solQuoteVia,
+        solQuoteCurrency: solanaQuote.currency,
+        solToGalaRate: solToGalaRate.toString()
+      });
+      throw edgeError; // Re-throw to be caught by mainLoop
+    }
     if (!edge.isProfitable) {
       reasons.push(...edge.invalidationReasons);
     }
@@ -63,7 +83,32 @@ export class RiskManager {
     const state = this.stateManager.getState() as any;
     const gcTokens = state?.inventory?.galaChain?.tokens || {};
     const gcToken = gcTokens ? gcTokens[token.symbol] : undefined;
-    if (!gcToken || !gcToken.balance || gcToken.balance.isLessThan(token.tradeSize)) {
+    
+    // Defensively handle balance - ensure it's a BigNumber
+    if (gcToken && gcToken.balance) {
+      let balanceBN: BigNumber;
+      try {
+        if (BigNumber.isBigNumber(gcToken.balance)) {
+          balanceBN = gcToken.balance;
+        } else {
+          // Convert to BigNumber if it's not already one
+          balanceBN = new BigNumber(gcToken.balance);
+          // Update the state with the converted value
+          gcToken.balance = balanceBN;
+        }
+        
+        if (balanceBN.isLessThan(token.tradeSize)) {
+          reasons.push('Insufficient GalaChain inventory for sell (simulation mode if dry-run)');
+        }
+      } catch (balanceError) {
+        logger.warn(`⚠️ Failed to check inventory balance for ${token.symbol}`, {
+          error: balanceError instanceof Error ? balanceError.message : String(balanceError),
+          balanceType: typeof gcToken.balance,
+          balanceValue: gcToken.balance
+        });
+        reasons.push('Unable to verify GalaChain inventory balance');
+      }
+    } else {
       reasons.push('Insufficient GalaChain inventory for sell (simulation mode if dry-run)');
     }
 

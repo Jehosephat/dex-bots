@@ -90,6 +90,16 @@ export class ConfigManager {
   }
 
   getRiskConfig() {
+    if (!this.botConfig || !this.botConfig.risk) {
+      logger.warn('⚠️ Risk config not found, returning default');
+      return {
+        circuitBreakerThreshold: 5,
+        maxDailyLoss: 1000,
+        maxDailyLossGALA: 1000,
+        inventoryMinimums: { GALA: 100, SOL: 1 },
+        inventoryTargets: {}
+      };
+    }
     return this.botConfig.risk;
   }
 

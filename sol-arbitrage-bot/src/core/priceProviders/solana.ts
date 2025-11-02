@@ -140,7 +140,10 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
       // Get the quote token configuration
       const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
-      if (!quoteTokenConfig?.solanaMint) {
+      if (!quoteTokenConfig) {
+        throw new Error(`Quote token config not found for ${tokenConfig.solQuoteVia}`);
+      }
+      if (!quoteTokenConfig.solanaMint) {
         throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
       }
 
@@ -198,7 +201,11 @@ export class SolanaPriceProvider extends BasePriceProvider {
       }
 
       const tokenConfig = getTokenConfig(tokenSymbol);
-      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig?.solQuoteVia || 'SOL');
+      const solQuoteVia = tokenConfig?.solQuoteVia || 'SOL';
+      const quoteTokenConfig = getQuoteTokenConfig(solQuoteVia);
+      if (!quoteTokenConfig) {
+        logger.warn(`⚠️ Quote token config not found for ${solQuoteVia}, using fallback decimals`);
+      }
       const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), quoteTokenConfig?.decimals || 9);
       const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), tokenConfig?.decimals || 6);
 

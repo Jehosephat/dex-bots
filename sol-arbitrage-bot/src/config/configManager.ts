@@ -52,8 +52,8 @@ export class ConfigManager implements IConfigManager {
       // Merge configurations
       const mergedConfig: BotConfig = {
         ...baseConfig,
-        tokens: tokensConfig.tokens || baseConfig.tokens,
-        quoteTokens: tokensConfig.quoteTokens || baseConfig.quoteTokens
+        tokens: tokensConfig.tokens || baseConfig.tokens || {},
+        quoteTokens: tokensConfig.quoteTokens || baseConfig.quoteTokens || {}
       };
 
       // Apply environment variable overrides
@@ -184,6 +184,10 @@ export class ConfigManager implements IConfigManager {
    * Get configuration for a specific quote token
    */
   getQuoteTokenConfig(symbol: string): QuoteTokenConfig | undefined {
+    if (!this.config || !this.config.quoteTokens) {
+      logger.warn(`⚠️ Config or quoteTokens not initialized when accessing ${symbol}`);
+      return undefined;
+    }
     return this.config.quoteTokens[symbol];
   }
 
@@ -191,6 +195,10 @@ export class ConfigManager implements IConfigManager {
    * Get trading configuration
    */
   getTradingConfig(): TradingConfig {
+    if (!this.config || !this.config.trading) {
+      logger.warn('⚠️ Trading config not found, returning empty config');
+      throw new Error('Trading configuration not loaded');
+    }
     return this.config.trading;
   }
 
@@ -198,6 +206,10 @@ export class ConfigManager implements IConfigManager {
    * Get bridging configuration
    */
   getBridgingConfig(): BridgingConfig {
+    if (!this.config || !this.config.bridging) {
+      logger.warn('⚠️ Bridging config not found, returning empty config');
+      throw new Error('Bridging configuration not loaded');
+    }
     return this.config.bridging;
   }
 
@@ -294,7 +306,8 @@ export class ConfigManager implements IConfigManager {
     }
 
     // Validate quote tokens
-    for (const [symbol, token] of Object.entries(this.config.quoteTokens)) {
+    const quoteTokens = this.config?.quoteTokens || {};
+    for (const [symbol, token] of Object.entries(quoteTokens)) {
       if (!token.galaChainMint) {
         errors.push(`Quote token ${symbol}: galaChainMint is required`);
       }

@@ -41,6 +41,23 @@ export class StateManager {
         const content = readFileSync(this.stateFilePath, 'utf8');
         const loadedState = JSON.parse(content);
         
+        // Ensure required fields exist (for backwards compatibility)
+        if (!loadedState.tokenCooldowns) {
+          loadedState.tokenCooldowns = {};
+        }
+        if (!loadedState.dailyTradeCounts) {
+          loadedState.dailyTradeCounts = {};
+        }
+        if (!loadedState.lastBridgeTimes) {
+          loadedState.lastBridgeTimes = {};
+        }
+        if (!loadedState.pendingBridges) {
+          loadedState.pendingBridges = [];
+        }
+        if (!loadedState.recentTrades) {
+          loadedState.recentTrades = [];
+        }
+        
         // Convert BigNumber strings back to BigNumber instances
         this.convertBigNumbers(loadedState);
         
@@ -63,6 +80,7 @@ export class StateManager {
 
   /**
    * Convert BigNumber strings back to BigNumber instances
+   * Also handles known BigNumber fields in TokenBalance structures
    */
   private convertBigNumbers(obj: any): void {
     if (obj === null || typeof obj !== 'object') return;
@@ -72,9 +90,28 @@ export class StateManager {
     } else {
       Object.keys(obj).forEach(key => {
         const value = obj[key];
+        
+        // Convert "BigNumber:..." strings back to BigNumber instances
         if (typeof value === 'string' && value.startsWith('BigNumber:')) {
           obj[key] = new BigNumber(value.replace('BigNumber:', ''));
-        } else if (typeof value === 'object') {
+        } 
+        // Convert known BigNumber fields in TokenBalance structures
+        // (even if they were stored as plain numbers/strings due to JSON serialization issues)
+        else if (key === 'balance' || key === 'rawBalance' || key === 'valueUsd' || 
+                 key === 'native' || key === 'totalValueUsd') {
+          if (typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)))) {
+            obj[key] = new BigNumber(value);
+          } else if (!BigNumber.isBigNumber(value) && value !== null && value !== undefined) {
+            // Try to convert if it's not already a BigNumber
+            try {
+              obj[key] = new BigNumber(value);
+            } catch (e) {
+              logger.warn(`⚠️ Failed to convert ${key} to BigNumber`, { value, error: e });
+            }
+          }
+        } 
+        // Recurse into nested objects
+        else if (typeof value === 'object') {
           this.convertBigNumbers(value);
         }
       });
@@ -303,6 +340,9 @@ export class StateManager {
    * Set token cooldown
    */
   setTokenCooldown(symbol: string, cooldown: CooldownInfo): void {
+    if (!this.state.tokenCooldowns) {
+      this.state.tokenCooldowns = {};
+    }
     this.state.tokenCooldowns[symbol] = cooldown;
     this.markDirty();
     
@@ -316,7 +356,9 @@ export class StateManager {
    * Clear token cooldown
    */
   clearTokenCooldown(symbol: string): void {
-    delete this.state.tokenCooldowns[symbol];
+    if (this.state.tokenCooldowns) {
+      delete this.state.tokenCooldowns[symbol];
+    }
     this.markDirty();
     
     logger.debug('✅ Token cooldown cleared', { symbol });
@@ -326,6 +368,10 @@ export class StateManager {
    * Check if token is in cooldown
    */
   isTokenInCooldown(symbol: string): boolean {
+    if (!this.state || !this.state.tokenCooldowns) {
+      // State not initialized or tokenCooldowns missing, no cooldown active
+      return false;
+    }
     const cooldown = this.state.tokenCooldowns[symbol];
     if (!cooldown) return false;
     
@@ -342,6 +388,9 @@ export class StateManager {
    * Get token cooldown info
    */
   getTokenCooldown(symbol: string): CooldownInfo | undefined {
+    if (!this.state || !this.state.tokenCooldowns) {
+      return undefined;
+    }
     const cooldown = this.state.tokenCooldowns[symbol];
     if (!cooldown) return undefined;
     
