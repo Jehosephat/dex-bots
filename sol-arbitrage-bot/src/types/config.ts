@@ -29,6 +29,9 @@ export interface TradingConfig {
   maxPriceImpactBps: number;
   cooldownMinutes: number;
   maxDailyTrades: number;
+  enableReverseArbitrage?: boolean; // Enable reverse arbitrage (buy GC, sell SOL)
+  reverseArbitrageMinEdgeBps?: number; // Min edge for reverse (defaults to minEdgeBps)
+  arbitrageDirection?: 'forward' | 'reverse' | 'best'; // Force direction or choose best
 }
 
 export interface BridgingConfig {

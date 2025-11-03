@@ -19,8 +19,9 @@ export interface IPriceProvider {
 
   /**
    * Get a quote for a specific token and amount
+   * @param reverse If true, get reverse quote (buy on GC, sell on SOL). Default false.
    */
-  getQuote(symbol: string, amount: number): Promise<PriceQuote | null>;
+  getQuote(symbol: string, amount: number, reverse?: boolean): Promise<PriceQuote | null>;
 
   /**
    * Get the name of this price provider

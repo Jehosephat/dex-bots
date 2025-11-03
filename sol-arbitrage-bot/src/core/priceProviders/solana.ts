@@ -13,7 +13,8 @@ import { TokenConfig } from '../../types/config';
 import { getTokenConfig, getQuoteTokenConfig } from '../../config';
 import logger from '../../utils/logger';
 import { 
-  calculatePriceImpactBps, 
+  calculatePriceImpactBps,
+  calculateBps,
   toRawAmount, 
   toTokenAmount,
   isValidPrice,
@@ -50,7 +51,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
     return 'solana';
   }
 
-  async getQuote(symbol: string, amount: number): Promise<PriceQuote | null> {
+  async getQuote(symbol: string, amount: number, reverse: boolean = false): Promise<PriceQuote | null> {
     try {
       if (!this.isReady()) {
         throw new Error('Provider not ready');
@@ -68,8 +69,10 @@ export class SolanaPriceProvider extends BasePriceProvider {
       // Update SOL/USD price if needed
       await this.updateSOLUSDPrice();
 
-      // Get quote for SOL → Token (buying token with SOL)
-      const quote = await this.getJupiterQuote(symbol, amount);
+      // Get quote based on direction
+      // reverse=false: SOL → Token (buying token with SOL/USDC)
+      // reverse=true: Token → SOL (selling token for SOL/USDC)
+      const quote = await this.getJupiterQuote(symbol, amount, reverse);
 
       if (!quote) {
         return null;
@@ -77,15 +80,36 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
       // Calculate price and price impact
       const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
-      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), quoteTokenConfig?.decimals || 9);
-      const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), tokenConfig.decimals);
-      const price = inputAmount.div(outputAmount); // QuoteToken per token
-      const spotPrice = await this.getSpotPrice(symbol);
-      const priceImpactBps = calculatePriceImpactBps(
-        outputAmount,
-        inputAmount,
-        spotPrice
-      );
+      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), reverse ? tokenConfig.decimals : (quoteTokenConfig?.decimals || 9));
+      const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), reverse ? (quoteTokenConfig?.decimals || 9) : tokenConfig.decimals);
+      
+      // Price calculation:
+      // reverse=false: buying token with quoteToken, price = inputAmount (quoteToken) / outputAmount (token) = quoteToken per token
+      // reverse=true: selling token for quoteToken, price = outputAmount (quoteToken) / inputAmount (token) = quoteToken per token
+      const price = reverse ? outputAmount.div(inputAmount) : inputAmount.div(outputAmount);
+      
+      // Calculate price impact
+      // For reverse quotes, Jupiter provides priceImpact directly, use that
+      // For forward quotes, calculate from spot price
+      let priceImpactBps: number;
+      if (reverse) {
+        // Use Jupiter's price impact if available (it's in percentage, convert to bps)
+        priceImpactBps = (quote.priceImpact || 0) * 100; // Convert percentage to bps
+        if (priceImpactBps === 0) {
+          // Fallback: calculate from spot price (inverted since we're selling)
+          const spotPrice = await this.getSpotPrice(symbol);
+          // For selling: spot price is for buying (quoteToken/token), we need inverse
+          if (!spotPrice.isZero()) {
+            const inverseSpotPrice = new BigNumber(1).div(spotPrice); // tokens per quoteToken
+            const effectivePrice = inputAmount.div(outputAmount); // tokens per quoteToken (inverse of price)
+            priceImpactBps = calculateBps(effectivePrice, inverseSpotPrice);
+          }
+        }
+      } else {
+        // Forward: calculate from spot price
+        const spotPrice = await this.getSpotPrice(symbol);
+        priceImpactBps = calculatePriceImpactBps(outputAmount, inputAmount, spotPrice); // tokens received, quoteToken paid, spot price
+      }
 
       // Calculate priority fee
       const priorityFee = this.calculatePriorityFee(quote.priceImpact);
@@ -125,7 +149,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
   private async getJupiterQuote(
     tokenSymbol: string, 
-    amount: number
+    amount: number,
+    reverse: boolean = false
   ): Promise<{
     inputAmount: string;
     outputAmount: string;
@@ -147,20 +172,33 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
       }
 
-      const inputMint = quoteTokenConfig.solanaMint; // e.g., USDC
-      const outputMint = tokenConfig.solanaMint;     // target token (e.g., SOL or other)
+      let inputMint: string;
+      let outputMint: string;
+      let swapMode: 'ExactIn' | 'ExactOut';
+      let rawAmount: string;
 
-      // We request ExactOut: amount is in output token units
-      const rawAmountOut = toRawAmount(new BigNumber(amount), tokenConfig.decimals);
+      if (reverse) {
+        // Selling token for quote token: Token → QuoteToken
+        inputMint = tokenConfig.solanaMint;     // source token
+        outputMint = quoteTokenConfig.solanaMint; // e.g., USDC
+        swapMode = 'ExactIn';
+        rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
+      } else {
+        // Buying token with quote token: QuoteToken → Token
+        inputMint = quoteTokenConfig.solanaMint; // e.g., USDC
+        outputMint = tokenConfig.solanaMint;     // target token
+        swapMode = 'ExactOut';
+        rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
+      }
 
-      // Get quote from Jupiter (QuoteToken → Token) using ExactOut
+      // Get quote from Jupiter
       const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
         params: {
           inputMint,
           outputMint,
-          amount: rawAmountOut.toString(),
+          amount: rawAmount,
           slippageBps: 50, // 0.5% slippage
-          swapMode: 'ExactOut'
+          swapMode
         },
         timeout: 10000
       });
