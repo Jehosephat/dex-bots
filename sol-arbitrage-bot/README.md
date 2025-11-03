@@ -50,6 +50,17 @@ This bot implements the "Arb-MVP" strategy as defined in the PRD:
    npm start
    ```
 
+5. Analyze trade logs:
+   ```bash
+   # Analyze all trades
+   npm run analyze
+   
+   # Analyze trades for a specific date
+   npm run analyze -- --date=2025-11-03
+   
+   # Reports are saved to logs/analysis-latest.txt (or logs/analysis-YYYY-MM-DD.txt)
+   ```
+
 ## Development
 
 ```bash

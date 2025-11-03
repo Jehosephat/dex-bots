@@ -16,7 +16,10 @@
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop sol-arbitrage-bot",
     "pm2:restart": "pm2 restart sol-arbitrage-bot",
-    "pm2:logs": "pm2 logs sol-arbitrage-bot"
+    "pm2:logs": "pm2 logs sol-arbitrage-bot",
+    "analyze": "ts-node src/analyze-trades.ts",
+    "analyze:date": "ts-node src/analyze-trades.ts",
+    "balances": "ts-node src/check-balances.ts"
   },
   "keywords": [
     "arbitrage",

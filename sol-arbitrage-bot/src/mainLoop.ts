@@ -10,10 +10,11 @@ import { sendAlert } from './utils/alerts';
 import { getTradeLogger } from './utils/tradeLogger';
 import { ReverseEdgeCalculator } from './core/reverseEdgeCalculator';
 import { EdgeCalculationResult } from './core/edgeCalculator';
+import { BalanceChecker } from './core/balanceChecker';
 
 export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Promise<boolean> {
   initializeConfig();
-
+  
   const enabled = getEnabledTokens();
   if (enabled.length === 0) {
     logger.warn('⚠️ No enabled tokens');
@@ -31,6 +32,43 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
   
   // Get stateManager for cooldown checks
   const stateManager = (risk as any).stateManager;
+  
+  // Initialize balance checker
+  const balanceChecker = new BalanceChecker(stateManager);
+  
+  // Always check balances before starting (especially for live mode)
+  // Force check on cycle start to ensure we have accurate state
+  if (runMode === 'live') {
+    logger.info(`\n🔍 Running initial balance check before cycle...`);
+    const initialBalanceCheck = await balanceChecker.checkBalances(true, true); // forceCheck=true
+    
+    if (!initialBalanceCheck.canTrade) {
+      logger.error(`\n⛔ TRADING PAUSED: Insufficient funds detected at cycle start`);
+      logger.error(`   Insufficient funds:`);
+      initialBalanceCheck.insufficientFunds.forEach(f => {
+        logger.error(`   ${f.chain === 'galaChain' ? '🔷' : '🔸'} ${f.chain.toUpperCase()}: ${f.token}`);
+        logger.error(`      Current: ${f.currentBalance.toFixed(8)}`);
+        logger.error(`      Required: ${f.requiredBalance.toFixed(8)}`);
+        logger.error(`      Purpose: ${f.purpose === 'sell' ? 'SELL (inventory)' : f.purpose === 'buy' ? 'BUY (quote currency)' : 'QUOTE (fees)'}`);
+      });
+      
+      if (initialBalanceCheck.recommendations.length > 0) {
+        logger.warn(`   Recommendations:`);
+        initialBalanceCheck.recommendations.forEach(r => logger.warn(`   - ${r}`));
+      }
+      
+      logger.error(`\n🛑 Stopping cycle - waiting for balance replenishment`);
+      logger.error(`   Run 'npm run balances' to check current balances`);
+      return false;
+    } else {
+      logger.info(`✅ Balance check passed: Sufficient funds available`);
+      
+      // If trading was previously paused but now we have funds, resume
+      if (balanceChecker.isTradingPaused()) {
+        logger.info(`✅ Trading resumed: Funds replenished`);
+      }
+    }
+  }
 
   await gcProvider.initialize();
   await solProvider.initialize();
@@ -430,6 +468,29 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
         
         // Log the trade
         tradeLogger.logTrade(logEntry);
+        
+        // Check balances after successful live trade
+        if (gc.success && sol.success) {
+          try {
+            logger.info(`\n🔍 Checking balances after trade...`);
+            const balanceCheck = await balanceChecker.checkBalances();
+            
+            if (!balanceCheck.canTrade) {
+              logger.error(`\n⛔ TRADING PAUSED: Insufficient funds detected`);
+              logger.error(`   Reason: ${balanceCheck.insufficientFunds.map(f => `${f.chain} ${f.token}`).join(', ')}`);
+              
+              // Return early to stop processing more tokens
+              logger.info(`\n🛑 Stopping main cycle due to insufficient funds`);
+              return anyExecuted;
+            } else {
+              logger.info(`✅ Balance check passed: Sufficient funds available`);
+            }
+          } catch (balanceError) {
+            logger.warn(`⚠️ Balance check failed, continuing with caution`, {
+              error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+            });
+          }
+        }
         
       } else {
         await coord.dryRun(token.symbol);
