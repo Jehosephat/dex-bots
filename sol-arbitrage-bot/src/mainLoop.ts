@@ -148,16 +148,35 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
       try {
         // Use forward quote currency to determine rate (should be same for reverse)
         const quoteCurrency = solQuoteForward.currency;
-        if (quoteCurrency === 'SOL') {
-          const solUsd = solProvider.getSOLUSDPrice();
+        if (quoteCurrency === 'GALA') {
+          // Solana quote is already in GALA (e.g., SOL→GALA quote), no conversion needed
+          quoteToGalaRate = new BigNumber(1);
+          logger.debug(`💱 Solana quote already in GALA - no conversion needed (1:1)`);
           galaUsdPrice = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01;
-          if (solUsd > 0 && galaUsdPrice > 0) {
-            quoteToGalaRate = new BigNumber(solUsd).div(galaUsdPrice);
+        } else if (quoteCurrency === 'SOL') {
+          // Try to get rate directly from GALA/GSOL pool (more accurate, no USD conversion)
+          const solCost = solQuoteForward.price.multipliedBy(token.tradeSize);
+          const poolRate = await gcProvider.getSOLToGALARate?.(solCost);
+          
+          if (poolRate && !poolRate.isZero() && !poolRate.isNaN()) {
+            quoteToGalaRate = poolRate;
+            logger.debug(`💱 Using SOL→GALA rate from pool: ${quoteToGalaRate.toFixed(4)} GALA per SOL`);
+          } else {
+            // Fallback to USD conversion if pool quote fails
+            logger.debug(`⚠️ Pool quote failed, falling back to USD conversion for SOL→GALA rate`);
+            const solUsd = solProvider.getSOLUSDPrice();
+            galaUsdPrice = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01;
+            if (solUsd > 0 && galaUsdPrice > 0) {
+              quoteToGalaRate = new BigNumber(solUsd).div(galaUsdPrice);
+              logger.debug(`💱 Using USD-based SOL→GALA rate: ${quoteToGalaRate.toFixed(4)} GALA per SOL (via $${solUsd}/$${galaUsdPrice.toFixed(6)})`);
+            }
           }
         } else if (quoteCurrency === 'USDC') {
+          // USDC still needs USD conversion (no direct pool on GalaChain)
           galaUsdPrice = gcProvider.getGALAUSDPrice ? gcProvider.getGALAUSDPrice() : 0.01;
           if (galaUsdPrice > 0) {
             quoteToGalaRate = new BigNumber(1).div(galaUsdPrice);
+            logger.debug(`💱 USDC→GALA rate: ${quoteToGalaRate.toFixed(4)} GALA per USDC (via GALA/USD: $${galaUsdPrice.toFixed(6)})`);
           }
         }
       } catch (rateError) {

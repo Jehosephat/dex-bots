@@ -445,7 +445,7 @@ export class BalanceChecker {
         }
         
         // Determine quote currency (USDC or SOL)
-        const quoteVia = token.solQuoteVia || 'USDC';
+        const quoteVia = token.solQuoteVia || 'SOL'; // Default to SOL instead of USDC
         const quoteToken = getQuoteTokenBySymbol(quoteVia);
         
         if (!quoteToken || !quoteToken.solanaMint) {
@@ -456,6 +456,19 @@ export class BalanceChecker {
         // Skip SOL quote currency check here - we'll handle it separately below to avoid duplicates
         if (quoteVia === 'SOL') {
           continue; // Will be checked in the consolidated SOL check below
+        }
+
+        // Only check quote currencies that are actually being used by enabled tokens
+        // Skip USDC and other quote currencies if no enabled tokens use them
+        const tokensUsingThisQuote = enabledTokens.filter(t => 
+          t.enabled !== false && 
+          !skipTokensSolana.includes(t.symbol) &&
+          (t.solQuoteVia || 'SOL') === quoteVia
+        );
+        
+        if (tokensUsingThisQuote.length === 0) {
+          logger.debug(`Skipping ${quoteVia} balance check - no enabled tokens use it as quote currency`);
+          continue;
         }
 
         // For USDC and other quote currencies: need quote currency to BUY tokens
@@ -539,9 +552,11 @@ export class BalanceChecker {
       const minSolForFees = new BigNumber(minSolForFeesConfig);
       
       // Only check tokens that are enabled and not in skipTokens list
+      // Exclude SOL token itself - for SOL arbitrage, we're selling SOL to get GALA, not buying SOL with SOL
       const solAsQuoteTokens = enabledTokens.filter(t => 
         t.enabled !== false && 
         !skipTokensSolana.includes(t.symbol) &&
+        t.symbol !== 'SOL' && // Exclude SOL token - it's the asset being traded, not a quote currency
         (t.solQuoteVia || 'USDC') === 'SOL'
       );
       
@@ -599,6 +614,44 @@ export class BalanceChecker {
           requiredBalance: minSolRequired,
           purpose: solRequiredForTrading ? 'buy' : 'quote' // 'buy' if used as quote, 'quote' if just for fees
         });
+      }
+
+      // Check GALA balance on Solana (if reverse trades enabled or for visibility)
+      // GALA on Solana is an SPL token that might be needed for certain operations
+      const tradingConfig = (config as any).trading || {};
+      const enableReverse = tradingConfig.enableReverseArbitrage !== false;
+      const minGalaOnSolana = (config as any).balanceChecking?.minGalaOnSolana || 0; // Optional minimum, default 0
+      
+      // Only check if there's a minimum requirement or reverse trades are enabled
+      if (enableReverse || minGalaOnSolana > 0) {
+        const galaQuoteToken = getQuoteTokenBySymbol('GALA');
+        if (galaQuoteToken && galaQuoteToken.solanaMint) {
+          const galaBalance = balanceMap.get(galaQuoteToken.solanaMint) || new BigNumber(0);
+          const minGalaRequired = new BigNumber(minGalaOnSolana);
+          const galaSufficient = galaBalance.isGreaterThanOrEqualTo(minGalaRequired);
+          
+          // Track this check (always, for visibility)
+          if (checkedBalances) {
+            checkedBalances.push({
+              token: 'GALA',
+              current: galaBalance,
+              required: minGalaRequired,
+              purpose: minGalaRequired.isGreaterThan(0) ? 'quote' : 'info', // 'quote' if there's a requirement, 'info' if just for visibility
+              sufficient: galaSufficient
+            });
+          }
+          
+          // Only add to insufficientFunds if there's an actual minimum requirement
+          if (minGalaRequired.isGreaterThan(0) && !galaSufficient) {
+            insufficientFunds.push({
+              chain: 'solana',
+              token: 'GALA',
+              currentBalance: galaBalance,
+              requiredBalance: minGalaRequired,
+              purpose: 'quote'
+            });
+          }
+        }
       }
 
     } catch (error) {

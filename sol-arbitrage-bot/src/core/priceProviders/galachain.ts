@@ -601,6 +601,35 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   }
 
   /**
+   * Get SOL to GALA conversion rate directly from GALA/GSOL pool
+   * This is more accurate than using USD prices as it uses actual market rates
+   */
+  async getSOLToGALARate(solAmount: BigNumber): Promise<BigNumber | null> {
+    try {
+      // Get quote for converting SOL to GALA using the GALA/GSOL pool
+      const quote = await this.getLocalQuote('SOL', 'GALA', solAmount, DexFeePercentageTypes.FEE_1_PERCENT, false);
+      if (!quote || !quote.outputAmount) {
+        return null;
+      }
+      
+      const outputGala = new BigNumber(quote.outputAmount);
+      if (outputGala.isZero() || outputGala.isNaN()) {
+        return null;
+      }
+      
+      // Rate = GALA received / SOL amount
+      const rate = outputGala.div(solAmount);
+      logger.debug(`💱 SOL→GALA rate from pool: ${rate.toFixed(4)} GALA per SOL (for ${solAmount.toFixed(9)} SOL)`);
+      return rate;
+    } catch (error) {
+      logger.warn('Failed to get SOL→GALA rate from pool, falling back to USD conversion', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  /**
    * Get current GALA/USD price
    */
   getGALAUSDPrice(): number {

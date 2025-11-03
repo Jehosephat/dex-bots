@@ -69,6 +69,69 @@ export class SolanaPriceProvider extends BasePriceProvider {
       // Update SOL/USD price if needed
       await this.updateSOLUSDPrice();
 
+      // Special case: SOL token with SOL as quote currency
+      // For SOL arbitrage, we always quote SOL → GALA on Solana
+      // Forward: Selling SOL → Getting GALA (building GALA inventory on Solana)
+      // Reverse: Selling SOL → Getting GALA (same as forward, just different direction context)
+      if (symbol === 'SOL' && (tokenConfig.solQuoteVia || 'SOL') === 'SOL') {
+        // Always quote SOL → GALA (selling SOL to get GALA)
+        const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
+        const solMint = 'So11111111111111111111111111111111111111112'; // Native SOL
+        const rawAmount = toRawAmount(new BigNumber(amount), 9).toString(); // SOL has 9 decimals
+        
+        try {
+          const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
+            params: {
+              inputMint: solMint,
+              outputMint: galaMint,
+              amount: rawAmount,
+              slippageBps: 50,
+              swapMode: 'ExactIn'
+            },
+            timeout: 10000
+          });
+
+          if (response.data?.outAmount) {
+            // GALA has 8 decimals
+            const solAmount = new BigNumber(amount);
+            const galaAmount = toTokenAmount(new BigNumber(response.data.outAmount), 8);
+            const price = galaAmount.div(solAmount); // GALA per SOL
+            
+            const solanaQuote: SolanaQuote = {
+              symbol,
+              price,
+              currency: 'GALA', // Return price in GALA, not SOL
+              tradeSize: amount,
+              priceImpactBps: (response.data.priceImpactPct || 0) * 100,
+              minOutput: galaAmount.multipliedBy(0.99),
+              provider: this.getName(),
+              timestamp: Date.now(),
+              expiresAt: Date.now() + 30000,
+              isValid: true,
+              priorityFee: this.calculatePriorityFee(response.data.priceImpactPct || 0),
+              jupiterRoute: response.data.routePlan ? {
+                routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
+                inputMint: solMint,
+                outputMint: galaMint,
+                steps: response.data.routePlan || [],
+                totalPriceImpact: response.data.priceImpactPct || 0,
+                totalFee: response.data.platformFee?.amount || 0
+              } : undefined
+            };
+            
+            this.updateTimestamp();
+            this.clearError();
+            logger.debug(`📊 Solana quote for ${symbol} (SOL→GALA, ${reverse ? 'reverse' : 'forward'}): ${price.toString()} GALA per SOL`);
+            return solanaQuote;
+          }
+        } catch (error) {
+          logger.warn('Failed to get SOL→GALA quote on Solana', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          return null;
+        }
+      }
+
       // Get quote based on direction
       // reverse=false: SOL → Token (buying token with SOL/USDC)
       // reverse=true: Token → SOL (selling token for SOL/USDC)
@@ -172,6 +235,19 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
       }
 
+      // Special case: Can't quote SOL/SOL on Jupiter (trying to swap SOL for itself)
+      if (tokenConfig.solanaMint === quoteTokenConfig.solanaMint) {
+        logger.debug(`Skipping Jupiter quote for ${tokenSymbol}/${tokenConfig.solQuoteVia} - same mint, returning 1:1 price`);
+        // Return a 1:1 quote with no price impact
+        const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
+        return {
+          inputAmount: rawAmount,
+          outputAmount: rawAmount,
+          priceImpact: 0,
+          route: undefined
+        };
+      }
+
       let inputMint: string;
       let outputMint: string;
       let swapMode: 'ExactIn' | 'ExactOut';
@@ -271,8 +347,43 @@ export class SolanaPriceProvider extends BasePriceProvider {
       return;
     }
 
+    // Try to get SOL/USD from SOL/USDC pool on Jupiter first (most accurate)
     try {
-      // Fetch SOL/USD price from CoinGecko
+      const solMint = 'So11111111111111111111111111111111111111112'; // Native SOL
+      const usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC
+      const amount = 1; // 1 SOL
+      const rawAmount = (amount * 1_000_000_000).toString(); // Convert to lamports
+      
+      const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
+        params: {
+          inputMint: solMint,
+          outputMint: usdcMint,
+          amount: rawAmount,
+          slippageBps: 50,
+          swapMode: 'ExactIn'
+        },
+        timeout: 5000
+      });
+
+      if (response.data?.outAmount) {
+        // USDC has 6 decimals, SOL has 9 decimals
+        const solAmount = new BigNumber(amount);
+        const usdcAmount = new BigNumber(response.data.outAmount).dividedBy(1_000_000); // Convert from raw USDC (6 decimals)
+        
+        // Price = USDC received / SOL spent
+        this.solUsdPrice = usdcAmount.toNumber();
+        this.solUsdPriceLastUpdate = now;
+        logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)} [Source: SOL/USDC pool on Jupiter]`);
+        return;
+      }
+    } catch (jupiterError) {
+      logger.debug('Failed to get SOL/USD from Jupiter pool, trying CoinGecko', {
+        error: jupiterError instanceof Error ? jupiterError.message : String(jupiterError)
+      });
+    }
+
+    // Fallback to CoinGecko
+    try {
       const response = await axios.get(`${this.coinGeckoApiUrl}/simple/price`, {
         params: {
           ids: 'solana',
@@ -284,7 +395,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
       if (response.data?.solana?.usd) {
         this.solUsdPrice = response.data.solana.usd;
         this.solUsdPriceLastUpdate = now;
-        logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)}`);
+        logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)} [Source: CoinGecko]`);
+        return;
       }
     } catch (error) {
       // Keep this quiet to avoid noisy stack traces (e.g., CG 429). Use concise message and fallback once.
@@ -292,10 +404,12 @@ export class SolanaPriceProvider extends BasePriceProvider {
         ? 'Coingecko rate limited (429)'
         : (error instanceof Error ? error.message : String(error));
       logger.warn('⚠️ Failed to fetch SOL/USD price, using fallback', { reason: msg });
-      if (this.solUsdPrice === 0) {
-        this.solUsdPrice = 225; // Fallback price
-        logger.warn(`Using fallback SOL/USD price: $${this.solUsdPrice}`);
-      }
+    }
+
+    // Last resort: use fallback if no price sources worked
+    if (this.solUsdPrice === 0) {
+      this.solUsdPrice = 225; // Fallback price
+      logger.warn(`Using fallback SOL/USD price: $${this.solUsdPrice}`);
     }
   }
 
