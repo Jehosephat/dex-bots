@@ -69,10 +69,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
       // Update SOL/USD price if needed
       await this.updateSOLUSDPrice();
 
-      // Special case: SOL token with SOL as quote currency
-      // For SOL arbitrage, we always quote SOL → GALA on Solana
-      // Forward: Selling SOL → Getting GALA (building GALA inventory on Solana)
-      // Reverse: Selling SOL → Getting GALA (same as forward, just different direction context)
+      // Special case: SOL token - quote SOL → GALA on Solana (buying GALA with SOL)
+      // For forward arbitrage: BUY GALA using SOL on Solana
       if (symbol === 'SOL' && (tokenConfig.solQuoteVia || 'SOL') === 'SOL') {
         // Always quote SOL → GALA (selling SOL to get GALA)
         const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
@@ -121,7 +119,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
             
             this.updateTimestamp();
             this.clearError();
-            logger.debug(`📊 Solana quote for ${symbol} (SOL→GALA, ${reverse ? 'reverse' : 'forward'}): ${price.toString()} GALA per SOL`);
+            logger.debug(`📊 Solana quote for ${symbol} (SOL→GALA): ${price.toString()} GALA per SOL`);
             return solanaQuote;
           }
         } catch (error) {

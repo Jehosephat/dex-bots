@@ -34,7 +34,7 @@
           "balance": "1.002145203",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762189089092
+          "lastUpdated": 1762190332905
         },
         "GALA": {
           "symbol": "GALA",
@@ -43,24 +43,24 @@
           "balance": "23574.20135442",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762189089092
+          "lastUpdated": 1762190332905
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762189089092
+      "lastUpdated": 1762190332905
     },
     "solana": {
       "tokens": {},
       "native": "0.55459599",
       "totalValueUsd": "0",
-      "lastUpdated": 1762189089330
+      "lastUpdated": 1762190333408
     },
-    "lastUpdated": 1762189089330,
-    "version": 369
+    "lastUpdated": 1762190333408,
+    "version": 373
   },
-  "lastSaved": 1762189089331,
-  "version": 60,
+  "lastSaved": 1762190333409,
+  "version": 62,
   "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
