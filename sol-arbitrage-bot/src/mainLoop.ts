@@ -42,15 +42,40 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
     logger.info(`\n🔍 Running initial balance check before cycle...`);
     const initialBalanceCheck = await balanceChecker.checkBalances(true, true); // forceCheck=true
     
+    // Log all balance checks (both sufficient and insufficient) for visibility
+    logger.info(`\n📊 Balance Check Summary:`);
+    
+    // Show all checked balances, grouped by chain
+    if (initialBalanceCheck.checkedBalances) {
+      // GalaChain balances
+      if (initialBalanceCheck.checkedBalances.galaChain.length > 0) {
+        logger.info(`   🔷 GalaChain:`);
+        initialBalanceCheck.checkedBalances.galaChain.forEach(check => {
+          const status = check.sufficient ? '✅' : '❌';
+          logger.info(`      ${status} ${check.token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)} (${check.purpose.toUpperCase()})`);
+        });
+      }
+      
+      // Solana balances
+      if (initialBalanceCheck.checkedBalances.solana.length > 0) {
+        logger.info(`   🔸 Solana:`);
+        initialBalanceCheck.checkedBalances.solana.forEach(check => {
+          const status = check.sufficient ? '✅' : '❌';
+          logger.info(`      ${status} ${check.token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)} (${check.purpose.toUpperCase()})`);
+        });
+      }
+    }
+    
+    // Also show insufficient funds in detail
+    if (initialBalanceCheck.insufficientFunds.length > 0) {
+      logger.error(`\n   ⚠️ Insufficient funds:`);
+      initialBalanceCheck.insufficientFunds.forEach(f => {
+        logger.error(`      ${f.chain === 'galaChain' ? '🔷' : '🔸'} ${f.chain.toUpperCase()}: ${f.token} - ${f.currentBalance.toFixed(8)} < ${f.requiredBalance.toFixed(8)} (${f.purpose.toUpperCase()})`);
+      });
+    }
+    
     if (!initialBalanceCheck.canTrade) {
       logger.error(`\n⛔ TRADING PAUSED: Insufficient funds detected at cycle start`);
-      logger.error(`   Insufficient funds:`);
-      initialBalanceCheck.insufficientFunds.forEach(f => {
-        logger.error(`   ${f.chain === 'galaChain' ? '🔷' : '🔸'} ${f.chain.toUpperCase()}: ${f.token}`);
-        logger.error(`      Current: ${f.currentBalance.toFixed(8)}`);
-        logger.error(`      Required: ${f.requiredBalance.toFixed(8)}`);
-        logger.error(`      Purpose: ${f.purpose === 'sell' ? 'SELL (inventory)' : f.purpose === 'buy' ? 'BUY (quote currency)' : 'QUOTE (fees)'}`);
-      });
       
       if (initialBalanceCheck.recommendations.length > 0) {
         logger.warn(`   Recommendations:`);

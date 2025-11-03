@@ -21,6 +21,10 @@ export interface BalanceCheckResult {
   canTrade: boolean;
   insufficientFunds: InsufficientFund[];
   recommendations: string[];
+  checkedBalances?: {
+    galaChain: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>;
+    solana: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>;
+  };
 }
 
 export interface InsufficientFund {
@@ -72,6 +76,10 @@ export class BalanceChecker {
     this.lastBalanceCheckTime = now;
     const insufficientFunds: InsufficientFund[] = [];
     const recommendations: string[] = [];
+    const checkedBalances = {
+      galaChain: [] as Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>,
+      solana: [] as Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
+    };
     
     try {
       const enabledTokens = getEnabledTokens();
@@ -147,7 +155,8 @@ export class BalanceChecker {
       return {
         canTrade,
         insufficientFunds,
-        recommendations
+        recommendations,
+        checkedBalances
       };
 
     } catch (error) {
@@ -176,7 +185,8 @@ export class BalanceChecker {
     enabledTokens: any[],
     insufficientFunds: InsufficientFund[],
     recommendations: string[],
-    priceProvider?: GalaChainPriceProvider | null
+    priceProvider?: GalaChainPriceProvider | null,
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
   ): Promise<void> {
     try {
       const owner = process.env.GALACHAIN_WALLET_ADDRESS;
@@ -253,7 +263,20 @@ export class BalanceChecker {
         // For forward trades: need token inventory to SELL
         // Check if we have enough to sell
         const requiredForSell = new BigNumber(token.tradeSize || 0);
-        if (tokenBalance.isLessThan(requiredForSell)) {
+        const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
+        
+        // Track this check
+        if (checkedBalances) {
+          checkedBalances.push({
+            token: token.symbol,
+            current: tokenBalance,
+            required: requiredForSell,
+            purpose: 'sell',
+            sufficient
+          });
+        }
+        
+        if (!sufficient) {
           insufficientFunds.push({
             chain: 'galaChain',
             token: token.symbol,
@@ -276,9 +299,20 @@ export class BalanceChecker {
           const galaKey = galaQuoteToken.galaChainMint;
           const galaBalance = balanceMap.get(galaKey) || new BigNumber(0);
           const minGalaForReverse = new BigNumber(minGalaFromConfig);
+          const sufficient = galaBalance.isGreaterThanOrEqualTo(minGalaForReverse);
           
-          // Only check if balance is below configured minimum
-          if (galaBalance.isLessThan(minGalaForReverse)) {
+          // Track this check (always, for visibility)
+          if (checkedBalances) {
+            checkedBalances.push({
+              token: 'GALA',
+              current: galaBalance,
+              required: minGalaForReverse,
+              purpose: 'buy',
+              sufficient
+            });
+          }
+          
+          if (!sufficient) {
             insufficientFunds.push({
               chain: 'galaChain',
               token: 'GALA',
@@ -290,24 +324,8 @@ export class BalanceChecker {
         }
       }
 
-      // Check SOL (GSOL) balance on GalaChain - needed if SOL is an enabled token
-      const solQuoteToken = getQuoteTokenBySymbol('SOL');
-      const solEnabledToken = enabledTokens.find(t => t.symbol === 'SOL');
-      if (solQuoteToken && solEnabledToken) {
-        const solKey = solQuoteToken.galaChainMint; // GSOL|Unit|none|none
-        const solBalance = balanceMap.get(solKey) || new BigNumber(0);
-        const requiredForSell = new BigNumber(solEnabledToken.tradeSize || 0);
-        
-        if (solBalance.isLessThan(requiredForSell)) {
-          insufficientFunds.push({
-            chain: 'galaChain',
-            token: 'SOL',
-            currentBalance: solBalance,
-            requiredBalance: requiredForSell,
-            purpose: 'sell'
-          });
-        }
-      }
+      // Note: SOL on GalaChain is already checked in the loop above if it's an enabled token
+      // No need to check it separately here - that would create duplicates
 
     } catch (error) {
       logger.error('Failed to check GalaChain balances', {
@@ -324,7 +342,8 @@ export class BalanceChecker {
     enabledTokens: any[],
     insufficientFunds: InsufficientFund[],
     recommendations: string[],
-    priceProvider?: SolanaPriceProvider | null
+    priceProvider?: SolanaPriceProvider | null,
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
   ): Promise<void> {
     const config = getConfig();
     
@@ -474,8 +493,21 @@ export class BalanceChecker {
         if (!checkedQuoteCurrencies.has(quoteVia)) {
           checkedQuoteCurrencies.add(quoteVia);
           
+          const sufficient = quoteBalance.isGreaterThanOrEqualTo(requiredInQuoteCurrency);
+          
+          // Track this check
+          if (checkedBalances) {
+            checkedBalances.push({
+              token: quoteVia,
+              current: quoteBalance,
+              required: requiredInQuoteCurrency,
+              purpose: 'buy',
+              sufficient
+            });
+          }
+          
           // Check if we have enough quote currency
-          if (quoteBalance.isLessThan(requiredInQuoteCurrency)) {
+          if (!sufficient) {
             insufficientFunds.push({
               chain: 'solana',
               token: quoteVia,
@@ -545,8 +577,21 @@ export class BalanceChecker {
         }
       }
       
-      // Check if we have enough SOL (only add once, not per token)
-      if (solBalance.isLessThan(minSolRequired)) {
+      // ALWAYS check SOL balance on Solana (for visibility)
+      const solSufficient = solBalance.isGreaterThanOrEqualTo(minSolRequired);
+      
+      // Track this check (always, for visibility)
+      if (checkedBalances) {
+        checkedBalances.push({
+          token: 'SOL',
+          current: solBalance,
+          required: minSolRequired,
+          purpose: solRequiredForTrading ? 'buy' : 'quote',
+          sufficient: solSufficient
+        });
+      }
+      
+      if (!solSufficient) {
         insufficientFunds.push({
           chain: 'solana',
           token: 'SOL',
