@@ -312,9 +312,17 @@ function formatBalancesReport(gcBalances: ChainBalances, solBalances: ChainBalan
     lines.push('-'.repeat(80));
     enabledTokens.forEach(token => {
       const gcToken = gcBalances.tokens.find(t => t.symbol === token.symbol);
-      const solToken = solBalances.tokens.find(t => t.symbol === token.symbol);
+      
+      // For SOL on Solana, check native balance instead of SPL tokens
+      let solBalance: string;
+      if (token.symbol === 'SOL' && solBalances.native) {
+        solBalance = formatLargeNumber(solBalances.native);
+      } else {
+        const solToken = solBalances.tokens.find(t => t.symbol === token.symbol);
+        solBalance = solToken ? formatLargeNumber(solToken.balance) : '0';
+      }
+      
       const gcBalance = gcToken ? formatLargeNumber(gcToken.balance) : '0';
-      const solBalance = solToken ? formatLargeNumber(solToken.balance) : '0';
       lines.push(
         token.symbol.padEnd(15) +
         gcBalance.padStart(20) +
