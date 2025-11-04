@@ -260,30 +260,90 @@ export class BalanceChecker {
           }
         });
 
-        // For forward trades: need token inventory to SELL
-        // Check if we have enough to sell
-        const requiredForSell = new BigNumber(token.tradeSize || 0);
-        const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
+        // For forward trades: determine what we need based on quote currency
+        // If gcQuoteVia is GALA: we're selling GALA to buy token (need GALA, not token inventory)
+        // Otherwise: we're selling token to get quote currency (need token inventory)
+        const quoteVia = token.gcQuoteVia || 'GALA';
         
-        // Track this check
-        if (checkedBalances) {
-          checkedBalances.push({
-            token: token.symbol,
-            current: tokenBalance,
-            required: requiredForSell,
-            purpose: 'sell',
-            sufficient
-          });
-        }
-        
-        if (!sufficient) {
-          insufficientFunds.push({
-            chain: 'galaChain',
-            token: token.symbol,
-            currentBalance: tokenBalance,
-            requiredBalance: requiredForSell,
-            purpose: 'sell'
-          });
+        if (quoteVia === 'GALA') {
+          // Forward: Selling GALA to buy token - need GALA balance
+          const galaQuoteToken = getQuoteTokenBySymbol('GALA');
+          if (galaQuoteToken) {
+            const galaKey = galaQuoteToken.galaChainMint;
+            const galaBalance = balanceMap.get(galaKey) || new BigNumber(0);
+            
+            // Estimate GALA needed to buy tradeSize tokens
+            let requiredGala: BigNumber;
+            if (priceProvider) {
+              try {
+                // Get quote to determine actual cost
+                const quote = await priceProvider.getQuote(token.symbol, token.tradeSize || 0, false);
+                if (quote && quote.price && !quote.price.isZero()) {
+                  // cost = price * tradeSize (price is GALA per token)
+                  requiredGala = quote.price.multipliedBy(token.tradeSize || 0);
+                  // Add 10% buffer for safety
+                  requiredGala = requiredGala.multipliedBy(1.1);
+                } else {
+                  throw new Error('Quote returned zero price');
+                }
+              } catch (quoteError) {
+                // Fall back to using token trade size as rough estimate
+                // Assume 1:1 ratio as conservative estimate
+                requiredGala = new BigNumber(token.tradeSize || 0);
+              }
+            } else {
+              // No price provider, use conservative estimate
+              requiredGala = new BigNumber(token.tradeSize || 0);
+            }
+            
+            const sufficient = galaBalance.isGreaterThanOrEqualTo(requiredGala);
+            
+            // Track this check
+            if (checkedBalances) {
+              checkedBalances.push({
+                token: 'GALA',
+                current: galaBalance,
+                required: requiredGala,
+                purpose: 'buy',
+                sufficient
+              });
+            }
+            
+            if (!sufficient) {
+              insufficientFunds.push({
+                chain: 'galaChain',
+                token: 'GALA',
+                currentBalance: galaBalance,
+                requiredBalance: requiredGala,
+                purpose: 'buy'
+              });
+            }
+          }
+        } else {
+          // Forward: Selling token to get quote currency - need token inventory
+          const requiredForSell = new BigNumber(token.tradeSize || 0);
+          const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
+          
+          // Track this check
+          if (checkedBalances) {
+            checkedBalances.push({
+              token: token.symbol,
+              current: tokenBalance,
+              required: requiredForSell,
+              purpose: 'sell',
+              sufficient
+            });
+          }
+          
+          if (!sufficient) {
+            insufficientFunds.push({
+              chain: 'galaChain',
+              token: token.symbol,
+              currentBalance: tokenBalance,
+              requiredBalance: requiredForSell,
+              purpose: 'sell'
+            });
+          }
         }
       }
 
