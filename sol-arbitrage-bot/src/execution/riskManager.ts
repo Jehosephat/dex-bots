@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { getTradingConfig } from '../config';
+import { getTradingConfig, getQuoteTokenBySymbol } from '../config';
 import { EdgeCalculator, EdgeCalculationResult } from '../core/edgeCalculator';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { TokenConfig } from '../types/config';
@@ -81,36 +81,55 @@ export class RiskManager {
     }
 
     // 4) Inventory check (best-effort; warn if absent)
+    // Determine what we're selling on GalaChain based on gcQuoteVia
+    const quoteVia = token.gcQuoteVia || 'GALA';
     const state = this.stateManager.getState() as any;
     const gcTokens = state?.inventory?.galaChain?.tokens || {};
-    const gcToken = gcTokens ? gcTokens[token.symbol] : undefined;
+    
+    let inventoryTokenSymbol: string;
+    let requiredAmount: BigNumber;
+    let inventoryToken: any;
+    
+    if (quoteVia === 'GALA') {
+      // Selling GALA to buy token - need GALA inventory
+      inventoryTokenSymbol = 'GALA';
+      // Calculate GALA needed: price * tradeSize
+      // For MEW: price is GALA per MEW, so cost = price * 1500 MEW = GALA needed
+      requiredAmount = galaChainQuote.price.multipliedBy(token.tradeSize);
+      inventoryToken = gcTokens ? gcTokens['GALA'] : undefined;
+    } else {
+      // Selling token to get quote currency - need token inventory
+      inventoryTokenSymbol = token.symbol;
+      requiredAmount = new BigNumber(token.tradeSize);
+      inventoryToken = gcTokens ? gcTokens[token.symbol] : undefined;
+    }
     
     // Defensively handle balance - ensure it's a BigNumber
-    if (gcToken && gcToken.balance) {
+    if (inventoryToken && inventoryToken.balance) {
       let balanceBN: BigNumber;
       try {
-        if (BigNumber.isBigNumber(gcToken.balance)) {
-          balanceBN = gcToken.balance;
+        if (BigNumber.isBigNumber(inventoryToken.balance)) {
+          balanceBN = inventoryToken.balance;
         } else {
           // Convert to BigNumber if it's not already one
-          balanceBN = new BigNumber(gcToken.balance);
+          balanceBN = new BigNumber(inventoryToken.balance);
           // Update the state with the converted value
-          gcToken.balance = balanceBN;
+          inventoryToken.balance = balanceBN;
         }
         
-        if (balanceBN.isLessThan(token.tradeSize)) {
-          reasons.push('Insufficient GalaChain inventory for sell (simulation mode if dry-run)');
+        if (balanceBN.isLessThan(requiredAmount)) {
+          reasons.push(`Insufficient GalaChain ${inventoryTokenSymbol} inventory (have ${balanceBN.toString()}, need ${requiredAmount.toString()})`);
         }
       } catch (balanceError) {
-        logger.warn(`⚠️ Failed to check inventory balance for ${token.symbol}`, {
+        logger.warn(`⚠️ Failed to check inventory balance for ${inventoryTokenSymbol}`, {
           error: balanceError instanceof Error ? balanceError.message : String(balanceError),
-          balanceType: typeof gcToken.balance,
-          balanceValue: gcToken.balance
+          balanceType: typeof inventoryToken.balance,
+          balanceValue: inventoryToken.balance
         });
-        reasons.push('Unable to verify GalaChain inventory balance');
+        reasons.push(`Unable to verify GalaChain ${inventoryTokenSymbol} inventory balance`);
       }
     } else {
-      reasons.push('Insufficient GalaChain inventory for sell (simulation mode if dry-run)');
+      reasons.push(`Insufficient GalaChain ${inventoryTokenSymbol} inventory for ${quoteVia === 'GALA' ? 'buy' : 'sell'} (simulation mode if dry-run)`);
     }
 
     const shouldProceed = reasons.length === 0;

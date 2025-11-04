@@ -183,15 +183,31 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
       const solCost = solQuote.price.multipliedBy(token.tradeSize);
       
       logger.info(`\n💰 MARKET PRICES`);
-      logger.info(`   🔷 GalaChain (SELL ${token.symbol})`);
+      // Determine what we're doing on each chain
+      const gcAction = token.gcQuoteVia === 'GALA' 
+        ? `SELL GALA → BUY ${token.symbol}` 
+        : `SELL ${token.symbol}`;
+      const solAction = token.solQuoteVia === 'GALA' 
+        ? `SELL ${token.symbol} → BUY GALA` 
+        : `BUY ${token.symbol}`;
+      
+      logger.info(`   🔷 GalaChain (${gcAction})`);
       logger.info(`      Price:    ${galaQuote.price.toFixed(8)} ${galaQuote.currency} per ${token.symbol}`);
       logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-      logger.info(`      Proceeds: ${gcProceeds.toFixed(8)} ${galaQuote.currency}`);
+      if (token.gcQuoteVia === 'GALA') {
+        logger.info(`      Cost:     ${gcProceeds.toFixed(8)} ${galaQuote.currency} (to buy ${token.tradeSize} ${token.symbol})`);
+      } else {
+        logger.info(`      Proceeds: ${gcProceeds.toFixed(8)} ${galaQuote.currency}`);
+      }
       logger.info(`      Impact:   ${galaQuote.priceImpactBps.toFixed(2)} bps`);
-      logger.info(`   🔸 Solana (BUY with ${solQuote.currency})`);
+      logger.info(`   🔸 Solana (${solAction})`);
       logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
       logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-      logger.info(`      Cost:     ${solCost.toFixed(8)} ${solQuote.currency}`);
+      if (token.solQuoteVia === 'GALA') {
+        logger.info(`      Proceeds: ${solCost.toFixed(8)} ${solQuote.currency} (from selling ${token.tradeSize} ${token.symbol})`);
+      } else {
+        logger.info(`      Cost:     ${solCost.toFixed(8)} ${solQuote.currency}`);
+      }
       logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
 
       if (!riskResult || !riskResult.shouldProceed) {
@@ -329,6 +345,24 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Pro
         
         // Log the trade
         tradeLogger.logTrade(logEntry);
+        
+        // Set cooldown after any trade attempt (success or failure)
+        const cooldownMinutes = 1; // 1 minute cooldown
+        const cooldownEndsAt = Date.now() + (cooldownMinutes * 60 * 1000);
+        const cooldownReason = gc.success && sol.success 
+          ? 'Trade executed successfully' 
+          : (!gc.success && !sol.success) 
+            ? 'Both legs failed' 
+            : 'Partial success';
+        
+        stateManager.setTokenCooldown(token.symbol, {
+          isInCooldown: true,
+          cooldownEndsAt,
+          remainingSeconds: cooldownMinutes * 60,
+          reason: cooldownReason
+        });
+        
+        logger.info(`⏰ Cooldown set for ${token.symbol}: ${cooldownMinutes} minute(s) - ${cooldownReason}`);
         
         // Check balances after successful live trade
         if (gc.success && sol.success) {

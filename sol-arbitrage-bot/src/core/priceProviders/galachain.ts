@@ -84,14 +84,18 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         throw new Error(`Quote token ${quoteVia} not configured`);
       }
 
-      // Get the quote - pass amount directly (e.g., 0.01 SOL)
-      // Always forward: selling token to get GALA
+      // Determine quote direction:
+      // If gcQuoteVia is GALA: we're selling GALA to buy token (reverse quote)
+      // Otherwise: we're selling token to get quote currency (forward quote)
+      const shouldReverse = quoteVia === 'GALA';
+
+      // Get the quote - pass amount directly (e.g., 0.01 SOL or 1500 MEW)
       const quote = await this.getLocalQuote(
         symbol,
         quoteVia,
         new BigNumber(amount),
         DexFeePercentageTypes.FEE_1_PERCENT,
-        false // Always false for forward quotes
+        shouldReverse // Reverse if we're selling GALA to buy token
       );
 
       if (!quote) {
@@ -100,11 +104,36 @@ export class GalaChainPriceProvider extends BasePriceProvider {
 
       // Calculate price and price impact
       const outputAmount = new BigNumber(quote.outputAmount);
-      // Price = outputAmount (GALA received) / amount (tokens sold) = GALA per token
-      const price = outputAmount.div(amount);
+      
+      // Price calculation depends on direction:
+      let price: BigNumber;
+      if (shouldReverse) {
+        // Selling GALA to buy token: outputAmount is GALA cost, amount is tokens received
+        // Price = outputAmount (GALA cost) / amount (tokens received) = GALA per token
+        price = outputAmount.div(amount);
+      } else {
+        // Selling token to get quote currency: outputAmount is quote currency received, amount is tokens sold
+        // Price = outputAmount (quote currency received) / amount (tokens sold) = quote currency per token
+        price = outputAmount.div(amount);
+      }
       const spotPrice = await this.getSpotPrice(symbol, quoteVia);
-      // Price impact: tokens sold, GALA received, spot price (selling)
-      const priceImpactBps = calculatePriceImpactBps(new BigNumber(amount), outputAmount, spotPrice);
+      
+      // Price impact calculation depends on direction:
+      let priceImpactBps: number;
+      if (shouldReverse) {
+        // Buying token with GALA: calculate impact from spot price
+        // Spot price is for selling token (GALA per token), we're buying at effective price
+        if (!spotPrice.isZero()) {
+          // Calculate impact: (effectivePrice - spotPrice) / spotPrice
+          const priceDiff = price.minus(spotPrice);
+          priceImpactBps = priceDiff.div(spotPrice).multipliedBy(10000).abs().toNumber(); // Convert to bps
+        } else {
+          priceImpactBps = 0;
+        }
+      } else {
+        // Selling token: amount is tokens sold, outputAmount is quote currency received
+        priceImpactBps = calculatePriceImpactBps(new BigNumber(amount), outputAmount, spotPrice);
+      }
 
       // Calculate GALA fee (1 GALA per hop + pool fees)
       const galaFee = this.calculateGalaFee(quote.route?.length || 1);
@@ -215,10 +244,112 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       
       let outputAmount: BigNumber;
       
-      // Simplified: Only forward quotes (selling token to get GALA)
-      // Forward quote: selling token for GALA
-      let zeroForOne: boolean;
-      if (isToken0Quote) {
+      if (reverse) {
+        // Reverse: Selling GALA to buy token
+        // First, estimate GALA needed by doing a small forward quote (selling token to get GALA)
+        let estimatedGalaNeeded: BigNumber;
+        
+        try {
+          // Do a small forward quote (selling token to get GALA) to estimate rate
+          const smallAmount = new BigNumber(1); // 1 token for estimation
+          let forwardZeroForOne: boolean;
+          if (isToken0Quote) {
+            // Pool is GALA/TOKEN, forward: selling token1 for token0 (GALA)
+            forwardZeroForOne = false;
+          } else {
+            // Pool is TOKEN/GALA, forward: selling token0 for token1 (GALA)
+            forwardZeroForOne = true;
+          }
+          
+          const estimateDto = new QuoteExactAmountDto(
+            token0Key,
+            token1Key,
+            fee,
+            smallAmount,
+            forwardZeroForOne,
+            compositePoolData
+          );
+          
+          const estimateResult: any = await quoteExactAmount(null as any, estimateDto);
+          
+          // Extract GALA received from selling smallAmount tokens
+          let galaReceived: BigNumber;
+          if (forwardZeroForOne) {
+            galaReceived = new BigNumber(estimateResult.amount1 || '0').abs();
+          } else {
+            galaReceived = new BigNumber(estimateResult.amount0 || '0').abs();
+          }
+          
+          // Price = GALA received / tokens sold = GALA per token
+          const pricePerToken = galaReceived.div(smallAmount);
+          // Estimate GALA needed to buy 'amount' tokens
+          estimatedGalaNeeded = pricePerToken.multipliedBy(amount);
+          // Add 10% buffer for price impact
+          estimatedGalaNeeded = estimatedGalaNeeded.multipliedBy(1.1);
+          
+          logger.debug(`📊 Reverse quote estimation: ${pricePerToken.toString()} GALA per ${tokenSymbol} → ${estimatedGalaNeeded.toString()} GALA needed for ${amount.toString()} ${tokenSymbol}`);
+        } catch (estError) {
+          // Fallback: assume 1:1 ratio (conservative)
+          estimatedGalaNeeded = amount.multipliedBy(1.1);
+          logger.debug(`⚠️ Failed to estimate GALA needed, using fallback: ${estimatedGalaNeeded.toString()}`);
+        }
+        
+        // Now quote selling GALA to get tokens
+        let reverseZeroForOne: boolean;
+        if (isToken0Quote) {
+          // Pool is GALA/TOKEN, reverse: selling token0 (GALA) for token1 (token)
+          reverseZeroForOne = true;
+        } else {
+          // Pool is TOKEN/GALA, reverse: selling token1 (GALA) for token0 (token)
+          reverseZeroForOne = false;
+        }
+        
+        logger.info('🔍 Reverse Quote Parameters (GALA → Token):', {
+          tokenSymbol,
+          quoteVia,
+          token0: token0Str,
+          token1: token1Str,
+          desiredTokens: amount.toString(),
+          estimatedGalaInput: estimatedGalaNeeded.toString(),
+          reverseZeroForOne,
+          sellingToken: reverseZeroForOne ? 'token0 (GALA)' : 'token1 (GALA)',
+          receivingToken: reverseZeroForOne ? 'token1 (token)' : 'token0 (token)'
+        });
+        
+        const reverseQuoteDto = new QuoteExactAmountDto(
+          token0Key,
+          token1Key,
+          fee,
+          estimatedGalaNeeded, // GALA input
+          reverseZeroForOne,
+          compositePoolData
+        );
+        
+        const reverseQuoteResult: any = await quoteExactAmount(null as any, reverseQuoteDto);
+        
+        // Extract tokens received
+        let tokensReceived: BigNumber;
+        if (reverseZeroForOne) {
+          tokensReceived = new BigNumber(reverseQuoteResult.amount1 || '0').abs();
+        } else {
+          tokensReceived = new BigNumber(reverseQuoteResult.amount0 || '0').abs();
+        }
+        
+        // Calculate actual price: GALA spent / tokens received
+        const actualPrice = estimatedGalaNeeded.div(tokensReceived);
+        // For 'amount' tokens, the total cost is: actualPrice * amount
+        // But we need to scale this based on how many tokens we actually received vs desired
+        const scaleFactor = amount.div(tokensReceived); // Scale factor to get to desired amount
+        const costForAmount = estimatedGalaNeeded.multipliedBy(scaleFactor);
+        
+        // Return the GALA cost for 'amount' tokens
+        outputAmount = costForAmount;
+        
+        logger.debug(`📊 Reverse quote result: ${estimatedGalaNeeded.toString()} GALA → ${tokensReceived.toString()} ${tokenSymbol}, price: ${actualPrice.toString()} GALA per ${tokenSymbol}, scaled cost for ${amount.toString()}: ${costForAmount.toString()} GALA`);
+      } else {
+        // Forward quote: selling token to get GALA
+        let zeroForOne: boolean;
+        if (isToken0Quote) {
           // Pool is GALA/TOKEN, forward: selling token1 (SOL) for token0 (GALA)
           zeroForOne = false;
         } else {
@@ -226,7 +357,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
           zeroForOne = true;
         }
         
-        logger.info('🔍 Quote Parameters:', {
+        logger.info('🔍 Forward Quote Parameters (Token → GALA):', {
           tokenSymbol,
           quoteVia,
           token0: token0Str,
@@ -259,6 +390,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         
         // Take absolute value to handle negative values
         outputAmount = outputAmount.abs();
+      }
       
       return {
         outputAmount: outputAmount.toString(),
