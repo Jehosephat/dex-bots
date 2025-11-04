@@ -130,18 +130,23 @@ export class SolanaPriceProvider extends BasePriceProvider {
         }
       }
 
-      // Special case: MEW token - quote MEW → GALA on Solana (selling MEW to get GALA)
-      // For forward arbitrage: Get GALA using MEW on Solana
-      if (symbol === 'MEW' && (tokenConfig.solQuoteVia || 'SOL') === 'GALA') {
-        // Always quote MEW → GALA (selling MEW to get GALA)
+      // Special case: Any token with solQuoteVia === 'GALA' - quote Token → GALA on Solana (selling token to get GALA)
+      // For forward arbitrage: Get GALA by selling token on Solana
+      // This applies to MEW, USDUC, and any other token that uses GALA as the quote currency
+      if ((tokenConfig.solQuoteVia || 'SOL') === 'GALA') {
         const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
-        const mewMint = 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5'; // MEW on Solana
+        const tokenMint = tokenConfig.solanaMint;
+        if (!tokenMint) {
+          logger.warn(`No Solana mint found for ${symbol}`);
+          return null;
+        }
+        
         const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
         
         try {
           const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
             params: {
-              inputMint: mewMint,
+              inputMint: tokenMint,
               outputMint: galaMint,
               amount: rawAmount,
               slippageBps: 50,
@@ -151,15 +156,15 @@ export class SolanaPriceProvider extends BasePriceProvider {
           });
 
           if (response.data?.outAmount) {
-            // GALA has 8 decimals, MEW has 6 decimals
-            const mewAmount = new BigNumber(amount);
+            // GALA has 8 decimals
+            const tokenAmount = new BigNumber(amount);
             const galaAmount = toTokenAmount(new BigNumber(response.data.outAmount), 8);
-            const price = galaAmount.div(mewAmount); // GALA per MEW
+            const price = galaAmount.div(tokenAmount); // GALA per token
             
             const solanaQuote: SolanaQuote = {
               symbol,
               price,
-              currency: 'GALA', // Return price in GALA, not MEW
+              currency: 'GALA', // Return price in GALA
               tradeSize: amount,
               priceImpactBps: (response.data.priceImpactPct || 0) * 100,
               minOutput: galaAmount.multipliedBy(0.99),
@@ -170,7 +175,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
               priorityFee: this.calculatePriorityFee(response.data.priceImpactPct || 0),
               jupiterRoute: response.data.routePlan ? {
                 routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
-                inputMint: mewMint,
+                inputMint: tokenMint,
                 outputMint: galaMint,
                 steps: response.data.routePlan || [],
                 totalPriceImpact: response.data.priceImpactPct || 0,
@@ -180,11 +185,11 @@ export class SolanaPriceProvider extends BasePriceProvider {
             
             this.updateTimestamp();
             this.clearError();
-            logger.debug(`📊 Solana quote for ${symbol} (MEW→GALA): ${price.toString()} GALA per MEW`);
+            logger.debug(`📊 Solana quote for ${symbol} (${symbol}→GALA): ${price.toString()} GALA per ${symbol}`);
             return solanaQuote;
           }
         } catch (error) {
-          logger.warn('Failed to get MEW→GALA quote on Solana', {
+          logger.warn(`Failed to get ${symbol}→GALA quote on Solana`, {
             error: error instanceof Error ? error.message : String(error)
           });
           return null;
