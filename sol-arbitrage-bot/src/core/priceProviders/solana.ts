@@ -130,6 +130,67 @@ export class SolanaPriceProvider extends BasePriceProvider {
         }
       }
 
+      // Special case: MEW token - quote MEW → GALA on Solana (selling MEW to get GALA)
+      // For forward arbitrage: Get GALA using MEW on Solana
+      if (symbol === 'MEW' && (tokenConfig.solQuoteVia || 'SOL') === 'GALA') {
+        // Always quote MEW → GALA (selling MEW to get GALA)
+        const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
+        const mewMint = 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5'; // MEW on Solana
+        const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
+        
+        try {
+          const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
+            params: {
+              inputMint: mewMint,
+              outputMint: galaMint,
+              amount: rawAmount,
+              slippageBps: 50,
+              swapMode: 'ExactIn'
+            },
+            timeout: 10000
+          });
+
+          if (response.data?.outAmount) {
+            // GALA has 8 decimals, MEW has 6 decimals
+            const mewAmount = new BigNumber(amount);
+            const galaAmount = toTokenAmount(new BigNumber(response.data.outAmount), 8);
+            const price = galaAmount.div(mewAmount); // GALA per MEW
+            
+            const solanaQuote: SolanaQuote = {
+              symbol,
+              price,
+              currency: 'GALA', // Return price in GALA, not MEW
+              tradeSize: amount,
+              priceImpactBps: (response.data.priceImpactPct || 0) * 100,
+              minOutput: galaAmount.multipliedBy(0.99),
+              provider: this.getName(),
+              timestamp: Date.now(),
+              expiresAt: Date.now() + 30000,
+              isValid: true,
+              priorityFee: this.calculatePriorityFee(response.data.priceImpactPct || 0),
+              jupiterRoute: response.data.routePlan ? {
+                routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
+                inputMint: mewMint,
+                outputMint: galaMint,
+                steps: response.data.routePlan || [],
+                totalPriceImpact: response.data.priceImpactPct || 0,
+                totalFee: response.data.platformFee?.amount || 0
+              } : undefined
+            };
+            
+            this.updateTimestamp();
+            this.clearError();
+            logger.debug(`📊 Solana quote for ${symbol} (MEW→GALA): ${price.toString()} GALA per MEW`);
+            return solanaQuote;
+          }
+        } catch (error) {
+          logger.warn('Failed to get MEW→GALA quote on Solana', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          return null;
+        }
+      }
+
       // Get quote based on direction
       // reverse=false: SOL → Token (buying token with SOL/USDC)
       // reverse=true: Token → SOL (selling token for SOL/USDC)
