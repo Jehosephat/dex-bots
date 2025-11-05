@@ -7,10 +7,12 @@
  * See: https://github.com/techsavvy5416/solana-jupiter-swap-mcp
  */
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { join } from 'path';
 import logger from '../utils/logger';
+
+// MCP SDK types - optional dependency, may not be installed
+type Client = any;
+type StdioClientTransport = any;
 
 export interface JupiterMcpSwapQuoteParams {
   inputMint: string;
@@ -43,12 +45,27 @@ export class JupiterMcpClient {
   private transport: StdioClientTransport | null = null;
   private isConnected = false;
   private mcpServerPath: string;
+  private ClientClass: any;
+  private TransportClass: any;
 
   constructor(mcpServerPath?: string) {
     // Default to looking for the built MCP server in node_modules or a configured path
     this.mcpServerPath = mcpServerPath || 
       process.env.JUPITER_MCP_SERVER_PATH || 
       join(process.cwd(), 'node_modules', 'techsavvy5416-solana-jupiter-swap-mcp', 'build', 'index.js');
+    
+    // Try to load MCP SDK classes (optional dependency)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      this.ClientClass = require('@modelcontextprotocol/sdk/client/index.js').Client;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      this.TransportClass = require('@modelcontextprotocol/sdk/client/stdio.js').StdioClientTransport;
+    } catch (error) {
+      // MCP SDK not installed - this is optional functionality
+      logger.warn('⚠️ MCP SDK not installed - Jupiter MCP client will not be available');
+      this.ClientClass = null;
+      this.TransportClass = null;
+    }
   }
 
   /**
@@ -72,7 +89,10 @@ export class JupiterMcpClient {
       }
 
       // Create transport - spawn the MCP server as a child process
-      this.transport = new StdioClientTransport({
+      if (!this.TransportClass) {
+        throw new Error('MCP SDK not available. Install @modelcontextprotocol/sdk to use Jupiter MCP client.');
+      }
+      this.transport = new this.TransportClass({
         command: 'node',
         args: [this.mcpServerPath],
         env: {
@@ -83,7 +103,10 @@ export class JupiterMcpClient {
       });
 
       // Create client
-      this.client = new Client({
+      if (!this.ClientClass) {
+        throw new Error('MCP SDK not available. Install @modelcontextprotocol/sdk to use Jupiter MCP client.');
+      }
+      this.client = new this.ClientClass({
         name: 'sol-arbitrage-bot',
         version: '1.0.0',
       }, {

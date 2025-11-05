@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { initializeConfig } from './config';
+import { initializeConfig, createConfigService } from './config';
 import logger from './utils/logger';
 import { DualLegCoordinator } from './execution/dualLegCoordinator';
 
@@ -8,7 +8,8 @@ async function main() {
   const symbol = (process.env.TEST_DUAL_SYMBOL || 'SOL').toUpperCase();
 
   logger.info('🧪 Running Dual-Leg live test', { symbol });
-  const coord = new DualLegCoordinator();
+  const configService = createConfigService();
+  const coord = new DualLegCoordinator(configService);
 
   try {
     const { gc, sol } = await coord.executeLive(symbol);

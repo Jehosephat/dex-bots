@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createConfigService } from './config';
 import logger from './utils/logger';
 import { DualLegCoordinator } from './execution/dualLegCoordinator';
 
@@ -8,7 +9,8 @@ async function main() {
 
   logger.info('🧪 Live smoke test', { symbol, runMode });
 
-  const coord = new DualLegCoordinator();
+  const configService = createConfigService();
+  const coord = new DualLegCoordinator(configService);
   if (runMode === 'live') {
     const { gc, sol } = await coord.executeLive(symbol);
     logger.info('✅ Smoke result', { gc: gc.success, sol: sol.success });

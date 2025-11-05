@@ -13,7 +13,7 @@ import {
   SolanaQuote
 } from '../types/core';
 import { TokenConfig } from '../types/config';
-import { getTradingConfig, getBridgingConfig } from '../config';
+import { IConfigService } from '../config';
 import logger from '../utils/logger';
 import { 
   calculateNetEdge, 
@@ -71,13 +71,13 @@ export class EdgeCalculator {
   private tradingConfig: any;
   private bridgingConfig: any;
   
-  constructor() {
+  constructor(private configService: IConfigService) {
     try {
       logger.debug(`🔍 DEBUG: EdgeCalculator constructor - getting trading config...`);
-      this.tradingConfig = getTradingConfig();
+      this.tradingConfig = configService.getTradingConfig();
       logger.debug(`🔍 DEBUG: EdgeCalculator constructor - trading config obtained`);
       logger.debug(`🔍 DEBUG: EdgeCalculator constructor - getting bridging config...`);
-      this.bridgingConfig = getBridgingConfig();
+      this.bridgingConfig = configService.getBridgingConfig();
       logger.debug(`🔍 DEBUG: EdgeCalculator constructor - bridging config obtained`);
     } catch (configError) {
       logger.error(`❌ ERROR getting config in EdgeCalculator constructor`, {

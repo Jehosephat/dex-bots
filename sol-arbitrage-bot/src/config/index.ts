@@ -2,16 +2,22 @@
  * Configuration Module for SOL Arbitrage Bot
  * 
  * Provides easy access to configuration throughout the application.
+ * 
+ * DEPRECATED: The global functions are maintained for backward compatibility.
+ * New code should use dependency injection with IConfigService.
  */
 
 import { ConfigManager } from './configManager';
+import { IConfigService } from './configService';
 import { BotConfig, TokenConfig, QuoteTokenConfig, TradingConfig, BridgingConfig, MonitoringConfig, NetworksConfig } from '../types/config';
 
-// Global configuration manager instance
+// Global configuration manager instance (for backward compatibility)
 let configManager: ConfigManager | null = null;
 
 /**
  * Initialize the configuration manager
+ * 
+ * @deprecated Use createConfigService() for new code to enable dependency injection
  */
 export function initializeConfig(configPath?: string, tokensPath?: string): ConfigManager {
   if (configManager) {
@@ -20,6 +26,16 @@ export function initializeConfig(configPath?: string, tokensPath?: string): Conf
   
   configManager = new ConfigManager(configPath, tokensPath);
   return configManager;
+}
+
+/**
+ * Create a new configuration service instance
+ * 
+ * Use this for dependency injection instead of global functions.
+ * Each instance can have its own configuration paths for testing.
+ */
+export function createConfigService(configPath?: string, tokensPath?: string): IConfigService {
+  return new ConfigManager(configPath, tokensPath);
 }
 
 /**
@@ -158,3 +174,6 @@ export type {
   MonitoringConfig,
   NetworksConfig
 } from '../types/config';
+
+// Export configuration service interface
+export type { IConfigService } from './configService';

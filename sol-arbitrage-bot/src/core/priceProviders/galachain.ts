@@ -20,7 +20,7 @@ import {
 import { BasePriceProvider } from './base';
 import { PriceQuote, GalaChainQuote } from '../../types/core';
 import { TokenConfig } from '../../types/config';
-import { getTokenConfig, getQuoteTokenConfig } from '../../config';
+import { IConfigService } from '../../config';
 import logger from '../../utils/logger';
 import { 
   calculatePriceImpactBps, 
@@ -37,6 +37,10 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   private galaUsdPrice: number = 0;
   private galaUsdPriceLastUpdate: number = 0;
   private galaUsdPriceCacheDuration: number = 300000; // Cache for 5 minutes (300 seconds)
+
+  constructor(private configService: IConfigService) {
+    super();
+  }
 
   async initialize(): Promise<void> {
     try {
@@ -68,7 +72,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         throw new Error('Provider not ready');
       }
 
-      const tokenConfig = getTokenConfig(symbol);
+      const tokenConfig = this.configService.getTokenConfig(symbol);
       if (!tokenConfig) {
         throw new Error(`Token ${symbol} not configured`);
       }
@@ -79,7 +83,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
 
       // Get quote via the configured quote token (usually GALA)
       const quoteVia = tokenConfig.gcQuoteVia || 'GALA';
-      const quoteTokenConfig = getQuoteTokenConfig(quoteVia);
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(quoteVia);
       if (!quoteTokenConfig) {
         throw new Error(`Quote token ${quoteVia} not configured`);
       }
@@ -195,8 +199,8 @@ export class GalaChainPriceProvider extends BasePriceProvider {
     
     try {
       // Parse token mints
-      tokenConfig = getTokenConfig(tokenSymbol);
-      quoteTokenConfig = getQuoteTokenConfig(quoteVia);
+      tokenConfig = this.configService.getTokenConfig(tokenSymbol);
+      quoteTokenConfig = this.configService.getQuoteTokenConfig(quoteVia);
       
       if (!tokenConfig || !quoteTokenConfig) {
         throw new Error('Token configuration not found');

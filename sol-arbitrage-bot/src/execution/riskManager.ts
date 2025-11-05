@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { getTradingConfig, getQuoteTokenBySymbol } from '../config';
+import { IConfigService } from '../config';
 import { EdgeCalculator, EdgeCalculationResult } from '../core/edgeCalculator';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { TokenConfig } from '../types/config';
@@ -13,13 +13,16 @@ export interface RiskCheckResult {
 }
 
 export class RiskManager {
-  private trading = getTradingConfig();
+  private trading: any;
   private stateManager: StateManager;
   private edgeCalculator: EdgeCalculator;
 
-  constructor(stateManager?: StateManager) {
+  constructor(stateManager?: StateManager, configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
-    this.edgeCalculator = new EdgeCalculator();
+    // Use provided config service or create default one
+    const config = configService || (require('../config').createConfigService());
+    this.trading = config.getTradingConfig();
+    this.edgeCalculator = new EdgeCalculator(config);
   }
 
   /**

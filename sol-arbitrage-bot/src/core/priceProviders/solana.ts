@@ -10,7 +10,7 @@ import BigNumber from 'bignumber.js';
 import { BasePriceProvider } from './base';
 import { PriceQuote, SolanaQuote } from '../../types/core';
 import { TokenConfig } from '../../types/config';
-import { getTokenConfig, getQuoteTokenConfig } from '../../config';
+import { IConfigService } from '../../config';
 import logger from '../../utils/logger';
 import { 
   calculatePriceImpactBps,
@@ -31,6 +31,10 @@ export class SolanaPriceProvider extends BasePriceProvider {
   private solUsdPrice: number = 0;
   private solUsdPriceLastUpdate: number = 0;
   private solUsdPriceCacheDuration: number = 60000; // Cache for 60 seconds
+
+  constructor(private configService: IConfigService) {
+    super();
+  }
 
   async initialize(): Promise<void> {
     try {
@@ -57,7 +61,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error('Provider not ready');
       }
 
-      const tokenConfig = getTokenConfig(symbol);
+      const tokenConfig = this.configService.getTokenConfig(symbol);
       if (!tokenConfig) {
         throw new Error(`Token ${symbol} not configured`);
       }
@@ -206,7 +210,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
       }
 
       // Calculate price and price impact
-      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(tokenConfig.solQuoteVia);
       const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), reverse ? tokenConfig.decimals : (quoteTokenConfig?.decimals || 9));
       const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), reverse ? (quoteTokenConfig?.decimals || 9) : tokenConfig.decimals);
       
@@ -285,13 +289,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
     route?: any;
   } | null> {
     try {
-      const tokenConfig = getTokenConfig(tokenSymbol);
+      const tokenConfig = this.configService.getTokenConfig(tokenSymbol);
       if (!tokenConfig?.solanaMint) {
         throw new Error(`No Solana mint for token ${tokenSymbol}`);
       }
 
       // Get the quote token configuration
-      const quoteTokenConfig = getQuoteTokenConfig(tokenConfig.solQuoteVia);
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(tokenConfig.solQuoteVia);
       if (!quoteTokenConfig) {
         throw new Error(`Quote token config not found for ${tokenConfig.solQuoteVia}`);
       }
@@ -378,9 +382,9 @@ export class SolanaPriceProvider extends BasePriceProvider {
         return new BigNumber(0);
       }
 
-      const tokenConfig = getTokenConfig(tokenSymbol);
+      const tokenConfig = this.configService.getTokenConfig(tokenSymbol);
       const solQuoteVia = tokenConfig?.solQuoteVia || 'SOL';
-      const quoteTokenConfig = getQuoteTokenConfig(solQuoteVia);
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(solQuoteVia);
       if (!quoteTokenConfig) {
         logger.warn(`⚠️ Quote token config not found for ${solQuoteVia}, using fallback decimals`);
       }

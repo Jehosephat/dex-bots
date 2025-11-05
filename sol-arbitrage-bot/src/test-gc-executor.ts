@@ -17,7 +17,8 @@ async function testGcExecutor() {
       return false;
     }
 
-    const provider = new GalaChainPriceProvider();
+    const configService = require('./config').createConfigService();
+    const provider = new GalaChainPriceProvider(configService);
     await provider.initialize();
 
     const genericQuote = await provider.getQuote(symbol, token.tradeSize);

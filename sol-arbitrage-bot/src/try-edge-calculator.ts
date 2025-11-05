@@ -22,14 +22,15 @@ async function tryEdgeCalculator() {
     initializeConfig();
     
     // Initialize price providers
-    const galaChainProvider = new GalaChainPriceProvider();
-    const solanaProvider = new SolanaPriceProvider();
+    const configService = require('./config').createConfigService();
+    const galaChainProvider = new GalaChainPriceProvider(configService);
+    const solanaProvider = new SolanaPriceProvider(configService);
     
     await galaChainProvider.initialize();
     await solanaProvider.initialize();
     
     // Initialize edge calculator
-    const edgeCalculator = new EdgeCalculator();
+    const edgeCalculator = new EdgeCalculator(configService);
     
     logger.info('✅ All components initialized');
     

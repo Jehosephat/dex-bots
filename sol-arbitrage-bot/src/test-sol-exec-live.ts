@@ -20,7 +20,8 @@ async function main() {
 
   logger.info('🧪 Running Solana live executor test', { symbol, tradeSize, rpcUrl });
 
-  const provider = new SolanaPriceProvider();
+  const configService = require('./config').createConfigService();
+  const provider = new SolanaPriceProvider(configService);
   await provider.initialize();
   const quote = await provider.getQuote(symbol, tradeSize) as any; // cast for test
 

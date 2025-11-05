@@ -3,6 +3,8 @@
  * 
  * Handles loading, validation, and management of bot configuration
  * from JSON files and environment variables.
+ * 
+ * Uses Zod for runtime schema validation to ensure type safety.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -19,13 +21,19 @@ import {
   NetworksConfig,
   EnvironmentConfig,
   ConfigValidationResult,
-  ConfigManager as IConfigManager
 } from '../types/config';
+import { IConfigService } from './configService';
+import {
+  validateBotConfig,
+  formatValidationError,
+  botConfigSchema,
+} from './configSchema';
+import { z } from 'zod';
 
 // Load environment variables
 dotenvConfig();
 
-export class ConfigManager implements IConfigManager {
+export class ConfigManager implements IConfigService {
   private config: BotConfig;
   private envConfig: EnvironmentConfig;
   private configPath: string;
@@ -50,14 +58,26 @@ export class ConfigManager implements IConfigManager {
       const tokensConfig = this.loadJsonConfig(this.tokensPath);
       
       // Merge configurations
-      const mergedConfig: BotConfig = {
+      const mergedConfig: any = {
         ...baseConfig,
         tokens: tokensConfig.tokens || baseConfig.tokens || {},
         quoteTokens: tokensConfig.quoteTokens || baseConfig.quoteTokens || {}
       };
 
       // Apply environment variable overrides
-      return this.applyEnvironmentOverrides(mergedConfig);
+      const configWithOverrides = this.applyEnvironmentOverrides(mergedConfig);
+
+      // Validate configuration with Zod schema
+      try {
+        return validateBotConfig(configWithOverrides);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          const errors = formatValidationError(validationError);
+          logger.error('Configuration validation failed', { errors });
+          throw new Error(`Configuration validation failed: ${errors.join(', ')}`);
+        }
+        throw validationError;
+      }
     } catch (error) {
       logger.error('Failed to load configuration', { error: error instanceof Error ? error.message : String(error) });
       throw new Error('Configuration loading failed');
@@ -192,6 +212,40 @@ export class ConfigManager implements IConfigManager {
   }
 
   /**
+   * Get all enabled tokens
+   */
+  getEnabledTokens(): TokenConfig[] {
+    return Object.values(this.config.tokens).filter(token => token.enabled);
+  }
+
+  /**
+   * Get token by symbol (case-insensitive)
+   */
+  getTokenBySymbol(symbol: string): TokenConfig | undefined {
+    const upperSymbol = symbol.toUpperCase();
+    return this.config.tokens[upperSymbol];
+  }
+
+  /**
+   * Get quote token by symbol (case-insensitive)
+   */
+  getQuoteTokenBySymbol(symbol: string): QuoteTokenConfig | undefined {
+    if (!this.config || !this.config.quoteTokens) {
+      return undefined;
+    }
+    const upperSymbol = symbol.toUpperCase();
+    return this.config.quoteTokens[upperSymbol];
+  }
+
+  /**
+   * Check if a token is enabled
+   */
+  isTokenEnabled(symbol: string): boolean {
+    const token = this.getTokenBySymbol(symbol);
+    return token ? token.enabled : false;
+  }
+
+  /**
    * Get trading configuration
    */
   getTradingConfig(): TradingConfig {
@@ -228,94 +282,37 @@ export class ConfigManager implements IConfigManager {
   }
 
   /**
-   * Validate configuration
+   * Validate configuration using Zod schema
    */
   validateConfig(): ConfigValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Validate trading configuration
-    if (this.config.trading.minEdgeBps < 0) {
-      errors.push('minEdgeBps must be non-negative');
-    }
-    if (this.config.trading.maxSlippageBps < 0 || this.config.trading.maxSlippageBps > 10000) {
-      errors.push('maxSlippageBps must be between 0 and 10000 (0-100%)');
-    }
-    if (this.config.trading.riskBufferBps < 0) {
-      errors.push('riskBufferBps must be non-negative');
-    }
-    if (this.config.trading.maxPriceImpactBps < 0 || this.config.trading.maxPriceImpactBps > 10000) {
-      errors.push('maxPriceImpactBps must be between 0 and 10000 (0-100%)');
-    }
-    if (this.config.trading.cooldownMinutes < 0) {
-      errors.push('cooldownMinutes must be non-negative');
-    }
-    if (this.config.trading.maxDailyTrades < 0) {
-      errors.push('maxDailyTrades must be non-negative');
+    try {
+      // Validate using Zod schema (this catches type and format issues)
+      botConfigSchema.parse(this.config);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        errors.push(...formatValidationError(validationError));
+      } else {
+        errors.push(`Validation error: ${validationError instanceof Error ? validationError.message : String(validationError)}`);
+      }
     }
 
-    // Validate bridging configuration
-    if (this.config.bridging.intervalMinutes < 1) {
-      errors.push('bridging.intervalMinutes must be at least 1');
-    }
-    if (this.config.bridging.thresholdUsd < 0) {
-      errors.push('bridging.thresholdUsd must be non-negative');
-    }
-    if (this.config.bridging.maxRetries < 0) {
-      errors.push('bridging.maxRetries must be non-negative');
-    }
-    if (this.config.bridging.retryDelayMinutes < 0) {
-      errors.push('bridging.retryDelayMinutes must be non-negative');
-    }
-
-    // Validate monitoring configuration
-    if (this.config.monitoring.inventoryFloorUsd < 0) {
-      errors.push('monitoring.inventoryFloorUsd must be non-negative');
-    }
-    if (this.config.monitoring.bridgeTimeoutMinutes < 1) {
-      errors.push('monitoring.bridgeTimeoutMinutes must be at least 1');
-    }
-
-    // Validate network configuration
-    if (!this.config.networks.galaChain.rpcUrl) {
-      errors.push('galaChain.rpcUrl is required');
-    }
-    if (!this.config.networks.solana.rpcUrl) {
-      errors.push('solana.rpcUrl is required');
-    }
-
-    // Validate tokens
+    // Additional business logic validations
     const enabledTokens = Object.values(this.config.tokens).filter(token => token.enabled);
     if (enabledTokens.length === 0) {
       warnings.push('No tokens are enabled for trading');
     }
 
+    // Validate quote tokens are referenced by tokens
+    const quoteTokenSymbols = new Set(Object.keys(this.config.quoteTokens));
     for (const [symbol, token] of Object.entries(this.config.tokens)) {
-      if (!token.galaChainMint) {
-        errors.push(`Token ${symbol}: galaChainMint is required`);
+      if (!quoteTokenSymbols.has(token.gcQuoteVia)) {
+        warnings.push(`Token ${symbol}: gcQuoteVia "${token.gcQuoteVia}" not found in quoteTokens`);
       }
-      if (!token.solanaMint) {
-        errors.push(`Token ${symbol}: solanaMint is required`);
-      }
-      if (token.decimals < 0 || token.decimals > 18) {
-        errors.push(`Token ${symbol}: decimals must be between 0 and 18`);
-      }
-      if (token.tradeSize <= 0) {
-        errors.push(`Token ${symbol}: tradeSize must be positive`);
-      }
-    }
-
-    // Validate quote tokens
-    const quoteTokens = this.config?.quoteTokens || {};
-    for (const [symbol, token] of Object.entries(quoteTokens)) {
-      if (!token.galaChainMint) {
-        errors.push(`Quote token ${symbol}: galaChainMint is required`);
-      }
-      if (!token.solanaMint) {
-        errors.push(`Quote token ${symbol}: solanaMint is required`);
-      }
-      if (token.decimals < 0 || token.decimals > 18) {
-        errors.push(`Quote token ${symbol}: decimals must be between 0 and 18`);
+      if (!quoteTokenSymbols.has(token.solQuoteVia)) {
+        warnings.push(`Token ${symbol}: solQuoteVia "${token.solQuoteVia}" not found in quoteTokens`);
       }
     }
 

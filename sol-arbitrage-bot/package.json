@@ -45,7 +45,8 @@
     "ethers": "^6.15.0",
     "json-stringify-deterministic": "^1.0.12",
     "p-retry": "^7.0.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

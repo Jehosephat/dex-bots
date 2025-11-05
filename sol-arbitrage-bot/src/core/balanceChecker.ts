@@ -9,13 +9,12 @@ import BigNumber from 'bignumber.js';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { GalaConnectClient } from '../bridging/galaConnectClient';
 import { resolveGalaEndpoints } from '../bridging/galaEndpoints';
-import { getEnabledTokens, getQuoteTokenBySymbol, getTokenConfig } from '../config';
+import { IConfigService } from '../config';
 import { StateManager } from './stateManager';
 import logger from '../utils/logger';
 import { sendAlert } from '../utils/alerts';
 import { GalaChainPriceProvider } from './priceProviders/galachain';
 import { SolanaPriceProvider } from './priceProviders/solana';
-import { getConfig } from '../config';
 
 export interface BalanceCheckResult {
   canTrade: boolean;
@@ -44,8 +43,12 @@ export class BalanceChecker {
   private pauseReason: string = '';
   private lastBalanceCheckTime: number = 0;
 
-  constructor(stateManager?: StateManager) {
+  constructor(stateManager?: StateManager, private configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
+    // Use provided config service or create default one
+    if (!this.configService) {
+      this.configService = require('../config').createConfigService();
+    }
   }
 
   /**
@@ -55,7 +58,7 @@ export class BalanceChecker {
    */
   async checkBalances(usePriceQuotes: boolean = true, forceCheck: boolean = false): Promise<BalanceCheckResult> {
     // If paused, respect cooldown to avoid checking too frequently
-    const config = getConfig();
+    const config = this.configService!.getConfig();
     const cooldownSeconds = (config as any).balanceChecking?.balanceCheckCooldownSeconds || 60;
     const now = Date.now();
     
@@ -82,7 +85,7 @@ export class BalanceChecker {
     };
     
     try {
-      const enabledTokens = getEnabledTokens();
+      const enabledTokens = this.configService!.getEnabledTokens();
       if (enabledTokens.length === 0) {
         return {
           canTrade: false,
@@ -97,8 +100,8 @@ export class BalanceChecker {
       
       if (usePriceQuotes) {
         try {
-          gcProvider = new GalaChainPriceProvider();
-          solProvider = new SolanaPriceProvider();
+          gcProvider = new GalaChainPriceProvider(this.configService!);
+          solProvider = new SolanaPriceProvider(this.configService!);
           await Promise.all([
             gcProvider.initialize().catch(() => {}),
             solProvider.initialize().catch(() => {})
@@ -238,7 +241,7 @@ export class BalanceChecker {
       });
 
       // Get tokens to skip from config
-      const config = getConfig();
+      const config = this.configService!.getConfig();
       const skipTokens = (config as any).balanceChecking?.skipTokens || [];
       
       // Check each enabled token (skip tokens in skipTokens list)
@@ -267,7 +270,7 @@ export class BalanceChecker {
         
         if (quoteVia === 'GALA') {
           // Forward: Selling GALA to buy token - need GALA balance
-          const galaQuoteToken = getQuoteTokenBySymbol('GALA');
+          const galaQuoteToken = this.configService!.getQuoteTokenBySymbol('GALA');
           if (galaQuoteToken) {
             const galaKey = galaQuoteToken.galaChainMint;
             const galaBalance = balanceMap.get(galaKey) || new BigNumber(0);
@@ -354,7 +357,7 @@ export class BalanceChecker {
       const minGalaFromConfig = (config as any).balanceChecking?.minGalaForReverse || 1000;
       
       if (enableReverse) {
-        const galaQuoteToken = getQuoteTokenBySymbol('GALA');
+        const galaQuoteToken = this.configService!.getQuoteTokenBySymbol('GALA');
         if (galaQuoteToken) {
           const galaKey = galaQuoteToken.galaChainMint;
           const galaBalance = balanceMap.get(galaKey) || new BigNumber(0);
@@ -405,7 +408,7 @@ export class BalanceChecker {
     priceProvider?: SolanaPriceProvider | null,
     checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
   ): Promise<void> {
-    const config = getConfig();
+    const config = this.configService!.getConfig();
     
     try {
       const wallet = process.env.SOLANA_WALLET_ADDRESS;
@@ -506,7 +509,7 @@ export class BalanceChecker {
         
         // Determine quote currency (USDC or SOL)
         const quoteVia = token.solQuoteVia || 'SOL'; // Default to SOL instead of USDC
-        const quoteToken = getQuoteTokenBySymbol(quoteVia);
+        const quoteToken = this.configService!.getQuoteTokenBySymbol(quoteVia);
         
         if (!quoteToken || !quoteToken.solanaMint) {
           recommendations.push(`Quote token ${quoteVia} not configured for Solana`);
@@ -684,7 +687,7 @@ export class BalanceChecker {
       
       // Only check if there's a minimum requirement or reverse trades are enabled
       if (enableReverse || minGalaOnSolana > 0) {
-        const galaQuoteToken = getQuoteTokenBySymbol('GALA');
+        const galaQuoteToken = this.configService!.getQuoteTokenBySymbol('GALA');
         if (galaQuoteToken && galaQuoteToken.solanaMint) {
           const galaBalance = balanceMap.get(galaQuoteToken.solanaMint) || new BigNumber(0);
           const minGalaRequired = new BigNumber(minGalaOnSolana);

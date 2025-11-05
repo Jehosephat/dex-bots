@@ -8,7 +8,7 @@ import { EdgeCalculator } from './core/edgeCalculator';
 import { GalaChainPriceProvider } from './core/priceProviders/galachain';
 import { SolanaPriceProvider } from './core/priceProviders/solana';
 import { QuoteManager } from './core/quoteManager';
-import { initializeConfig, getEnabledTokens } from './config';
+import { initializeConfig, getEnabledTokens, createConfigService } from './config';
 import { GalaChainQuote, SolanaQuote } from './types/core';
 import { TokenConfig } from './types/config';
 import logger from './utils/logger';
@@ -22,16 +22,17 @@ async function testEdgeCalculator() {
     initializeConfig();
     
     // Initialize price providers
-    const galaChainProvider = new GalaChainPriceProvider();
-    const solanaProvider = new SolanaPriceProvider();
-    const quoteManager = new QuoteManager(galaChainProvider, solanaProvider);
+    const configService = createConfigService();
+    const galaChainProvider = new GalaChainPriceProvider(configService);
+    const solanaProvider = new SolanaPriceProvider(configService);
+    const quoteManager = new QuoteManager(galaChainProvider, solanaProvider, undefined, configService);
     
     await galaChainProvider.initialize();
     await solanaProvider.initialize();
     await quoteManager.initialize();
     
     // Initialize edge calculator
-    const edgeCalculator = new EdgeCalculator();
+    const edgeCalculator = new EdgeCalculator(configService);
     
     logger.info('✅ All components initialized');
     

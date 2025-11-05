@@ -20,7 +20,8 @@ async function main() {
 
   logger.info('🧪 Running GalaChain live executor test', { symbol, tradeSize });
 
-  const provider = new GalaChainPriceProvider();
+  const configService = require('./config').createConfigService();
+  const provider = new GalaChainPriceProvider(configService);
   await provider.initialize();
   const quote = await provider.getQuote(symbol, tradeSize) as any; // cast for test
   if (!quote) {

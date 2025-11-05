@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { initializeConfig, getTokenConfig } from '../config';
+import { IConfigService } from '../config';
 import { GalaChainPriceProvider } from '../core/priceProviders/galachain';
 import { SolanaPriceProvider } from '../core/priceProviders/solana';
 import { GalaChainExecutor, GalaChainExecutionResult } from './galaChainExecutor';
@@ -23,21 +23,20 @@ export class DualLegCoordinator {
   private gcExecutor?: GalaChainExecutor;
   private solExecutor?: SolanaExecutor;
 
-  constructor() {
-    this.gcProvider = new GalaChainPriceProvider();
-    this.solProvider = new SolanaPriceProvider();
+  constructor(private configService: IConfigService) {
+    this.gcProvider = new GalaChainPriceProvider(configService);
+    this.solProvider = new SolanaPriceProvider(configService);
   }
 
   /**
    * Prepare both legs (dry-run): GC sell and SOL buy for the token's configured tradeSize.
    */
   async dryRun(symbol: string): Promise<DualLegDryRunResult | null> {
-    initializeConfig();
     // Instantiate executors after config is initialized to avoid early access
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
 
-    const token = getTokenConfig(symbol);
+    const token = this.configService.getTokenConfig(symbol);
     if (!token) {
       logger.error('❌ Token not configured', { symbol });
       return null;
@@ -108,11 +107,10 @@ export class DualLegCoordinator {
    * GC sell and SOL buy are launched near-simultaneously.
    */
   async executeLive(symbol: string): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
-    initializeConfig();
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
 
-    const token = getTokenConfig(symbol);
+    const token = this.configService.getTokenConfig(symbol);
     if (!token) {
       throw new Error(`Token not configured: ${symbol}`);
     }

@@ -5,7 +5,7 @@
  */
 
 import { GalaChainPriceProvider } from './core/priceProviders/galachain';
-import { initializeConfig, getTokenConfig } from './config';
+import { initializeConfig, getTokenConfig, createConfigService } from './config';
 import logger from './utils/logger';
 
 async function testSOLQuote() {
@@ -31,7 +31,8 @@ async function testSOLQuote() {
     
     // Initialize price provider
     logger.info('📊 Initializing GalaChain price provider...');
-    const galaChainProvider = new GalaChainPriceProvider();
+    const configService = createConfigService();
+    const galaChainProvider = new GalaChainPriceProvider(configService);
     await galaChainProvider.initialize();
     
     logger.info('✅ Price provider initialized');

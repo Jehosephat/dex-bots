@@ -1,11 +1,13 @@
 import { DualLegCoordinator } from './execution/dualLegCoordinator';
+import { createConfigService } from './config';
 import logger from './utils/logger';
 
 async function testDualLeg() {
   try {
     logger.info('🧪 Testing Dual-Leg Coordinator (dry-run)...');
 
-    const coordinator = new DualLegCoordinator();
+    const configService = createConfigService();
+    const coordinator = new DualLegCoordinator(configService);
     const result = await coordinator.dryRun('SOL');
 
     if (!result) {

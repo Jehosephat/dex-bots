@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 import logger from './utils/logger';
-import { initializeConfig, getEnabledTokens, getTradingConfig } from './config';
+import { initializeConfig, createConfigService, IConfigService } from './config';
 import { GalaChainPriceProvider } from './core/priceProviders/galachain';
 import { SolanaPriceProvider } from './core/priceProviders/solana';
 import { RiskManager } from './execution/riskManager';
@@ -11,26 +11,27 @@ import { getTradeLogger } from './utils/tradeLogger';
 import { EdgeCalculationResult } from './core/edgeCalculator';
 import { BalanceChecker } from './core/balanceChecker';
 
-export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run'): Promise<boolean> {
-  initializeConfig();
+export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', configService?: IConfigService): Promise<boolean> {
+  // Use provided config service or create default one
+  const config = configService || createConfigService();
   
-  const enabled = getEnabledTokens();
+  const enabled = config.getEnabledTokens();
   if (enabled.length === 0) {
     logger.warn('⚠️ No enabled tokens');
     return false;
   }
 
-  const gcProvider = new GalaChainPriceProvider();
-  const solProvider = new SolanaPriceProvider();
-  const risk = new RiskManager();
-        const coord = new DualLegCoordinator();
-        const tradingConfig = getTradingConfig();
+  const gcProvider = new GalaChainPriceProvider(config);
+  const solProvider = new SolanaPriceProvider(config);
+  const risk = new RiskManager(undefined, config);
+  const coord = new DualLegCoordinator(config);
+  const tradingConfig = config.getTradingConfig();
   
   // Get stateManager for cooldown checks
   const stateManager = (risk as any).stateManager;
   
-  // Initialize balance checker
-  const balanceChecker = new BalanceChecker(stateManager);
+  // Initialize balance checker (with config service)
+  const balanceChecker = new BalanceChecker(stateManager, config);
   
   // Always check balances before starting (especially for live mode)
   // Force check on cycle start to ensure we have accurate state

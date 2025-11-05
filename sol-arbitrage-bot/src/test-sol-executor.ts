@@ -17,7 +17,8 @@ async function testSolExecutor() {
       return false;
     }
 
-    const provider = new SolanaPriceProvider();
+    const configService = require('./config').createConfigService();
+    const provider = new SolanaPriceProvider(configService);
     await provider.initialize();
 
     const genericQuote = await provider.getQuote(symbol, token.tradeSize);

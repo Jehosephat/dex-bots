@@ -19,8 +19,9 @@ async function testRiskManager() {
       return false;
     }
 
-    const gc = new GalaChainPriceProvider();
-    const sol = new SolanaPriceProvider();
+    const configService = require('./config').createConfigService();
+    const gc = new GalaChainPriceProvider(configService);
+    const sol = new SolanaPriceProvider(configService);
     await gc.initialize();
     await sol.initialize();
 

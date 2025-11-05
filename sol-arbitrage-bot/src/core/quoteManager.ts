@@ -12,7 +12,7 @@ import {
   SolanaQuote
 } from '../types/core';
 import { TokenConfig } from '../types/config';
-import { getEnabledTokens, getTradingConfig } from '../config';
+import { IConfigService, createConfigService } from '../config';
 import { IPriceProvider } from './priceProviders/base';
 import { EdgeCalculator } from './edgeCalculator';
 import logger from '../utils/logger';
@@ -43,11 +43,12 @@ export class QuoteManager {
   constructor(
     galaChainProvider: IPriceProvider,
     solanaProvider: IPriceProvider,
-    config?: Partial<QuoteManagerConfig>
+    config?: Partial<QuoteManagerConfig>,
+    configService?: IConfigService
   ) {
     this.galaChainProvider = galaChainProvider;
     this.solanaProvider = solanaProvider;
-    this.edgeCalculator = new EdgeCalculator();
+    this.edgeCalculator = new EdgeCalculator(configService || createConfigService());
     
     this.config = {
       maxQuoteAge: 30, // 30 seconds
@@ -87,7 +88,9 @@ export class QuoteManager {
    */
   async discoverOpportunities(): Promise<ArbitrageOpportunity[]> {
     const opportunities: ArbitrageOpportunity[] = [];
-    const enabledTokens = getEnabledTokens();
+    // Use config service from edge calculator or create default
+    const configService = (this.edgeCalculator as any).configService || createConfigService();
+    const enabledTokens = configService.getEnabledTokens();
     
     logger.info(`🔍 Discovering opportunities for ${enabledTokens.length} tokens`);
     

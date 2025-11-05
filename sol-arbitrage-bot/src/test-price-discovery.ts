@@ -7,7 +7,7 @@
 import { GalaChainPriceProvider } from './core/priceProviders/galachain';
 import { SolanaPriceProvider } from './core/priceProviders/solana';
 import { QuoteManager } from './core/quoteManager';
-import { initializeConfig, getEnabledTokens } from './config';
+import { initializeConfig, createConfigService, getEnabledTokens } from './config';
 import logger from './utils/logger';
 
 async function testPriceDiscovery() {
@@ -17,11 +17,12 @@ async function testPriceDiscovery() {
     // Initialize configuration
     logger.info('📋 Initializing configuration...');
     initializeConfig();
+    const configService = createConfigService();
     
     // Initialize price providers
     logger.info('📊 Initializing price providers...');
-    const galaChainProvider = new GalaChainPriceProvider();
-    const solanaProvider = new SolanaPriceProvider();
+    const galaChainProvider = new GalaChainPriceProvider(configService);
+    const solanaProvider = new SolanaPriceProvider(configService);
     
     await galaChainProvider.initialize();
     await solanaProvider.initialize();
@@ -30,7 +31,7 @@ async function testPriceDiscovery() {
     
     // Test individual quotes
     logger.info('🔍 Testing individual quotes...');
-    const enabledTokens = getEnabledTokens();
+    const enabledTokens = configService.getEnabledTokens();
     
     for (const token of enabledTokens) { // Test all enabled tokens
       logger.info(`📈 Testing quotes for ${token.symbol}...`);
@@ -69,7 +70,7 @@ async function testPriceDiscovery() {
     
     // Test quote manager
     logger.info('🎯 Testing quote manager...');
-    const quoteManager = new QuoteManager(galaChainProvider, solanaProvider);
+    const quoteManager = new QuoteManager(galaChainProvider, solanaProvider, undefined, configService);
     await quoteManager.initialize();
     
     // Discover opportunities

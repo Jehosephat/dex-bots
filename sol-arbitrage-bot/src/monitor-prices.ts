@@ -29,8 +29,9 @@ class PriceMonitor {
   private isRunning: boolean = false;
 
   constructor() {
-    this.galaChainProvider = new GalaChainPriceProvider();
-    this.solanaProvider = new SolanaPriceProvider();
+    const configService = require('./config').createConfigService();
+    this.galaChainProvider = new GalaChainPriceProvider(configService);
+    this.solanaProvider = new SolanaPriceProvider(configService);
     this.quoteManager = new QuoteManager(this.galaChainProvider, this.solanaProvider);
   }
 

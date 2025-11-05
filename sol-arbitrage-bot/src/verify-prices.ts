@@ -17,8 +17,9 @@ async function verifyPrices() {
     initializeConfig();
     
     // Initialize price providers
-    const galaChainProvider = new GalaChainPriceProvider();
-    const solanaProvider = new SolanaPriceProvider();
+    const configService = require('./config').createConfigService();
+    const galaChainProvider = new GalaChainPriceProvider(configService);
+    const solanaProvider = new SolanaPriceProvider(configService);
     
     await galaChainProvider.initialize();
     await solanaProvider.initialize();

@@ -1,11 +1,15 @@
 import 'dotenv/config';
 import logger from './utils/logger';
-import { initializeConfig } from './config';
+import { initializeConfig, createConfigService } from './config';
 import { runMainCycle } from './mainLoop';
 import { InventoryRefresher } from './core/inventoryRefresher';
 
 async function main() {
+  // Initialize config (for backward compatibility)
   initializeConfig();
+  
+  // Create config service for dependency injection
+  const configService = createConfigService();
 
   const runMode = ((process.env.RUN_MODE || 'dry_run').toLowerCase() === 'live') ? 'live' : 'dry_run';
   const intervalMs = Number(process.env.UPDATE_INTERVAL_MS || '15000');
@@ -37,7 +41,7 @@ async function main() {
       if (paused) {
         logger.info('⏸️  Bot paused (PAUSE=true), skipping cycle');
       } else {
-        await runMainCycle(runMode);
+        await runMainCycle(runMode, configService);
       }
     } catch (e) {
       logger.error('❌ Error in main runner cycle', { error: e instanceof Error ? e.message : String(e) });
