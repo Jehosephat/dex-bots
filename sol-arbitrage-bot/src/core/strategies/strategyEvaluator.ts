@@ -33,6 +33,9 @@ export class StrategyEvaluator {
   private errorHandler = getErrorHandler();
   private rateConverter: RateConverter;
   private riskManager: RiskManager;
+  // Quote cache to avoid duplicate API calls within an evaluation cycle
+  private quoteCache: Map<string, { gcQuote: GalaChainQuote | null; solQuote: SolanaQuote | null; timestamp: number }> = new Map();
+  private readonly QUOTE_CACHE_TTL = 5000; // 5 seconds - quotes are only valid for a short time
 
   constructor(
     private configService: IConfigService,
@@ -59,12 +62,23 @@ export class StrategyEvaluator {
     logger.info(`📊 Evaluating ${strategies.length} Strategy(ies) for ${token.symbol}`);
     logger.info(`   Trade Size: ${token.tradeSize} ${token.symbol}`);
 
-    // Evaluate all strategies in parallel
-    const evaluationPromises = strategies.map(strategy =>
-      this.evaluateStrategy(token, strategy)
-    );
+    // Clear quote cache at start of evaluation cycle
+    this.quoteCache.clear();
 
-    const results = await Promise.all(evaluationPromises);
+    // Evaluate strategies sequentially with small delays to avoid rate limiting
+    // This also allows quote caching to work more effectively
+    const results: StrategyEvaluationResult[] = [];
+    for (let i = 0; i < strategies.length; i++) {
+      const strategy = strategies[i];
+      
+      // Add delay between evaluations to avoid rate limits (except for first one)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+      }
+      
+      const result = await this.evaluateStrategy(token, strategy);
+      results.push(result);
+    }
 
     // Log summary with better formatting
     // "Successful" = evaluation completed without errors (quotes fetched, edge calculated)
@@ -169,10 +183,33 @@ export class StrategyEvaluator {
       };
 
       // Fetch quotes with strategy-specific quote currencies
-      const [gcQuote, solQuote] = await Promise.all([
-        this.fetchGalaChainQuote(token.symbol, token.tradeSize, gcReverse, strategy.galaChainSide.quoteCurrency),
-        this.fetchSolanaQuote(token.symbol, token.tradeSize, solReverse, strategy.solanaSide.quoteCurrency)
-      ]);
+      // Use cache key to deduplicate identical quote requests
+      const gcCacheKey = `gc:${token.symbol}:${token.tradeSize}:${strategy.galaChainSide.quoteCurrency}:${gcReverse}`;
+      const solCacheKey = `sol:${token.symbol}:${token.tradeSize}:${strategy.solanaSide.quoteCurrency}:${solReverse}`;
+      
+      // Check cache first
+      const cachedGc = this.quoteCache.get(gcCacheKey);
+      const cachedSol = this.quoteCache.get(solCacheKey);
+      const now = Date.now();
+      
+      let gcQuote: GalaChainQuote | null;
+      let solQuote: SolanaQuote | null;
+      
+      if (cachedGc && (now - cachedGc.timestamp) < this.QUOTE_CACHE_TTL) {
+        gcQuote = cachedGc.gcQuote;
+        logger.debug(`   ♻️  Reusing cached GalaChain quote for ${strategy.galaChainSide.quoteCurrency}`);
+      } else {
+        gcQuote = await this.fetchGalaChainQuote(token.symbol, token.tradeSize, gcReverse, strategy.galaChainSide.quoteCurrency);
+        this.quoteCache.set(gcCacheKey, { gcQuote, solQuote: null, timestamp: now });
+      }
+      
+      if (cachedSol && (now - cachedSol.timestamp) < this.QUOTE_CACHE_TTL) {
+        solQuote = cachedSol.solQuote;
+        logger.debug(`   ♻️  Reusing cached Solana quote for ${strategy.solanaSide.quoteCurrency}`);
+      } else {
+        solQuote = await this.fetchSolanaQuote(token.symbol, token.tradeSize, solReverse, strategy.solanaSide.quoteCurrency);
+        this.quoteCache.set(solCacheKey, { gcQuote: null, solQuote, timestamp: now });
+      }
 
       if (!gcQuote || !solQuote) {
         const error = `Missing quote(s) for strategy ${strategy.id} - hasGcQuote: ${!!gcQuote}, hasSolQuote: ${!!solQuote}`;
@@ -371,6 +408,9 @@ export class StrategyEvaluator {
     const passingStrategies = results.filter(r =>
       r.success && r.riskResult?.shouldProceed && r.edge?.isProfitable && r.edge?.meetsThreshold
     );
+    
+    // Clear cache after evaluation cycle
+    this.quoteCache.clear();
 
     return {
       strategies: results,
@@ -378,6 +418,13 @@ export class StrategyEvaluator {
       hasProfitableStrategy: bestStrategy !== null,
       passingStrategies: passingStrategies.length
     };
+  }
+  
+  /**
+   * Clear the quote cache
+   */
+  clearCache(): void {
+    this.quoteCache.clear();
   }
 }
 
