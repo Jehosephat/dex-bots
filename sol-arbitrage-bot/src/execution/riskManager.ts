@@ -143,7 +143,7 @@ export class RiskManager {
 
     const shouldProceed = reasons.length === 0;
 
-    logger.execution(`Risk evaluation for ${token.symbol}: ${shouldProceed ? 'PASS' : 'FAIL'}`, {
+    logger.debug(`[EXECUTION] Risk evaluation for ${token.symbol}: ${shouldProceed ? 'PASS' : 'FAIL'}`, {
       token: token.symbol,
       reasons,
       netEdge: edge.netEdge.toString(),
@@ -294,7 +294,7 @@ export class RiskManager {
 
     const shouldProceed = reasons.length === 0;
 
-    logger.execution(`Risk evaluation for ${token.symbol} (${direction}): ${shouldProceed ? 'PASS' : 'FAIL'}`, {
+    logger.debug(`[EXECUTION] Risk evaluation for ${token.symbol} (${direction}): ${shouldProceed ? 'PASS' : 'FAIL'}`, {
       token: token.symbol,
       direction,
       reasons,

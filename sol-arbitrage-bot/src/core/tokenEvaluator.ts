@@ -80,16 +80,16 @@ export class TokenEvaluator {
       const directionConfig = this.configService.getDirectionConfig();
 
       // Evaluate forward direction (always)
-      logger.info(`   📈 Evaluating FORWARD direction...`);
+      logger.debug(`   📈 Evaluating FORWARD direction...`);
       const forwardEvaluation = await this.evaluateDirection(token, 'forward');
 
       // Evaluate reverse direction (if enabled)
       let reverseEvaluation: TokenEvaluationResult | null = null;
       if (directionConfig.reverse.enabled) {
-        logger.info(`   📉 Evaluating REVERSE direction...`);
+        logger.debug(`   📉 Evaluating REVERSE direction...`);
         reverseEvaluation = await this.evaluateDirection(token, 'reverse');
       } else {
-        logger.info(`   ⏭️  REVERSE direction disabled in config`);
+        logger.debug(`   ⏭️  REVERSE direction disabled in config`);
       }
 
       // Log both evaluations before selecting
@@ -107,9 +107,9 @@ export class TokenEvaluator {
       );
 
       if (reverseEvaluation && selectedEvaluation.direction !== forwardEvaluation.direction) {
-        logger.info(`   ✅ Selected REVERSE direction (better edge)`);
+        logger.debug(`   ✅ Selected REVERSE direction (better edge)`);
       } else if (reverseEvaluation) {
-        logger.info(`   ✅ Selected FORWARD direction`);
+        logger.debug(`   ✅ Selected FORWARD direction`);
       }
 
       // Store both evaluations for logging purposes
@@ -150,7 +150,7 @@ export class TokenEvaluator {
     const directionLabel = DirectionUtils.getLabel(direction);
 
     try {
-      logger.info(`   🔍 Fetching quotes for ${directionLabel} direction...`);
+      logger.debug(`   🔍 Fetching quotes for ${directionLabel} direction...`);
 
       // Fetch quotes for the specified direction
       const [gcQuote, solQuote] = await Promise.all([
@@ -174,7 +174,7 @@ export class TokenEvaluator {
         };
       }
       
-      logger.info(`   ✅ Quotes received for ${directionLabel} direction`);
+      logger.debug(`   ✅ Quotes received for ${directionLabel} direction`);
 
       const galaQuote = gcQuote as GalaChainQuote;
       const solQuoteResult = solQuote as SolanaQuote;
@@ -202,7 +202,7 @@ export class TokenEvaluator {
       }
 
       // Evaluate risk (direction-aware)
-      logger.info(`   🧮 Evaluating risk for ${directionLabel} direction...`);
+      logger.debug(`   🧮 Evaluating risk for ${directionLabel} direction...`);
       let riskResult;
       try {
         // Use direction-aware risk evaluation if available, otherwise fallback
@@ -226,7 +226,7 @@ export class TokenEvaluator {
           );
         }
         
-        logger.info(`   ${riskResult.shouldProceed ? '✅' : '❌'} Risk evaluation ${directionLabel}: ${riskResult.shouldProceed ? 'PASS' : 'FAIL'} (Edge: ${riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
+        logger.debug(`   ${riskResult.shouldProceed ? '✅' : '❌'} Risk evaluation ${directionLabel}: ${riskResult.shouldProceed ? 'PASS' : 'FAIL'} (Edge: ${riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
       } catch (evalError) {
         logger.error(`❌ ERROR in risk.evaluate() for ${token.symbol} (${directionLabel})`, {
           error: evalError instanceof Error ? evalError.message : String(evalError)

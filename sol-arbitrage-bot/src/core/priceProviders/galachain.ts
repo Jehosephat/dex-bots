@@ -93,7 +93,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       // When reverse=false, use the existing logic based on quoteVia
       const shouldReverse = reverse ? true : (quoteVia === 'GALA');
 
-      logger.info(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
+      logger.debug(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
         tokenSymbol: symbol,
         quoteVia,
         token0: quoteVia === 'GALA' ? 'GALA' : symbol,
@@ -322,7 +322,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
           reverseZeroForOne = false;
         }
         
-        logger.info('🔍 Reverse Quote Parameters (GALA → Token):', {
+          logger.debug('🔍 Reverse Quote Parameters (GALA → Token):', {
           tokenSymbol,
           quoteVia,
           token0: token0Str,
@@ -375,7 +375,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
           zeroForOne = true;
         }
         
-        logger.info('🔍 Forward Quote Parameters (Token → GALA):', {
+          logger.debug('🔍 Forward Quote Parameters (Token → GALA):', {
           tokenSymbol,
           quoteVia,
           token0: token0Str,
