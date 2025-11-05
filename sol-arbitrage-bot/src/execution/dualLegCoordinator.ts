@@ -192,24 +192,15 @@ export class DualLegCoordinator {
       }
     }
 
-    // Fire both legs nearly concurrently with error handling
-    // For reverse: BUY on GC, SELL on SOL
-    // For forward: SELL on GC, BUY on SOL
-    const [gcRes, solRes] = await Promise.allSettled([
-      this.errorHandler.executeWithProtection(
-        () => {
-          if (direction === 'reverse') {
-            // Reverse: BUY on GalaChain
-            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, gcQuote);
-          } else {
-            // Forward: SELL on GalaChain
-            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote);
-          }
-        },
-        'galachain-executor',
-        `GC execution for ${symbol} (${direction})`
-      ),
-      this.errorHandler.executeWithProtection(
+    // Execute sequentially: Solana first, then GalaChain
+    // This ensures Solana confirms before executing GalaChain, reducing risk of one-sided trades
+    // For reverse: SELL on SOL first, then BUY on GC
+    // For forward: BUY on SOL first, then SELL on GC
+    
+    logger.info(`🔄 Executing Solana leg first (${direction} direction)...`);
+    let sol: SolanaExecutionResult;
+    try {
+      sol = await this.errorHandler.executeWithProtection(
         () => {
           if (direction === 'reverse') {
             // Reverse: SELL on Solana
@@ -221,58 +212,175 @@ export class DualLegCoordinator {
         },
         'solana-executor',
         `SOL execution for ${symbol} (${direction})`
-      )
-    ]);
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`❌ Solana execution failed before GalaChain execution`, { symbol, error: errorMessage });
+      sol = {
+        success: false,
+        params: {
+          symbol,
+          tradeSize: token.tradeSize,
+          quoteCurrency: solQuote.currency,
+          expectedCostInQuote: new BigNumber(0),
+          maxCostInQuote: new BigNumber(0),
+          deadlineMs: Date.now() + 60_000
+        },
+        error: errorMessage
+      } as SolanaExecutionResult;
+    }
 
-    const gc: GalaChainExecutionResult = gcRes.status === 'fulfilled' ? (gcRes.value as GalaChainExecutionResult) : {
-      success: false,
-      params: {
+    // If Solana failed, don't execute GalaChain to avoid one-sided trades
+    if (!sol.success) {
+      logger.warn(`⚠️ Solana execution failed - skipping GalaChain execution to prevent one-sided trade`, {
         symbol,
-        tradeSize: token.tradeSize,
-        expectedProceedsGala: new BigNumber(0),
-        minProceedsGala: new BigNumber(0),
-        deadlineMs: Date.now() + 60_000
-      },
-      error: (gcRes as PromiseRejectedResult).reason?.message || String((gcRes as PromiseRejectedResult).reason)
-    };
-
-    const sol: SolanaExecutionResult = solRes.status === 'fulfilled' ? (solRes.value as SolanaExecutionResult) : {
-      success: false,
-      params: {
-        symbol,
-        tradeSize: token.tradeSize,
-        quoteCurrency: solQuote.currency,
-        expectedCostInQuote: new BigNumber(0),
-        maxCostInQuote: new BigNumber(0),
-        deadlineMs: Date.now() + 60_000
-      },
-      error: (solRes as PromiseRejectedResult).reason?.message || String((solRes as PromiseRejectedResult).reason)
-    } as SolanaExecutionResult;
-
-    // Simple failure handling: if one leg failed and the other succeeded, log and caller can cooldown
-    if (gc.success && !sol.success) {
+        solError: sol.error
+      });
+      const gc: GalaChainExecutionResult = {
+        success: false,
+        params: {
+          symbol,
+          tradeSize: token.tradeSize,
+          expectedProceedsGala: new BigNumber(0),
+          minProceedsGala: new BigNumber(0),
+          deadlineMs: Date.now() + 60_000
+        },
+        error: 'Skipped - Solana execution failed first'
+      };
+      
       await this.errorHandler.handleError(
-        new ExecutionError('Dual-leg partial success: SOL failed', { symbol, gcTx: gc.txHash, solError: sol.error }, false),
+        new ExecutionError('Dual-leg execution aborted: SOL failed', { symbol, solError: sol.error }, false),
         undefined,
         undefined,
         { operation: 'executeLive', symbol, leg: 'solana' }
       );
-      logger.warn('⚠️ Dual-leg: GC succeeded but SOL failed - consider cooldown', { symbol, gcTx: gc.txHash, solError: sol.error });
-      sendAlert('Dual-leg partial success: SOL failed', { symbol, gcTx: gc.txHash, solError: sol.error }, 'warn').catch(() => {});
-    } else if (!gc.success && sol.success) {
+      sendAlert('Dual-leg execution aborted: SOL failed', { symbol, solError: sol.error }, 'error').catch(() => {});
+      
+      return { gc, sol };
+    }
+
+    // Solana succeeded - proceed with GalaChain execution
+    logger.info(`✅ Solana execution succeeded - proceeding with GalaChain execution...`);
+    let gc: GalaChainExecutionResult;
+    try {
+      gc = await this.errorHandler.executeWithProtection(
+        () => {
+          if (direction === 'reverse') {
+            // Reverse: BUY on GalaChain
+            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, gcQuote);
+          } else {
+            // Forward: SELL on GalaChain
+            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote);
+          }
+        },
+        'galachain-executor',
+        `GC execution for ${symbol} (${direction})`
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`❌ GalaChain execution failed after Solana succeeded`, {
+        symbol,
+        solTx: sol.txSig,
+        error: errorMessage
+      });
+      gc = {
+        success: false,
+        params: {
+          symbol,
+          tradeSize: token.tradeSize,
+          expectedProceedsGala: new BigNumber(0),
+          minProceedsGala: new BigNumber(0),
+          deadlineMs: Date.now() + 60_000
+        },
+        error: errorMessage
+      };
+    }
+
+    // Handle partial success: Solana succeeded but GalaChain failed
+    if (!gc.success && sol.success) {
       await this.errorHandler.handleError(
-        new ExecutionError('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, false),
+        new ExecutionError('Dual-leg partial success: GC failed after SOL succeeded', { symbol, solTx: sol.txSig, gcError: gc.error }, false),
         undefined,
         undefined,
         { operation: 'executeLive', symbol, leg: 'galachain' }
       );
-      logger.warn('⚠️ Dual-leg: SOL succeeded but GC failed - consider cooldown', { symbol, solTx: sol.txSig, gcError: gc.error });
+      logger.warn('⚠️ Dual-leg: SOL succeeded but GC failed - one-sided trade risk', { symbol, solTx: sol.txSig, gcError: gc.error });
       sendAlert('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, 'warn').catch(() => {});
     }
+    // Note: If Solana failed, we already handled it above and skipped GalaChain execution
 
     if (gc.success && sol.success) {
       logger.execution('✅ Dual-leg live execution complete', { symbol, gcTx: gc.txHash, solTx: sol.txSig });
-      sendAlert('Dual-leg trade executed', { symbol, gcTx: gc.txHash, solTx: sol.txSig }, 'success').catch(() => {});
+      
+      // Build detailed trade information for notification
+      const isReverse = direction === 'reverse';
+      const gcAction = isReverse ? 'BUY' : 'SELL';
+      const solAction = isReverse ? 'SELL' : 'BUY';
+      
+      // Format amounts for display
+      // GALA amounts are already in human-readable units (not raw)
+      const formatGala = (amount: BigNumber) => {
+        return amount.toFixed(8).replace(/\.?0+$/, '');
+      };
+      
+      // Get quote token decimals for proper formatting
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(sol.params.quoteCurrency);
+      const quoteDecimals = quoteTokenConfig?.decimals || (sol.params.quoteCurrency === 'SOL' ? 9 : 6);
+      
+      // Format quote currency amounts
+      // For FORWARD: expectedCostInQuote is already human-readable (from quote.price * tradeSize)
+      // For REVERSE: expectedCostInQuote is in raw units (from Jupiter API outAmount)
+      const formatQuote = (amount: BigNumber, isRaw: boolean) => {
+        if (isRaw) {
+          // Convert from raw units to human-readable
+          const humanReadable = amount.dividedBy(new BigNumber(10).pow(quoteDecimals));
+          return humanReadable.toFixed(quoteDecimals).replace(/\.?0+$/, '');
+        } else {
+          // Already human-readable, just format
+          return amount.toFixed(quoteDecimals).replace(/\.?0+$/, '');
+        }
+      };
+      
+      // GalaChain side details
+      const gcAmount = token.tradeSize;
+      const gcCurrency = 'GALA';
+      
+      // Solana side details
+      const solAmount = token.tradeSize;
+      const solCurrency = sol.params.quoteCurrency;
+      
+      // Build human-readable trade description
+      let gcDescription: string;
+      let solDescription: string;
+      
+      if (isReverse) {
+        // REVERSE: BUY on GC (spend GALA), SELL on SOL (receive quote currency)
+        // expectedProceedsGala is the cost (spent GALA) - already human-readable
+        // expectedCostInQuote is proceeds (received quote) - in RAW units (from Jupiter API)
+        const gcSpent = gc.params.expectedProceedsGala;
+        const solReceived = sol.params.expectedCostInQuote;
+        gcDescription = `BUY ${gcAmount} ${symbol} → Spent ${formatGala(gcSpent)} ${gcCurrency}`;
+        solDescription = `SELL ${solAmount} ${symbol} → Received ${formatQuote(solReceived, true)} ${solCurrency}`;
+      } else {
+        // FORWARD: SELL on GC (receive GALA), BUY on SOL (spend quote currency)
+        // expectedProceedsGala is proceeds (received GALA) - already human-readable
+        // expectedCostInQuote is cost (spent quote) - already HUMAN-READABLE (from quote.price * tradeSize)
+        const gcReceived = gc.params.expectedProceedsGala;
+        const solSpent = sol.params.expectedCostInQuote;
+        gcDescription = `SELL ${gcAmount} ${symbol} → Received ${formatGala(gcReceived)} ${gcCurrency}`;
+        solDescription = `BUY ${solAmount} ${symbol} → Spent ${formatQuote(solSpent, false)} ${solCurrency}`;
+      }
+      
+      const alertPayload: Record<string, unknown> = {
+        symbol,
+        direction: direction.toUpperCase(),
+        'GalaChain': gcDescription,
+        'Solana': solDescription,
+        gcTx: gc.txHash || 'N/A',
+        solTx: sol.txSig || 'N/A'
+      };
+      
+      sendAlert('Dual-leg trade executed', alertPayload, 'success').catch(() => {});
     }
 
     return { gc, sol };
