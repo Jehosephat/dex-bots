@@ -467,21 +467,37 @@ export class TokenEvaluator {
     // Log all strategy results for comparison in a cleaner format
     if (allStrategies.length > 1) {
       logger.info(`\n   📊 All Strategies Evaluated:`);
+      logger.info(`   ════════════════════════════════════════════════════════`);
       allStrategies.forEach((s, i) => {
         const edge = s.edge?.netEdgeBps?.toFixed(2) || 'N/A';
+        const grossEdge = s.edge && !s.edge.galaChainProceeds.isZero() ? 
+          (s.edge.galaChainProceeds.minus(s.edge.solanaCostGala).div(s.edge.galaChainProceeds).multipliedBy(10000).toFixed(2)) : 
+          'N/A';
         const isSelected = s.strategy.id === strategy.id;
         
         if (s.success && s.riskResult?.shouldProceed && s.edge?.isProfitable && s.edge?.meetsThreshold) {
           const marker = isSelected ? '⭐' : '✅';
-          logger.info(`      ${marker} ${s.strategy.name}: Edge ${edge} bps`);
+          logger.info(`      ${marker} ${s.strategy.name}`);
+          logger.info(`         Net Edge:    ${edge} bps (Gross: ${grossEdge} bps)`);
+          logger.info(`         GC Impact:   ${s.edge?.galaChainPriceImpactBps.toFixed(2) || 'N/A'} bps`);
+          logger.info(`         SOL Impact:  ${s.edge?.solanaPriceImpactBps.toFixed(2) || 'N/A'} bps`);
+          logger.info(`         Total Cost:  ${s.edge?.totalCost.toFixed(8) || 'N/A'} GALA`);
         } else if (s.success) {
           const reason = s.riskResult?.reasons?.[0] || 'Edge too low';
-          logger.debug(`      ❌ ${s.strategy.name}: ${reason}`);
+          const edgeInfo = edge !== 'N/A' ? ` (Edge: ${edge} bps)` : '';
+          logger.info(`      ❌ ${s.strategy.name}: ${reason}${edgeInfo}`);
+          if (s.edge && !s.edge.isProfitable) {
+            logger.debug(`         Net Edge: ${s.edge.netEdgeBps.toFixed(2)} bps (below threshold)`);
+          }
         } else {
           const error = s.error?.split(':')[0] || 'Failed';
-          logger.debug(`      ⚠️  ${s.strategy.name}: ${error}`);
+          logger.info(`      ⚠️  ${s.strategy.name}: ${error}`);
+        }
+        if (i < allStrategies.length - 1) {
+          logger.info(``);
         }
       });
+      logger.info(`   ════════════════════════════════════════════════════════`);
     }
     
     // Log detailed results for selected strategy
@@ -510,20 +526,31 @@ export class TokenEvaluator {
     const solCost = solQuote.price.multipliedBy(token.tradeSize);
 
     logger.info(`\n💰 MARKET PRICES (${directionLabel})`);
+    logger.info(`   ════════════════════════════════════════════════════════`);
     
     if (isReverse) {
       // REVERSE: BUY on GC, SELL on SOL
       logger.info(`   🔷 GalaChain (BUY ${token.symbol} with GALA)`);
-      logger.info(`      Price:    ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
-      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-      logger.info(`      Cost:     ${gcProceeds.toFixed(8)} ${gcQuote.currency} (to buy ${token.tradeSize} ${token.symbol})`);
-      logger.info(`      Impact:   ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+      logger.info(`      Price:      ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
+      logger.info(`      Trade Size:  ${token.tradeSize} ${token.symbol}`);
+      logger.info(`      Total Cost:  ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
+      logger.info(`      Price Impact: ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+      if (gcQuote.minOutput) {
+        logger.info(`      Min Output:  ${gcQuote.minOutput.toFixed(8)} ${gcQuote.currency}`);
+      }
 
-      logger.info(`   🔸 Solana (SELL ${token.symbol} for ${solQuote.currency})`);
-      logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
-      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-      logger.info(`      Proceeds: ${solCost.toFixed(8)} ${solQuote.currency} (from selling ${token.tradeSize} ${token.symbol})`);
-      logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
+      logger.info(`\n   🔸 Solana (SELL ${token.symbol} for ${solQuote.currency})`);
+      logger.info(`      Price:      ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
+      logger.info(`      Trade Size:  ${token.tradeSize} ${token.symbol}`);
+      logger.info(`      Proceeds:    ${solCost.toFixed(8)} ${solQuote.currency}`);
+      logger.info(`      Price Impact: ${solQuote.priceImpactBps.toFixed(2)} bps`);
+      if (solQuote.minOutput) {
+        logger.info(`      Min Output:  ${solQuote.minOutput.toFixed(8)} ${solQuote.currency}`);
+      }
+      if ((solQuote as any).jupiterRoute) {
+        const route = (solQuote as any).jupiterRoute;
+        logger.info(`      Route:       ${route.routeId || 'N/A'}`);
+      }
     } else {
       // FORWARD: SELL on GC, BUY on SOL
       const gcAction = token.gcQuoteVia === 'GALA'
@@ -534,25 +561,39 @@ export class TokenEvaluator {
         : `BUY ${token.symbol}`;
 
       logger.info(`   🔷 GalaChain (${gcAction})`);
-      logger.info(`      Price:    ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
-      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
+      logger.info(`      Price:      ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
+      logger.info(`      Trade Size:  ${token.tradeSize} ${token.symbol}`);
       if (token.gcQuoteVia === 'GALA') {
-        logger.info(`      Cost:     ${gcProceeds.toFixed(8)} ${gcQuote.currency} (to buy ${token.tradeSize} ${token.symbol})`);
+        logger.info(`      Total Cost:  ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
       } else {
-        logger.info(`      Proceeds: ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
+        logger.info(`      Proceeds:    ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
       }
-      logger.info(`      Impact:   ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+      logger.info(`      Price Impact: ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+      if (gcQuote.minOutput) {
+        logger.info(`      Min Output:  ${gcQuote.minOutput.toFixed(8)} ${gcQuote.currency}`);
+      }
 
-      logger.info(`   🔸 Solana (${solAction})`);
-      logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
-      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
+      logger.info(`\n   🔸 Solana (${solAction})`);
+      logger.info(`      Price:      ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
+      logger.info(`      Trade Size:  ${token.tradeSize} ${token.symbol}`);
       if (token.solQuoteVia === 'GALA') {
-        logger.info(`      Proceeds: ${solCost.toFixed(8)} ${solQuote.currency} (from selling ${token.tradeSize} ${token.symbol})`);
+        logger.info(`      Proceeds:    ${solCost.toFixed(8)} ${solQuote.currency}`);
       } else {
-        logger.info(`      Cost:     ${solCost.toFixed(8)} ${solQuote.currency}`);
+        logger.info(`      Total Cost:  ${solCost.toFixed(8)} ${solQuote.currency}`);
       }
-      logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
+      logger.info(`      Price Impact: ${solQuote.priceImpactBps.toFixed(2)} bps`);
+      if (solQuote.minOutput) {
+        logger.info(`      Min Output:  ${solQuote.minOutput.toFixed(8)} ${solQuote.currency}`);
+      }
+      if ((solQuote as any).jupiterRoute) {
+        const route = (solQuote as any).jupiterRoute;
+        logger.info(`      Route:       ${route.routeId || 'N/A'}`);
+        if (route.steps && route.steps.length > 0) {
+          logger.info(`      Route Hops:  ${route.steps.length} step(s)`);
+        }
+      }
     }
+    logger.info(`   ════════════════════════════════════════════════════════`);
 
     // Log risk evaluation result
     if (!result.riskResult || !result.riskResult.shouldProceed) {
@@ -577,38 +618,118 @@ export class TokenEvaluator {
         ? (tradingConfig.reverseArbitrageMinEdgeBps || tradingConfig.minEdgeBps)
         : tradingConfig.minEdgeBps;
 
+      // Calculate gross edge (before bridge cost and risk buffer)
+      const grossEdge = edge.galaChainProceeds.minus(edge.solanaCostGala);
+      const grossEdgeBps = edge.galaChainProceeds.isZero() ? 0 : 
+        grossEdge.div(edge.galaChainProceeds).multipliedBy(10000).toNumber();
+
+      // Get USD values if we have rate conversion
+      const galaUsdPrice = result.rateConversion?.galaUsdPrice;
+      
       logger.info(`\n🧮 EDGE CALCULATION (${directionLabel})`);
+      logger.info(`   ════════════════════════════════════════════════════════`);
       
       if (isReverse) {
         // REVERSE: SOL proceeds - GC cost
         logger.info(`   📥 INCOME:`);
-        logger.info(`      🔸 Solana Proceeds:    ${edge.galaChainProceeds.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
-        logger.info(`   📤 COSTS:`);
+        logger.info(`      🔸 Solana Proceeds:    ${edge.galaChainProceeds.toFixed(8)} GALA`);
+        if (solQuote.currency !== 'GALA') {
+          logger.info(`                          (${solCost.toFixed(8)} ${solQuote.currency})`);
+        }
+        if (galaUsdPrice) {
+          const usdValue = edge.galaChainProceeds.multipliedBy(galaUsdPrice);
+          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
+        }
+        
+        logger.info(`\n   📤 COSTS:`);
         logger.info(`      🔷 GalaChain Cost:    ${edge.solanaCostGala.toFixed(8)} GALA`);
-        logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
-        logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
+        if (galaUsdPrice) {
+          const usdValue = edge.solanaCostGala.multipliedBy(galaUsdPrice);
+          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
+        }
       } else {
         // FORWARD: GC proceeds - SOL cost
         logger.info(`   📥 INCOME:`);
         logger.info(`      🔷 GalaChain Proceeds:  ${edge.galaChainProceeds.toFixed(8)} GALA`);
-        logger.info(`   📤 COSTS:`);
-        logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
-        logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
-        logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
+        if (galaUsdPrice) {
+          const usdValue = edge.galaChainProceeds.multipliedBy(galaUsdPrice);
+          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
+        }
+        
+        logger.info(`\n   📤 COSTS:`);
+        logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA`);
+        if (solQuote.currency !== 'GALA') {
+          logger.info(`                          (${solCost.toFixed(8)} ${solQuote.currency})`);
+        }
+        if (galaUsdPrice) {
+          const usdValue = edge.solanaCostGala.multipliedBy(galaUsdPrice);
+          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
+        }
       }
       
-      logger.info(`      ────────────────────────────`);
-      logger.info(`      💰 Total Cost:         ${edge.totalCost.toFixed(8)} GALA`);
-      logger.info(`   ════════════════════════════════`);
-      logger.info(`   💵 NET EDGE:              ${edge.netEdge.toFixed(8)} GALA (${edge.netEdgeBps.toFixed(2)} bps)`);
-      logger.info(`   📊 Threshold:             ${minEdgeBps} bps minimum`);
-      logger.info(`   ✅ Meets Threshold:        ${meetsThreshold ? 'YES ✓' : 'NO ✗'}`);
-      logger.info(`   💹 Profitable:             ${isProfitable ? 'YES ✓' : 'NO ✗'}`);
-      logger.info(`\n   📉 PRICE IMPACT:`);
-      logger.info(`      🔷 GalaChain:           ${edge.galaChainPriceImpactBps.toFixed(2)} bps`);
-      logger.info(`      🔸 Solana:              ${edge.solanaPriceImpactBps.toFixed(2)} bps`);
-      logger.info(`      Max Allowed:            ${tradingConfig.maxPriceImpactBps} bps`);
-      logger.info(`      ✅ Acceptable:          ${impactAcceptable ? 'YES ✓' : 'NO ✗'}`);
+      // Rate conversion details
+      if (result.rateConversion && solQuote.currency !== 'GALA') {
+        logger.info(`\n   🔄 RATE CONVERSION:`);
+        logger.info(`      ${solQuote.currency}/GALA: ${edge.solToGalaRate.toFixed(8)}`);
+        if (galaUsdPrice && result.rateConversion.rate) {
+          const galaUsdPriceBN = new BigNumber(galaUsdPrice);
+          const quoteUsdPrice = galaUsdPriceBN.multipliedBy(result.rateConversion.rate);
+          logger.info(`      ${solQuote.currency}/USD: ${quoteUsdPrice.toFixed(8)}`);
+        }
+      }
+      
+      logger.info(`\n   💰 COST BREAKDOWN:`);
+      logger.info(`      🔷 GalaChain/Solana Cost: ${edge.solanaCostGala.toFixed(8)} GALA`);
+      logger.info(`      🌉 Bridge Cost (amort):   ${edge.bridgeCost.toFixed(8)} GALA`);
+      logger.info(`      🛡️  Risk Buffer:           ${edge.riskBuffer.toFixed(8)} GALA`);
+      logger.info(`      ───────────────────────────────────────────`);
+      logger.info(`      💰 Total Cost:            ${edge.totalCost.toFixed(8)} GALA`);
+      if (galaUsdPrice) {
+        const usdValue = edge.totalCost.multipliedBy(galaUsdPrice);
+        logger.info(`                              ≈ $${usdValue.toFixed(2)} USD`);
+      }
+      
+      logger.info(`\n   📊 EDGE ANALYSIS:`);
+      logger.info(`      💰 Gross Edge:            ${grossEdge.toFixed(8)} GALA (${grossEdgeBps.toFixed(2)} bps)`);
+      if (galaUsdPrice) {
+        const usdValue = grossEdge.multipliedBy(galaUsdPrice);
+        logger.info(`                              ≈ $${usdValue.toFixed(2)} USD`);
+      }
+      logger.info(`      💵 Net Edge:              ${edge.netEdge.toFixed(8)} GALA (${edge.netEdgeBps.toFixed(2)} bps)`);
+      if (galaUsdPrice) {
+        const usdValue = edge.netEdge.multipliedBy(galaUsdPrice);
+        logger.info(`                              ≈ $${usdValue.toFixed(2)} USD`);
+      }
+      logger.info(`      📉 Edge Reduction:        ${grossEdge.minus(edge.netEdge).toFixed(8)} GALA (${(grossEdgeBps - edge.netEdgeBps).toFixed(2)} bps)`);
+      logger.info(`      ───────────────────────────────────────────`);
+      logger.info(`      📊 Threshold:             ${minEdgeBps} bps minimum`);
+      logger.info(`      ✅ Meets Threshold:        ${meetsThreshold ? 'YES ✓' : 'NO ✗'}`);
+      logger.info(`      💹 Profitable:             ${isProfitable ? 'YES ✓' : 'NO ✗'}`);
+      
+      logger.info(`\n   📉 PRICE IMPACT ANALYSIS:`);
+      logger.info(`      🔷 GalaChain:             ${edge.galaChainPriceImpactBps.toFixed(2)} bps`);
+      logger.info(`      🔸 Solana:                ${edge.solanaPriceImpactBps.toFixed(2)} bps`);
+      logger.info(`      📊 Total Impact:          ${(edge.galaChainPriceImpactBps + edge.solanaPriceImpactBps).toFixed(2)} bps`);
+      logger.info(`      ⚠️  Max Allowed:           ${tradingConfig.maxPriceImpactBps} bps`);
+      logger.info(`      ✅ Acceptable:             ${impactAcceptable ? 'YES ✓' : 'NO ✗'}`);
+      
+      // Show quote details
+      if (gcQuote.priceImpactBps || solQuote.priceImpactBps) {
+        logger.info(`\n   📋 QUOTE DETAILS:`);
+        if (gcQuote.minOutput) {
+          logger.info(`      🔷 GalaChain Min Output: ${gcQuote.minOutput.toFixed(8)} ${gcQuote.currency}`);
+        }
+        if (solQuote.minOutput) {
+          logger.info(`      🔸 Solana Min Output:    ${solQuote.minOutput.toFixed(8)} ${solQuote.currency}`);
+        }
+        if ((solQuote as any).jupiterRoute) {
+          const route = (solQuote as any).jupiterRoute;
+          logger.info(`      🔸 Solana Route:         ${route.routeId || 'N/A'}`);
+          if (route.steps && route.steps.length > 0) {
+            logger.info(`      🔸 Route Steps:          ${route.steps.length} hop(s)`);
+          }
+        }
+      }
     }
 
     // Log decision

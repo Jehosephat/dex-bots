@@ -43,6 +43,7 @@ export class BalanceChecker {
   private isPaused: boolean = false;
   private pauseReason: string = '';
   private lastBalanceCheckTime: number = 0;
+  private lastBalanceCheckResult: BalanceCheckResult | null = null;
 
   constructor(stateManager?: StateManager, private configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
@@ -69,21 +70,21 @@ export class BalanceChecker {
     forceCheck: boolean = false,
     direction?: ArbitrageDirection // Deprecated, now checks both directions
   ): Promise<BalanceCheckResult> {
-    // If paused, respect cooldown to avoid checking too frequently
+    // Always respect cooldown to avoid checking too frequently (prevents API rate limiting)
     const config = this.configService!.getConfig();
     const cooldownSeconds = (config as any).balanceChecking?.balanceCheckCooldownSeconds || 60;
     const now = Date.now();
     
-    if (this.isPaused && !forceCheck) {
+    if (!forceCheck) {
       const timeSinceLastCheck = (now - this.lastBalanceCheckTime) / 1000;
       if (timeSinceLastCheck < cooldownSeconds) {
         const remainingSeconds = Math.ceil(cooldownSeconds - timeSinceLastCheck);
-        logger.debug(`⏸️ Balance check cooldown: ${remainingSeconds}s remaining (checking once per ${cooldownSeconds}s when paused)`);
-        // Return cached result or a "still paused" result
+        logger.debug(`⏸️ Balance check cooldown: ${remainingSeconds}s remaining (checking once per ${cooldownSeconds}s)`);
+        // Return cached result
         return {
-          canTrade: false,
-          insufficientFunds: [],
-          recommendations: [`Balance check on cooldown (${remainingSeconds}s remaining). Trading remains paused.`]
+          canTrade: this.lastBalanceCheckResult?.canTrade ?? true, // Use cached result if available
+          insufficientFunds: this.lastBalanceCheckResult?.insufficientFunds ?? [],
+          recommendations: [`Balance check on cooldown (${remainingSeconds}s remaining). Using cached result.`]
         };
       }
     }
@@ -187,12 +188,17 @@ export class BalanceChecker {
         }
       }
 
-      return {
+      const result: BalanceCheckResult = {
         canTrade,
         insufficientFunds,
         recommendations,
         checkedBalances
       };
+      
+      // Cache the result for cooldown period
+      this.lastBalanceCheckResult = result;
+      
+      return result;
 
     } catch (error) {
       logger.error('Failed to check balances', {

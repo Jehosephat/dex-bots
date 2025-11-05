@@ -169,7 +169,9 @@ export class StrategyEvaluator {
       // Log strategy being evaluated in a more readable format
       const gcAction = strategy.galaChainSide.operation === 'buy' ? 'BUY' : 'SELL';
       const solAction = strategy.solanaSide.operation === 'buy' ? 'BUY' : 'SELL';
-      logger.debug(`   🔍 ${strategy.name}: ${gcAction} on GC (${strategy.galaChainSide.quoteCurrency}) → ${solAction} on SOL (${strategy.solanaSide.quoteCurrency})`);
+      logger.info(`\n   🔍 Strategy: ${strategy.name}`);
+      logger.info(`      ${gcAction} ${token.symbol} on GalaChain (quote: ${strategy.galaChainSide.quoteCurrency})`);
+      logger.info(`      ${solAction} ${token.symbol} on Solana (quote: ${strategy.solanaSide.quoteCurrency})`);
 
       // Determine reverse flags based on operations
       const gcReverse = strategy.galaChainSide.operation === 'buy';
@@ -213,7 +215,13 @@ export class StrategyEvaluator {
 
       if (!gcQuote || !solQuote) {
         const error = `Missing quote(s) for strategy ${strategy.id} - hasGcQuote: ${!!gcQuote}, hasSolQuote: ${!!solQuote}`;
-        logger.debug(`   ⚠️ ${error}`);
+        logger.info(`      ⚠️ Quote Fetch Failed: ${error}`);
+        if (gcQuote) {
+          logger.info(`      🔷 GalaChain Quote: ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol} (Impact: ${gcQuote.priceImpactBps.toFixed(2)} bps)`);
+        }
+        if (solQuote) {
+          logger.info(`      🔸 Solana Quote: ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol} (Impact: ${solQuote.priceImpactBps.toFixed(2)} bps)`);
+        }
         return {
           strategy,
           tokenSymbol: token.symbol,
@@ -227,7 +235,9 @@ export class StrategyEvaluator {
         };
       }
 
-      logger.debug(`   ✅ Quotes received for strategy ${strategy.id}`);
+      logger.info(`      ✅ Quotes received`);
+      logger.info(`      🔷 GalaChain: ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol} (Impact: ${gcQuote.priceImpactBps.toFixed(2)} bps)`);
+      logger.info(`      🔸 Solana: ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol} (Impact: ${solQuote.priceImpactBps.toFixed(2)} bps)`);
 
       // Convert quote currency to GALA
       const rateConversion = await this.rateConverter.convertQuoteCurrencyToGala(
@@ -238,7 +248,7 @@ export class StrategyEvaluator {
 
       if (!rateConversion || rateConversion.rate.isZero()) {
         const error = `Failed to convert ${solQuote.currency} to GALA for strategy ${strategy.id}`;
-        logger.debug(`   ⚠️ ${error}`);
+        logger.info(`      ⚠️ Rate Conversion Failed: ${error}`);
         return {
           strategy,
           tokenSymbol: token.symbol,
@@ -250,6 +260,11 @@ export class StrategyEvaluator {
           error,
           timestamp: startTime
         };
+      }
+      
+      logger.info(`      🔄 Rate Conversion: ${solQuote.currency}/GALA = ${rateConversion.rate.toFixed(8)}`);
+      if (rateConversion.galaUsdPrice) {
+        logger.info(`      💵 GALA/USD: $${rateConversion.galaUsdPrice.toFixed(4)}`);
       }
 
       // Calculate edge
@@ -317,13 +332,42 @@ export class StrategyEvaluator {
         };
       }
 
-      const edgeDisplay = riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A';
-      const status = riskResult.shouldProceed ? '✅ PASS' : '❌ FAIL';
-      if (riskResult.shouldProceed) {
-        logger.info(`      ${status} - Edge: ${edgeDisplay} bps`);
+      // Log detailed edge calculation results
+      if (riskResult.edge) {
+        const edge = riskResult.edge;
+        const grossEdge = edge.galaChainProceeds.minus(edge.solanaCostGala);
+        const grossEdgeBps = edge.galaChainProceeds.isZero() ? 0 : 
+          grossEdge.div(edge.galaChainProceeds).multipliedBy(10000).toNumber();
+        
+        logger.info(`\n      🧮 Edge Calculation:`);
+        logger.info(`         📥 GalaChain Proceeds: ${edge.galaChainProceeds.toFixed(8)} GALA`);
+        logger.info(`         📤 Solana Cost:        ${edge.solanaCostGala.toFixed(8)} GALA`);
+        logger.info(`         💰 Gross Edge:         ${grossEdge.toFixed(8)} GALA (${grossEdgeBps.toFixed(2)} bps)`);
+        logger.info(`         🌉 Bridge Cost:        ${edge.bridgeCost.toFixed(8)} GALA`);
+        logger.info(`         🛡️ Risk Buffer:         ${edge.riskBuffer.toFixed(8)} GALA`);
+        logger.info(`         💰 Total Cost:          ${edge.totalCost.toFixed(8)} GALA`);
+        logger.info(`         💵 Net Edge:            ${edge.netEdge.toFixed(8)} GALA (${edge.netEdgeBps.toFixed(2)} bps)`);
+        logger.info(`         📉 GC Impact:           ${edge.galaChainPriceImpactBps.toFixed(2)} bps`);
+        logger.info(`         📉 SOL Impact:          ${edge.solanaPriceImpactBps.toFixed(2)} bps`);
+        logger.info(`         📊 Total Impact:        ${(edge.galaChainPriceImpactBps + edge.solanaPriceImpactBps).toFixed(2)} bps`);
+        
+        const status = riskResult.shouldProceed ? '✅ PASS' : '❌ FAIL';
+        logger.info(`         ${status}`);
+        
+        if (!riskResult.shouldProceed && riskResult.reasons && riskResult.reasons.length > 0) {
+          logger.info(`         ⚠️  Reasons:`);
+          riskResult.reasons.forEach((reason: string, i: number) => {
+            logger.info(`            ${i + 1}. ${reason}`);
+          });
+        }
       } else {
-        const reasons = riskResult.reasons?.slice(0, 2).join(', ') || 'See details';
-        logger.debug(`      ${status} - Edge: ${edgeDisplay} bps (${reasons})`);
+        const edgeDisplay = 'N/A';
+        const status = riskResult.shouldProceed ? '✅ PASS' : '❌ FAIL';
+        logger.info(`      ${status} - Edge: ${edgeDisplay}`);
+        if (!riskResult.shouldProceed && riskResult.reasons && riskResult.reasons.length > 0) {
+          const reasons = riskResult.reasons.slice(0, 2).join(', ');
+          logger.info(`      ⚠️  ${reasons}`);
+        }
       }
 
       return {
