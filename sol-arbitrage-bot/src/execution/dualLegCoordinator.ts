@@ -114,9 +114,15 @@ export class DualLegCoordinator {
 
   /**
    * Execute both legs live with simple failure handling.
-   * GC sell and SOL buy are launched near-simultaneously.
+   * Uses quotes from evaluation (with strategy-specific quote currencies).
+   * GC sell and SOL buy are launched sequentially (Solana first).
    */
-  async executeLive(symbol: string, direction: ArbitrageDirection = 'forward'): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
+  async executeLive(
+    symbol: string, 
+    direction: ArbitrageDirection = 'forward',
+    gcQuote?: GalaChainQuote,
+    solQuote?: SolanaQuote
+  ): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
 
@@ -145,29 +151,41 @@ export class DualLegCoordinator {
     await this.gcProvider.initialize();
     await this.solProvider.initialize();
 
-    // Fetch fresh quotes for the configured trade size with error handling
-    const reverse = direction === 'reverse';
-    const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
-      this.errorHandler.executeWithProtection(
-        () => this.gcProvider.getQuote(symbol, token.tradeSize, reverse),
-        'galachain-price-provider',
-        `GC quote for ${symbol} (${direction})`
-      ),
-      this.errorHandler.executeWithProtection(
-        () => this.solProvider.getQuote(symbol, token.tradeSize, reverse),
-        'solana-price-provider',
-        `SOL quote for ${symbol} (${direction})`
-      )
-    ]);
-    if (!gcQuoteGeneric) {
-      throw new ExecutionError('Missing GalaChain quote', { symbol, tradeSize: token.tradeSize }, false);
-    }
-    if (!solQuoteGeneric) {
-      throw new ExecutionError('Missing Solana quote', { symbol, tradeSize: token.tradeSize }, false);
-    }
+    // Use quotes from evaluation if provided (they contain strategy-specific quote currencies)
+    // Otherwise, fall back to fetching fresh quotes (for backward compatibility)
+    let finalGcQuote: GalaChainQuote;
+    let finalSolQuote: SolanaQuote;
+    
+    if (gcQuote && solQuote) {
+      // Use provided quotes from strategy evaluation (correct quote currencies)
+      finalGcQuote = gcQuote;
+      finalSolQuote = solQuote;
+      logger.debug(`Using evaluation quotes: GC=${finalGcQuote.currency}, SOL=${finalSolQuote.currency}`);
+    } else {
+      // Fallback: fetch fresh quotes (for backward compatibility)
+      const reverse = direction === 'reverse';
+      const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
+        this.errorHandler.executeWithProtection(
+          () => this.gcProvider.getQuote(symbol, token.tradeSize, reverse),
+          'galachain-price-provider',
+          `GC quote for ${symbol} (${direction})`
+        ),
+        this.errorHandler.executeWithProtection(
+          () => this.solProvider.getQuote(symbol, token.tradeSize, reverse),
+          'solana-price-provider',
+          `SOL quote for ${symbol} (${direction})`
+        )
+      ]);
+      if (!gcQuoteGeneric) {
+        throw new ExecutionError('Missing GalaChain quote', { symbol, tradeSize: token.tradeSize }, false);
+      }
+      if (!solQuoteGeneric) {
+        throw new ExecutionError('Missing Solana quote', { symbol, tradeSize: token.tradeSize }, false);
+      }
 
-    const gcQuote = gcQuoteGeneric as GalaChainQuote;
-    const solQuote = solQuoteGeneric as SolanaQuote;
+      finalGcQuote = gcQuoteGeneric as GalaChainQuote;
+      finalSolQuote = solQuoteGeneric as SolanaQuote;
+    }
 
     // Notional cap per trade (USD)
     const capStr = process.env.MAX_NOTIONAL_PER_TRADE;
@@ -175,11 +193,11 @@ export class DualLegCoordinator {
       const cap = Number(capStr);
       if (!Number.isNaN(cap) && cap > 0) {
         let notionalUsd = 0;
-        if (solQuote.currency === 'USDC') {
-          notionalUsd = solQuote.price.multipliedBy(token.tradeSize).toNumber();
-        } else if (solQuote.currency === 'SOL') {
+        if (finalSolQuote.currency === 'USDC') {
+          notionalUsd = finalSolQuote.price.multipliedBy(token.tradeSize).toNumber();
+        } else if (finalSolQuote.currency === 'SOL') {
           const solUsd = this.solProvider.getSOLUSDPrice();
-          const costSol = solQuote.price.multipliedBy(token.tradeSize).toNumber();
+          const costSol = finalSolQuote.price.multipliedBy(token.tradeSize).toNumber();
           notionalUsd = costSol * solUsd;
         }
         if (notionalUsd > cap) {
@@ -204,10 +222,10 @@ export class DualLegCoordinator {
         () => {
           if (direction === 'reverse') {
             // Reverse: SELL on Solana
-            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, solQuote);
+            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, finalSolQuote);
           } else {
             // Forward: BUY on Solana
-            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, solQuote);
+            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalSolQuote);
           }
         },
         'solana-executor',
@@ -221,7 +239,7 @@ export class DualLegCoordinator {
         params: {
           symbol,
           tradeSize: token.tradeSize,
-          quoteCurrency: solQuote.currency,
+          quoteCurrency: finalSolQuote.currency,
           expectedCostInQuote: new BigNumber(0),
           maxCostInQuote: new BigNumber(0),
           deadlineMs: Date.now() + 60_000
@@ -267,10 +285,10 @@ export class DualLegCoordinator {
         () => {
           if (direction === 'reverse') {
             // Reverse: BUY on GalaChain
-            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, gcQuote);
+            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, finalGcQuote);
           } else {
             // Forward: SELL on GalaChain
-            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote);
+            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalGcQuote);
           }
         },
         'galachain-executor',

@@ -116,10 +116,12 @@ export class SolanaExecutor {
       this.wallet = Keypair.fromSecretKey(secret);
 
       // Determine mints and decimals
+      // IMPORTANT: Use quote.currency from the quote (which respects strategy overrides), not tokenCfg.solQuoteVia
       const tokenCfg = getTokenConfig(symbol);
       if (!tokenCfg?.solanaMint) throw new Error(`No Solana mint for token ${symbol}`);
-      const quoteCfg = getQuoteTokenConfig(tokenCfg.solQuoteVia);
-      if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${tokenCfg.solQuoteVia}`);
+      const quoteCurrency = quote.currency || tokenCfg.solQuoteVia || 'SOL';
+      const quoteCfg = getQuoteTokenConfig(quoteCurrency);
+      if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${quoteCurrency}`);
 
       const inputMint = quote.jupiterRoute?.inputMint || quoteCfg.solanaMint; // quote currency
       const outputMint = quote.jupiterRoute?.outputMint || tokenCfg.solanaMint; // target token
@@ -221,10 +223,12 @@ export class SolanaExecutor {
       this.wallet = Keypair.fromSecretKey(secret);
 
       // Determine mints
+      // IMPORTANT: Use quote.currency from the quote (which respects strategy overrides), not tokenCfg.solQuoteVia
       const tokenCfg = getTokenConfig(symbol);
       if (!tokenCfg?.solanaMint) throw new Error(`No Solana mint for token ${symbol}`);
-      const quoteCfg = getQuoteTokenConfig(tokenCfg.solQuoteVia);
-      if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${tokenCfg.solQuoteVia}`);
+      const quoteCurrency = quote.currency || tokenCfg.solQuoteVia || 'SOL';
+      const quoteCfg = getQuoteTokenConfig(quoteCurrency);
+      if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${quoteCurrency}`);
 
       // REVERSE: inputMint = token, outputMint = quote currency
       const inputMint = tokenCfg.solanaMint; // token

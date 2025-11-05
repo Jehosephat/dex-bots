@@ -127,7 +127,8 @@ export class TradeExecutor {
         logger.info(`   Direction: 🔷 SELL on GalaChain → 🔸 BUY on Solana (FORWARD)`);
       }
 
-      const { gc, sol } = await this.coordinator.executeLive(token.symbol, direction);
+      // Pass quotes from evaluation to coordinator (they contain strategy-specific quote currencies)
+      const { gc, sol } = await this.coordinator.executeLive(token.symbol, direction, gcQuote, solQuote);
       const endTime = Date.now();
       const executionDurationMs = endTime - startTime;
 
