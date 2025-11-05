@@ -80,12 +80,23 @@ export class TokenEvaluator {
       const directionConfig = this.configService.getDirectionConfig();
 
       // Evaluate forward direction (always)
+      logger.info(`   📈 Evaluating FORWARD direction...`);
       const forwardEvaluation = await this.evaluateDirection(token, 'forward');
 
       // Evaluate reverse direction (if enabled)
       let reverseEvaluation: TokenEvaluationResult | null = null;
       if (directionConfig.reverse.enabled) {
+        logger.info(`   📉 Evaluating REVERSE direction...`);
         reverseEvaluation = await this.evaluateDirection(token, 'reverse');
+      } else {
+        logger.info(`   ⏭️  REVERSE direction disabled in config`);
+      }
+
+      // Log both evaluations before selecting
+      if (reverseEvaluation) {
+        logger.info(`\n   📊 Direction Comparison:`);
+        logger.info(`      FORWARD: ${forwardEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${forwardEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
+        logger.info(`      REVERSE: ${reverseEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${reverseEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
       }
 
       // Select best direction based on configuration
@@ -94,6 +105,16 @@ export class TokenEvaluator {
         reverseEvaluation,
         directionConfig
       );
+
+      if (reverseEvaluation && selectedEvaluation.direction !== forwardEvaluation.direction) {
+        logger.info(`   ✅ Selected REVERSE direction (better edge)`);
+      } else if (reverseEvaluation) {
+        logger.info(`   ✅ Selected FORWARD direction`);
+      }
+
+      // Store both evaluations for logging purposes
+      (selectedEvaluation as any).forwardEvaluation = forwardEvaluation;
+      (selectedEvaluation as any).reverseEvaluation = reverseEvaluation;
 
       return selectedEvaluation;
     } catch (error) {
@@ -129,7 +150,7 @@ export class TokenEvaluator {
     const directionLabel = DirectionUtils.getLabel(direction);
 
     try {
-      logger.debug(`   Evaluating ${directionLabel} direction for ${token.symbol}`);
+      logger.info(`   🔍 Fetching quotes for ${directionLabel} direction...`);
 
       // Fetch quotes for the specified direction
       const [gcQuote, solQuote] = await Promise.all([
@@ -140,7 +161,7 @@ export class TokenEvaluator {
       // Check if we have both quotes
       if (!gcQuote || !solQuote) {
         const error = `Missing quote(s) for ${directionLabel} - hasGcQuote: ${!!gcQuote}, hasSolQuote: ${!!solQuote}`;
-        logger.debug(`   ⚠️ ${error}`);
+        logger.warn(`   ⚠️ ${error}`);
         return {
           token,
           direction,
@@ -152,6 +173,8 @@ export class TokenEvaluator {
           error
         };
       }
+      
+      logger.info(`   ✅ Quotes received for ${directionLabel} direction`);
 
       const galaQuote = gcQuote as GalaChainQuote;
       const solQuoteResult = solQuote as SolanaQuote;
@@ -165,7 +188,7 @@ export class TokenEvaluator {
 
       if (!rateConversion || rateConversion.rate.isZero() || rateConversion.rate.isNaN()) {
         const error = `Invalid conversion rate for ${directionLabel}`;
-        logger.debug(`   ⚠️ ${error}`);
+        logger.warn(`   ⚠️ ${error}`);
         return {
           token,
           direction,
@@ -179,6 +202,7 @@ export class TokenEvaluator {
       }
 
       // Evaluate risk (direction-aware)
+      logger.info(`   🧮 Evaluating risk for ${directionLabel} direction...`);
       let riskResult;
       try {
         // Use direction-aware risk evaluation if available, otherwise fallback
@@ -201,6 +225,8 @@ export class TokenEvaluator {
             rateConversion.galaUsdPrice
           );
         }
+        
+        logger.info(`   ${riskResult.shouldProceed ? '✅' : '❌'} Risk evaluation ${directionLabel}: ${riskResult.shouldProceed ? 'PASS' : 'FAIL'} (Edge: ${riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
       } catch (evalError) {
         logger.error(`❌ ERROR in risk.evaluate() for ${token.symbol} (${directionLabel})`, {
           error: evalError instanceof Error ? evalError.message : String(evalError)
@@ -290,14 +316,39 @@ export class TokenEvaluator {
 
   /**
    * Log evaluation results
+   * Logs both forward and reverse results if both were evaluated
    */
   logEvaluationResults(result: TokenEvaluationResult): void {
-    if (!result.success || !result.gcQuote || !result.solQuote) {
+    const tradingConfig = this.configService.getTradingConfig();
+    
+    // Get both evaluations if available
+    const forwardEvaluation = (result as any).forwardEvaluation as TokenEvaluationResult | undefined;
+    const reverseEvaluation = (result as any).reverseEvaluation as TokenEvaluationResult | undefined;
+    
+    // Log forward evaluation if we have it
+    if (forwardEvaluation && forwardEvaluation.success && forwardEvaluation.gcQuote && forwardEvaluation.solQuote) {
+      this.logDirectionResults(forwardEvaluation, tradingConfig);
+    }
+    
+    // Log reverse evaluation if we have it (always show it for comparison)
+    if (reverseEvaluation && reverseEvaluation.success && reverseEvaluation.gcQuote && reverseEvaluation.solQuote) {
+      logger.info(`\n${'━'.repeat(60)}`);
+      logger.info(`📊 REVERSE Evaluation Results:`);
+      this.logDirectionResults(reverseEvaluation, tradingConfig);
+    }
+  }
+  
+  /**
+   * Log results for a specific direction
+   */
+  private logDirectionResults(result: TokenEvaluationResult, tradingConfig: any): void {
+    const { token, gcQuote, solQuote, direction } = result;
+    
+    if (!gcQuote || !solQuote) {
+      logger.warn(`   ⚠️ Cannot log ${direction} results - missing quotes`);
       return;
     }
-
-    const { token, gcQuote, solQuote, direction } = result;
-    const tradingConfig = this.configService.getTradingConfig();
+    
     const directionLabel = DirectionUtils.getLabel(direction);
     const isReverse = direction === 'reverse';
 

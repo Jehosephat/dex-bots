@@ -62,11 +62,6 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   }
 
   async getQuote(symbol: string, amount: number, reverse: boolean = false): Promise<PriceQuote | null> {
-    // Simplified: Only support forward quotes (selling token to get GALA)
-    if (reverse) {
-      logger.debug(`⚠️ Reverse quotes not supported, skipping reverse quote for ${symbol}`);
-      return null;
-    }
     try {
       if (!this.isReady()) {
         throw new Error('Provider not ready');
@@ -89,9 +84,26 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       }
 
       // Determine quote direction:
-      // If gcQuoteVia is GALA: we're selling GALA to buy token (reverse quote)
-      // Otherwise: we're selling token to get quote currency (forward quote)
-      const shouldReverse = quoteVia === 'GALA';
+      // For REVERSE arbitrage (reverse=true): We want to BUY token with GALA (spend GALA, get token)
+      // For FORWARD arbitrage (reverse=false): 
+      //   - If gcQuoteVia is GALA: we're selling GALA to buy token (reverse quote)
+      //   - Otherwise: we're selling token to get quote currency (forward quote)
+      // 
+      // When reverse=true, we always want to buy token with GALA, so shouldReverse=true
+      // When reverse=false, use the existing logic based on quoteVia
+      const shouldReverse = reverse ? true : (quoteVia === 'GALA');
+
+      logger.info(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
+        tokenSymbol: symbol,
+        quoteVia,
+        token0: quoteVia === 'GALA' ? 'GALA' : symbol,
+        token1: quoteVia === 'GALA' ? symbol : quoteVia,
+        desiredTokens: reverse ? amount : (quoteVia === 'GALA' ? 'N/A' : amount),
+        estimatedGalaInput: reverse ? 'N/A' : (quoteVia === 'GALA' ? amount : 'N/A'),
+        reverseZeroForOne: shouldReverse,
+        sellingToken: shouldReverse ? 'token0 (GALA)' : (quoteVia === 'GALA' ? 'token1 (token)' : 'token0 (token)'),
+        receivingToken: shouldReverse ? 'token1 (token)' : (quoteVia === 'GALA' ? 'token0 (GALA)' : 'token1 (quote)')
+      });
 
       // Get the quote - pass amount directly (e.g., 0.01 SOL or 1500 MEW)
       const quote = await this.getLocalQuote(
@@ -99,7 +111,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         quoteVia,
         new BigNumber(amount),
         DexFeePercentageTypes.FEE_1_PERCENT,
-        shouldReverse // Reverse if we're selling GALA to buy token
+        shouldReverse // Reverse if we're selling GALA to buy token (or if reverse arbitrage)
       );
 
       if (!quote) {
@@ -112,11 +124,13 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       // Price calculation depends on direction:
       let price: BigNumber;
       if (shouldReverse) {
-        // Selling GALA to buy token: outputAmount is GALA cost, amount is tokens received
+        // REVERSE: Buying token with GALA (spend GALA, get token)
+        // outputAmount is GALA cost, amount is tokens received
         // Price = outputAmount (GALA cost) / amount (tokens received) = GALA per token
         price = outputAmount.div(amount);
       } else {
-        // Selling token to get quote currency: outputAmount is quote currency received, amount is tokens sold
+        // FORWARD: Selling token to get quote currency
+        // outputAmount is quote currency received, amount is tokens sold
         // Price = outputAmount (quote currency received) / amount (tokens sold) = quote currency per token
         price = outputAmount.div(amount);
       }
@@ -125,7 +139,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       // Price impact calculation depends on direction:
       let priceImpactBps: number;
       if (shouldReverse) {
-        // Buying token with GALA: calculate impact from spot price
+        // REVERSE: Buying token with GALA - calculate impact from spot price
         // Spot price is for selling token (GALA per token), we're buying at effective price
         if (!spotPrice.isZero()) {
           // Calculate impact: (effectivePrice - spotPrice) / spotPrice
@@ -135,7 +149,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
           priceImpactBps = 0;
         }
       } else {
-        // Selling token: amount is tokens sold, outputAmount is quote currency received
+        // FORWARD: Selling token - amount is tokens sold, outputAmount is quote currency received
         priceImpactBps = calculatePriceImpactBps(new BigNumber(amount), outputAmount, spotPrice);
       }
 
