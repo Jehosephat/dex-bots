@@ -11,7 +11,7 @@ import {
   SolanaQuote
 } from '../types/core';
 import { TokenConfig } from '../types/config';
-import { getTradingConfig, getBridgingConfig } from '../config';
+import { IConfigService } from '../config';
 import logger from '../utils/logger';
 import { 
   calculateNetEdge, 
@@ -26,10 +26,10 @@ export class ReverseEdgeCalculator {
   private tradingConfig: any;
   private bridgingConfig: any;
   
-  constructor() {
+  constructor(private configService: IConfigService) {
     try {
-      this.tradingConfig = getTradingConfig();
-      this.bridgingConfig = getBridgingConfig();
+      this.tradingConfig = configService.getTradingConfig();
+      this.bridgingConfig = configService.getBridgingConfig();
     } catch (configError) {
       logger.error(`❌ ERROR getting config in ReverseEdgeCalculator constructor`, {
         error: configError instanceof Error ? configError.message : String(configError)

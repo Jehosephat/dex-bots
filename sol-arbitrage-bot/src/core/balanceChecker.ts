@@ -11,6 +11,7 @@ import { GalaConnectClient } from '../bridging/galaConnectClient';
 import { resolveGalaEndpoints } from '../bridging/galaEndpoints';
 import { IConfigService } from '../config';
 import { StateManager } from './stateManager';
+import { ArbitrageDirection } from '../types/direction';
 import logger from '../utils/logger';
 import { sendAlert } from '../utils/alerts';
 import { GalaChainPriceProvider } from './priceProviders/galachain';
@@ -52,11 +53,22 @@ export class BalanceChecker {
   }
 
   /**
-   * Check if we have sufficient balances for trading
+   * Check if we have sufficient balances for trading (BOTH directions)
+   * Since we support bidirectional arbitrage, we check all required balances:
+   * - Forward: Token on GC (to sell), SOL/USDC on SOL (to buy)
+   * - Reverse: GALA on GC (to buy), Token on SOL (to sell)
    * Uses price providers to get accurate cost estimates
    * Respects cooldown when paused to avoid excessive API calls
+   * 
+   * @param usePriceQuotes - Whether to use price quotes for accurate cost estimation
+   * @param forceCheck - Force check even if paused
+   * @param direction - DEPRECATED: Now checks both directions. Kept for backward compatibility.
    */
-  async checkBalances(usePriceQuotes: boolean = true, forceCheck: boolean = false): Promise<BalanceCheckResult> {
+  async checkBalances(
+    usePriceQuotes: boolean = true, 
+    forceCheck: boolean = false,
+    direction?: ArbitrageDirection // Deprecated, now checks both directions
+  ): Promise<BalanceCheckResult> {
     // If paused, respect cooldown to avoid checking too frequently
     const config = this.configService!.getConfig();
     const cooldownSeconds = (config as any).balanceChecking?.balanceCheckCooldownSeconds || 60;
@@ -111,11 +123,31 @@ export class BalanceChecker {
         }
       }
       
-      // Check GalaChain balances
-      await this.checkGalaChainBalances(enabledTokens, insufficientFunds, recommendations, gcProvider);
+      // Check balances for BOTH directions since we support bidirectional arbitrage
+      // This ensures we can trade in either direction when opportunities arise
+      // We check all required balances regardless of current direction preference
       
-      // Check Solana balances
-      await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider);
+      // FORWARD balances needed:
+      // - Token inventory on GalaChain (to sell tokens)
+      // - GALA on GalaChain (if gcQuoteVia is GALA, to buy tokens)
+      // - SOL/USDC on Solana (to buy tokens)
+      
+      // REVERSE balances needed:
+      // - GALA on GalaChain (to buy tokens)
+      // - Token inventory on Solana (to sell tokens)
+      
+      // Check all token balances on both chains
+      await this.checkGalaChainBalances(enabledTokens, insufficientFunds, recommendations, gcProvider, checkedBalances.galaChain, 'forward');
+      await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'forward');
+      
+      // Also check reverse-specific balances
+      const tradingConfig = this.configService!.getTradingConfig();
+      const enableReverse = tradingConfig.enableReverseArbitrage || false;
+      if (enableReverse) {
+        // Check reverse balances (GALA on GC for buying, tokens on SOL for selling)
+        await this.checkGalaChainBalances(enabledTokens, insufficientFunds, recommendations, gcProvider, checkedBalances.galaChain, 'reverse');
+        await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'reverse');
+      }
       
       // Determine if we can trade
       const canTrade = insufficientFunds.length === 0;
@@ -189,7 +221,8 @@ export class BalanceChecker {
     insufficientFunds: InsufficientFund[],
     recommendations: string[],
     priceProvider?: GalaChainPriceProvider | null,
-    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>,
+    direction: ArbitrageDirection = 'forward'
   ): Promise<void> {
     try {
       const owner = process.env.GALACHAIN_WALLET_ADDRESS;
@@ -263,13 +296,105 @@ export class BalanceChecker {
           }
         });
 
-        // For forward trades: determine what we need based on quote currency
-        // If gcQuoteVia is GALA: we're selling GALA to buy token (need GALA, not token inventory)
-        // Otherwise: we're selling token to get quote currency (need token inventory)
+        // Determine what we need based on direction and quote currency
         const quoteVia = token.gcQuoteVia || 'GALA';
         
-        if (quoteVia === 'GALA') {
-          // Forward: Selling GALA to buy token - need GALA balance
+        // ALWAYS check token balance on GalaChain (needed for forward trades - selling tokens)
+        // This is required regardless of direction since we support both
+        const requiredForSell = new BigNumber(token.tradeSize || 0);
+        const sufficientToken = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
+        
+        // Track token balance check (always, for visibility)
+        if (checkedBalances) {
+          // Check if we already have this token in the list (avoid duplicates)
+          const existingIndex = checkedBalances.findIndex(b => b.token === token.symbol);
+          if (existingIndex >= 0) {
+            // Update existing entry if this check is more restrictive
+            if (checkedBalances[existingIndex].required.isLessThan(requiredForSell)) {
+              checkedBalances[existingIndex].required = requiredForSell;
+              checkedBalances[existingIndex].sufficient = sufficientToken;
+            }
+          } else {
+            checkedBalances.push({
+              token: token.symbol,
+              current: tokenBalance,
+              required: requiredForSell,
+              purpose: 'sell',
+              sufficient: sufficientToken
+            });
+          }
+        }
+        
+        // Only add to insufficient funds for forward direction (since reverse doesn't need token on GC)
+        if (direction === 'forward' && !sufficientToken && quoteVia !== 'GALA') {
+          insufficientFunds.push({
+            chain: 'galaChain',
+            token: token.symbol,
+            currentBalance: tokenBalance,
+            requiredBalance: requiredForSell,
+            purpose: 'sell'
+          });
+        }
+        
+        if (direction === 'reverse') {
+          // REVERSE: Always need GALA on GC (to buy token)
+          // Check GALA balance on GC
+          const galaQuoteToken = this.configService!.getQuoteTokenBySymbol('GALA');
+          if (galaQuoteToken) {
+            const galaKey = galaQuoteToken.galaChainMint;
+            const galaBalance = balanceMap.get(galaKey) || new BigNumber(0);
+            
+            // Estimate GALA needed to buy tradeSize tokens
+            let requiredGala: BigNumber;
+            if (priceProvider) {
+              try {
+                const quote = await priceProvider.getQuote(token.symbol, token.tradeSize || 0, true);
+                if (quote && quote.price && !quote.price.isZero()) {
+                  requiredGala = quote.price.multipliedBy(token.tradeSize || 0);
+                  requiredGala = requiredGala.multipliedBy(1.1); // 10% buffer
+                } else {
+                  requiredGala = new BigNumber(token.tradeSize || 0);
+                }
+              } catch {
+                requiredGala = new BigNumber(token.tradeSize || 0);
+              }
+            } else {
+              requiredGala = new BigNumber(token.tradeSize || 0);
+            }
+            
+            const sufficient = galaBalance.isGreaterThanOrEqualTo(requiredGala);
+            
+            // Check if GALA already in checkedBalances (avoid duplicates)
+            if (checkedBalances) {
+              const galaIndex = checkedBalances.findIndex(b => b.token === 'GALA');
+              if (galaIndex >= 0) {
+                if (checkedBalances[galaIndex].required.isLessThan(requiredGala)) {
+                  checkedBalances[galaIndex].required = requiredGala;
+                  checkedBalances[galaIndex].sufficient = sufficient;
+                }
+              } else {
+                checkedBalances.push({
+                  token: 'GALA',
+                  current: galaBalance,
+                  required: requiredGala,
+                  purpose: 'buy',
+                  sufficient
+                });
+              }
+            }
+            
+            if (!sufficient) {
+              insufficientFunds.push({
+                chain: 'galaChain',
+                token: 'GALA',
+                currentBalance: galaBalance,
+                requiredBalance: requiredGala,
+                purpose: 'buy'
+              });
+            }
+          }
+        } else if (quoteVia === 'GALA') {
+          // FORWARD: Selling GALA to buy token - need GALA balance
           const galaQuoteToken = this.configService!.getQuoteTokenBySymbol('GALA');
           if (galaQuoteToken) {
             const galaKey = galaQuoteToken.galaChainMint;
@@ -321,31 +446,6 @@ export class BalanceChecker {
                 purpose: 'buy'
               });
             }
-          }
-        } else {
-          // Forward: Selling token to get quote currency - need token inventory
-          const requiredForSell = new BigNumber(token.tradeSize || 0);
-          const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
-          
-          // Track this check
-          if (checkedBalances) {
-            checkedBalances.push({
-              token: token.symbol,
-              current: tokenBalance,
-              required: requiredForSell,
-              purpose: 'sell',
-              sufficient
-            });
-          }
-          
-          if (!sufficient) {
-            insufficientFunds.push({
-              chain: 'galaChain',
-              token: token.symbol,
-              currentBalance: tokenBalance,
-              requiredBalance: requiredForSell,
-              purpose: 'sell'
-            });
           }
         }
       }
@@ -406,7 +506,8 @@ export class BalanceChecker {
     insufficientFunds: InsufficientFund[],
     recommendations: string[],
     priceProvider?: SolanaPriceProvider | null,
-    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>,
+    direction: ArbitrageDirection = 'forward'
   ): Promise<void> {
     const config = this.configService!.getConfig();
     
@@ -509,16 +610,18 @@ export class BalanceChecker {
         
         // Determine quote currency (USDC or SOL)
         const quoteVia = token.solQuoteVia || 'SOL'; // Default to SOL instead of USDC
-        const quoteToken = this.configService!.getQuoteTokenBySymbol(quoteVia);
         
+        // Skip SOL quote currency check here - we'll handle it separately below to avoid duplicates
+        // SOL is native token, doesn't need solanaMint check
+        if (quoteVia === 'SOL') {
+          continue; // Will be checked in the consolidated SOL check below
+        }
+        
+        // For non-SOL quote tokens, check if configured
+        const quoteToken = this.configService!.getQuoteTokenBySymbol(quoteVia);
         if (!quoteToken || !quoteToken.solanaMint) {
           recommendations.push(`Quote token ${quoteVia} not configured for Solana`);
           continue;
-        }
-
-        // Skip SOL quote currency check here - we'll handle it separately below to avoid duplicates
-        if (quoteVia === 'SOL') {
-          continue; // Will be checked in the consolidated SOL check below
         }
 
         // Only check quote currencies that are actually being used by enabled tokens
@@ -535,15 +638,24 @@ export class BalanceChecker {
         }
 
         // For USDC and other quote currencies: need quote currency to BUY tokens
-        const quoteBalance = balanceMap.get(quoteToken.solanaMint) || new BigNumber(0);
+        // SOL is native token, others are SPL tokens
+        let quoteBalance: BigNumber;
+        if (quoteVia === 'SOL') {
+          // SOL is native - use native balance
+          quoteBalance = balanceMap.get('SOL') || new BigNumber(0);
+        } else {
+          // SPL tokens - lookup by mint address
+          quoteBalance = balanceMap.get(quoteToken.solanaMint) || new BigNumber(0);
+        }
         
         // Try to get accurate price quote, otherwise use conservative estimate
         let requiredInQuoteCurrency: BigNumber;
         
         if (priceProvider) {
           try {
-            // Get quote to determine actual cost
-            const quote = await priceProvider.getQuote(token.symbol, token.tradeSize || 0, false);
+            // Get quote to determine actual cost (use reverse for reverse direction)
+            const reverse = direction === 'reverse';
+            const quote = await priceProvider.getQuote(token.symbol, token.tradeSize || 0, reverse);
             if (quote && quote.price && !quote.price.isZero()) {
               // cost = price * tradeSize
               requiredInQuoteCurrency = quote.price.multipliedBy(token.tradeSize || 0);
@@ -594,17 +706,57 @@ export class BalanceChecker {
           }
         }
 
-        // For reverse trades: need token inventory on Solana to SELL
-        // Check if we have the token on Solana
-        if (token.solanaMint) {
-          const tokenBalance = balanceMap.get(token.solanaMint) || new BigNumber(0);
-          const requiredForSell = new BigNumber(token.tradeSize || 0);
-          
-          // Note: We don't fail here for reverse trades since forward is primary
-          // But we can note it in recommendations
-          if (tokenBalance.isLessThan(requiredForSell)) {
-            recommendations.push(`Low ${token.symbol} balance on Solana for reverse trades: ${tokenBalance.toFixed(4)}`);
+        // ALWAYS check token balance on Solana (needed for reverse trades - selling tokens)
+        // This is required regardless of direction since we support both
+        // Special handling: SOL is native token, not SPL
+        let tokenBalance: BigNumber;
+        if (token.symbol === 'SOL') {
+          // SOL is native token - use native SOL balance
+          tokenBalance = balanceMap.get('SOL') || new BigNumber(0);
+        } else if (token.solanaMint) {
+          // For SPL tokens, lookup by mint address
+          tokenBalance = balanceMap.get(token.solanaMint) || new BigNumber(0);
+        } else {
+          // No mint address configured - skip this token
+          continue;
+        }
+        
+        const requiredForSell = new BigNumber(token.tradeSize || 0);
+        const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
+        
+        // Track this check (always, for visibility)
+        if (checkedBalances) {
+          // Check if we already have this token in the list (avoid duplicates)
+          const existingIndex = checkedBalances.findIndex(b => b.token === token.symbol);
+          if (existingIndex >= 0) {
+            // Update existing entry if this check is more restrictive
+            if (checkedBalances[existingIndex].required.isLessThan(requiredForSell)) {
+              checkedBalances[existingIndex].required = requiredForSell;
+              checkedBalances[existingIndex].sufficient = sufficient;
+            }
+          } else {
+            checkedBalances.push({
+              token: token.symbol,
+              current: tokenBalance,
+              required: requiredForSell,
+              purpose: 'sell',
+              sufficient
+            });
           }
+        }
+        
+        // Only add to insufficient funds for reverse direction (since forward doesn't need token on SOL)
+        if (direction === 'reverse' && !sufficient) {
+          insufficientFunds.push({
+            chain: 'solana',
+            token: token.symbol,
+            currentBalance: tokenBalance,
+            requiredBalance: requiredForSell,
+            purpose: 'sell'
+          });
+        } else if (direction === 'forward' && !sufficient) {
+          // For forward, note in recommendations (not blocking)
+          recommendations.push(`Low ${token.symbol} balance on Solana for reverse trades: ${tokenBalance.toFixed(4)}`);
         }
       }
 

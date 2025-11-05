@@ -139,4 +139,83 @@ export class GalaChainExecutor {
       return { success: false, params, error: message };
     }
   }
+
+  /**
+   * Execute a live GALA→token buy using the GSwap SDK.
+   * REVERSE: Spend GALA to buy token
+   */
+  async executeBuyFromQuoteLive(
+    symbol: string,
+    tradeSize: number,
+    quote: GalaChainQuote
+  ): Promise<GalaChainExecutionResult> {
+    const tokenCfg = getTokenConfig(symbol);
+    const params: GalaChainExecutionParams = {
+      symbol,
+      tradeSize,
+      expectedProceedsGala: new BigNumber(0), // For reverse, this is the cost
+      minProceedsGala: new BigNumber(0),
+      deadlineMs: Date.now() + this.defaultDeadlineSeconds * 1000
+    };
+
+    try {
+      const priv = process.env.GALACHAIN_PRIVATE_KEY;
+      const wallet = process.env.GALACHAIN_WALLET_ADDRESS;
+      if (!priv || !wallet) {
+        throw new Error('GALACHAIN_PRIVATE_KEY and GALACHAIN_WALLET_ADDRESS are required');
+      }
+      if (!tokenCfg?.galaChainMint) throw new Error(`No GalaChain mint for ${symbol}`);
+
+      if (!this.gswap) {
+        const signer = new PrivateKeySigner(priv);
+        this.gswap = new GSwap({ signer });
+      }
+
+      // REVERSE: tokenIn = GALA, tokenOut = token
+      const tokenIn = 'GALA|Unit|none|none';
+      const tokenOut = tokenCfg.galaChainMint;
+
+      // Calculate GALA cost from quote (quote.price is GALA per token)
+      const galaCost = quote.price.multipliedBy(tradeSize);
+      
+      // Get fresh quote for buying (spending GALA to get token)
+      const q = await this.gswap.quoting.quoteExactInput(
+        tokenIn,
+        tokenOut,
+        galaCost.toNumber()
+      );
+      
+      const expectedTokens = new BigNumber(q.outTokenAmount.toString());
+      const minTokens = expectedTokens.multipliedBy(1 - this.maxSlippageBps / 10000);
+
+      // Update params (for reverse, expectedProceedsGala is actually the cost)
+      params.expectedProceedsGala = galaCost;
+      params.minProceedsGala = galaCost.multipliedBy(1 + this.maxSlippageBps / 10000); // Max cost
+      params.feeTier = q.feeTier;
+
+      // Execute swap: spend GALA, get token
+      const result = await this.gswap.swaps.swap(
+        tokenIn,
+        tokenOut,
+        q.feeTier,
+        {
+          exactIn: galaCost.toNumber(),
+          amountOutMinimum: minTokens.toNumber()
+        },
+        wallet
+      );
+
+      logger.execution('✅ GalaChain buy executed (REVERSE)', { 
+        symbol, 
+        transactionId: result.transactionId,
+        galaCost: galaCost.toString(),
+        tokensReceived: expectedTokens.toString()
+      });
+      return { success: true, params, txHash: result.transactionId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('❌ GalaChain buy execution failed (REVERSE)', { symbol, error: message });
+      return { success: false, params, error: message };
+    }
+  }
 }

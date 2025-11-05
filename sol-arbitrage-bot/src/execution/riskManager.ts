@@ -1,9 +1,11 @@
 import BigNumber from 'bignumber.js';
 import { IConfigService } from '../config';
 import { EdgeCalculator, EdgeCalculationResult } from '../core/edgeCalculator';
+import { ReverseEdgeCalculator } from '../core/reverseEdgeCalculator';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { TokenConfig } from '../types/config';
 import { StateManager } from '../core/stateManager';
+import { ArbitrageDirection } from '../types/direction';
 import logger from '../utils/logger';
 
 export interface RiskCheckResult {
@@ -16,13 +18,17 @@ export class RiskManager {
   private trading: any;
   private stateManager: StateManager;
   private edgeCalculator: EdgeCalculator;
+  private reverseEdgeCalculator: ReverseEdgeCalculator;
+  private configService: IConfigService;
 
   constructor(stateManager?: StateManager, configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
     // Use provided config service or create default one
     const config = configService || (require('../config').createConfigService());
+    this.configService = config;
     this.trading = config.getTradingConfig();
     this.edgeCalculator = new EdgeCalculator(config);
+    this.reverseEdgeCalculator = new ReverseEdgeCalculator(config);
   }
 
   /**
@@ -139,6 +145,158 @@ export class RiskManager {
 
     logger.execution(`Risk evaluation for ${token.symbol}: ${shouldProceed ? 'PASS' : 'FAIL'}`, {
       token: token.symbol,
+      reasons,
+      netEdge: edge.netEdge.toString(),
+      netEdgeBps: edge.netEdgeBps
+    });
+
+    return { shouldProceed, reasons, edge };
+  }
+
+  /**
+   * Evaluate whether a trade should proceed for a specific direction
+   */
+  evaluateDirection(
+    token: TokenConfig,
+    galaChainQuote: GalaChainQuote,
+    solanaQuote: SolanaQuote,
+    solToGalaRate: BigNumber,
+    direction: ArbitrageDirection,
+    galaUsdPrice?: number
+  ): RiskCheckResult {
+    // Use appropriate edge calculator based on direction
+    const edgeCalculator = direction === 'reverse' 
+      ? this.reverseEdgeCalculator 
+      : this.edgeCalculator;
+    
+    const reasons: string[] = [];
+
+    // 1) Price impact guardrails
+    if (Math.abs(galaChainQuote.priceImpactBps) > this.trading.maxPriceImpactBps) {
+      reasons.push(`GalaChain price impact too high: ${galaChainQuote.priceImpactBps}bps > ${this.trading.maxPriceImpactBps}bps`);
+    }
+    if (Math.abs(solanaQuote.priceImpactBps) > this.trading.maxPriceImpactBps) {
+      reasons.push(`Solana price impact too high: ${solanaQuote.priceImpactBps}bps > ${this.trading.maxPriceImpactBps}bps`);
+    }
+
+    // 2) Cooldown check
+    if (this.stateManager.isTokenInCooldown(token.symbol)) {
+      reasons.push('Token is in cooldown');
+    }
+
+    // 3) Edge calculation and threshold (direction-aware)
+    let edge: EdgeCalculationResult;
+    try {
+      if (direction === 'reverse') {
+        edge = this.reverseEdgeCalculator.calculateReverseEdge(
+          token,
+          galaChainQuote,
+          solanaQuote,
+          solToGalaRate,
+          galaUsdPrice
+        );
+      } else {
+        edge = this.edgeCalculator.calculateEdge(
+          token,
+          galaChainQuote,
+          solanaQuote,
+          solToGalaRate,
+          galaUsdPrice
+        );
+      }
+    } catch (edgeError) {
+      logger.error(`❌ ERROR in edge calculation for ${token.symbol} (${direction})`, {
+        error: edgeError instanceof Error ? edgeError.message : String(edgeError)
+      });
+      throw edgeError;
+    }
+
+    // Apply direction-specific threshold
+    const minEdgeBps = direction === 'reverse'
+      ? (this.trading.reverseArbitrageMinEdgeBps || this.trading.minEdgeBps)
+      : this.trading.minEdgeBps;
+
+    if (!edge.isProfitable) {
+      reasons.push(...edge.invalidationReasons);
+    }
+    if (!edge.meetsThreshold) {
+      reasons.push(`Edge below threshold: ${edge.netEdgeBps}bps < ${minEdgeBps}bps`);
+    }
+    if (!edge.priceImpactAcceptable) {
+      reasons.push('Combined price impact not acceptable');
+    }
+
+    // 4) Inventory check (direction-aware)
+    const state = this.stateManager.getState() as any;
+    const gcTokens = state?.inventory?.galaChain?.tokens || {};
+    const solTokens = state?.inventory?.solana?.tokens || {};
+
+    if (direction === 'reverse') {
+      // REVERSE: Need GALA on GC (to buy token), Token on SOL (to sell)
+      // Check GALA balance on GC
+      const galaCost = galaChainQuote.price.multipliedBy(token.tradeSize);
+      const galaToken = gcTokens['GALA'];
+      if (galaToken && galaToken.balance) {
+        const balanceBN = BigNumber.isBigNumber(galaToken.balance) 
+          ? galaToken.balance 
+          : new BigNumber(galaToken.balance);
+        if (balanceBN.isLessThan(galaCost)) {
+          reasons.push(`Insufficient GALA on GalaChain for reverse trade (have ${balanceBN.toString()}, need ${galaCost.toString()})`);
+        }
+      } else {
+        reasons.push(`Insufficient GALA on GalaChain for reverse trade (simulation mode if dry-run)`);
+      }
+
+      // Check token balance on Solana
+      const tokenBalance = solTokens[token.symbol];
+      if (tokenBalance && tokenBalance.balance) {
+        const balanceBN = BigNumber.isBigNumber(tokenBalance.balance)
+          ? tokenBalance.balance
+          : new BigNumber(tokenBalance.balance);
+        const requiredAmount = new BigNumber(token.tradeSize);
+        if (balanceBN.isLessThan(requiredAmount)) {
+          reasons.push(`Insufficient ${token.symbol} on Solana for reverse trade (have ${balanceBN.toString()}, need ${requiredAmount.toString()})`);
+        }
+      } else {
+        reasons.push(`Insufficient ${token.symbol} on Solana for reverse trade (simulation mode if dry-run)`);
+      }
+    } else {
+      // FORWARD: Need token on GC (to sell), SOL/USDC on SOL (to buy)
+      // Check token balance on GC
+      const quoteVia = token.gcQuoteVia || 'GALA';
+      let inventoryTokenSymbol: string;
+      let requiredAmount: BigNumber;
+      let inventoryToken: any;
+
+      if (quoteVia === 'GALA') {
+        // Selling GALA to buy token - need GALA inventory
+        inventoryTokenSymbol = 'GALA';
+        requiredAmount = galaChainQuote.price.multipliedBy(token.tradeSize);
+        inventoryToken = gcTokens['GALA'];
+      } else {
+        // Selling token to get quote currency - need token inventory
+        inventoryTokenSymbol = token.symbol;
+        requiredAmount = new BigNumber(token.tradeSize);
+        inventoryToken = gcTokens[token.symbol];
+      }
+
+      if (inventoryToken && inventoryToken.balance) {
+        const balanceBN = BigNumber.isBigNumber(inventoryToken.balance)
+          ? inventoryToken.balance
+          : new BigNumber(inventoryToken.balance);
+        if (balanceBN.isLessThan(requiredAmount)) {
+          reasons.push(`Insufficient GalaChain ${inventoryTokenSymbol} inventory (have ${balanceBN.toString()}, need ${requiredAmount.toString()})`);
+        }
+      } else {
+        reasons.push(`Insufficient GalaChain ${inventoryTokenSymbol} inventory for ${quoteVia === 'GALA' ? 'buy' : 'sell'} (simulation mode if dry-run)`);
+      }
+    }
+
+    const shouldProceed = reasons.length === 0;
+
+    logger.execution(`Risk evaluation for ${token.symbol} (${direction}): ${shouldProceed ? 'PASS' : 'FAIL'}`, {
+      token: token.symbol,
+      direction,
       reasons,
       netEdge: edge.netEdge.toString(),
       netEdgeBps: edge.netEdgeBps

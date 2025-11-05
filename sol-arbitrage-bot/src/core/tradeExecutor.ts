@@ -22,6 +22,9 @@ import { getErrorHandler } from '../utils/errorHandler';
  * Trade execution result
  */
 export interface TradeExecutionResult {
+  /** Arbitrage direction ('forward' or 'reverse') */
+  direction: 'forward' | 'reverse';
+  
   /** Whether trade was executed (true for live, false for dry-run) */
   executed: boolean;
   
@@ -61,11 +64,14 @@ export class TradeExecutor {
     runMode: 'live' | 'dry_run'
   ): Promise<TradeExecutionResult> {
     const startTime = Date.now();
-    const { token, gcQuote, solQuote, riskResult } = evaluation;
+    const { token, gcQuote, solQuote, riskResult, direction } = evaluation;
 
     if (!gcQuote || !solQuote || !riskResult) {
       throw new Error('Cannot execute trade: missing quotes or risk evaluation');
     }
+
+    // Determine direction (default to forward)
+    const tradeDirection = direction || 'forward';
 
     // Prepare log entry
     const tradeLogger = getTradeLogger();
@@ -77,7 +83,7 @@ export class TradeExecutor {
       mode: runMode,
       token: token.symbol,
       tradeSize: token.tradeSize,
-      direction: 'forward',
+      direction: tradeDirection,
       success: false,
       expectedGalaChainProceeds: edge ? edge.galaChainProceeds.toNumber() : undefined,
       expectedSolanaCost: solCost.toNumber(),
@@ -93,9 +99,9 @@ export class TradeExecutor {
     };
 
     if (runMode === 'live') {
-      return await this.executeLiveTrade(token, gcQuote, solQuote, logEntry, tradeLogger, startTime);
+      return await this.executeLiveTrade(token, gcQuote, solQuote, tradeDirection, logEntry, tradeLogger, startTime);
     } else {
-      return await this.executeDryRunTrade(token, gcQuote, solQuote, logEntry, tradeLogger, startTime);
+      return await this.executeDryRunTrade(token, gcQuote, solQuote, tradeDirection, logEntry, tradeLogger, startTime);
     }
   }
 
@@ -106,6 +112,7 @@ export class TradeExecutor {
     token: TokenConfig,
     gcQuote: GalaChainQuote,
     solQuote: SolanaQuote,
+    direction: 'forward' | 'reverse',
     logEntry: any,
     tradeLogger: ReturnType<typeof getTradeLogger>,
     startTime: number
@@ -113,9 +120,14 @@ export class TradeExecutor {
     try {
       logger.info(`   Mode:     🚀 LIVE TRADING`);
       logger.info(`   Size:     ${token.tradeSize} ${token.symbol}`);
-      logger.info(`   Direction: 🔷 SELL on GalaChain → 🔸 BUY on Solana`);
+      
+      if (direction === 'reverse') {
+        logger.info(`   Direction: 🔷 BUY on GalaChain → 🔸 SELL on Solana (REVERSE)`);
+      } else {
+        logger.info(`   Direction: 🔷 SELL on GalaChain → 🔸 BUY on Solana (FORWARD)`);
+      }
 
-      const { gc, sol } = await this.coordinator.executeLive(token.symbol);
+      const { gc, sol } = await this.coordinator.executeLive(token.symbol, direction);
       const endTime = Date.now();
       const executionDurationMs = endTime - startTime;
 
@@ -141,10 +153,18 @@ export class TradeExecutor {
 
         logger.error(`\n❌ BOTH LEGS FAILED`);
         logger.error(`   Token: ${token.symbol}`);
-        logger.error(`   🔷 GalaChain (SELL): ❌ Failed`);
-        logger.error(`      Error: ${gc.error}`);
-        logger.error(`   🔸 Solana (BUY): ❌ Failed`);
-        logger.error(`      Error: ${sol.error}`);
+        logger.error(`   Direction: ${direction.toUpperCase()}`);
+        if (direction === 'reverse') {
+          logger.error(`   🔷 GalaChain (BUY): ❌ Failed`);
+          logger.error(`      Error: ${gc.error}`);
+          logger.error(`   🔸 Solana (SELL): ❌ Failed`);
+          logger.error(`      Error: ${sol.error}`);
+        } else {
+          logger.error(`   🔷 GalaChain (SELL): ❌ Failed`);
+          logger.error(`      Error: ${gc.error}`);
+          logger.error(`   🔸 Solana (BUY): ❌ Failed`);
+          logger.error(`      Error: ${sol.error}`);
+        }
 
         await sendAlert(
           'Dual-leg trade failed',
@@ -159,19 +179,37 @@ export class TradeExecutor {
 
         logger.warn(`\n⚠️ PARTIAL SUCCESS`);
         logger.warn(`   Token: ${token.symbol}`);
-        logger.warn(`   🔷 GalaChain (SELL): ${gc.success ? '✅ Success' : '❌ Failed'}`);
-        if (gc.success && gc.txHash) {
-          logger.warn(`      TX Hash: ${gc.txHash}`);
-        }
-        if (!gc.success && gc.error) {
-          logger.warn(`      Error: ${gc.error}`);
-        }
-        logger.warn(`   🔸 Solana (BUY): ${sol.success ? '✅ Success' : '❌ Failed'}`);
-        if (sol.success && sol.txSig) {
-          logger.warn(`      TX Signature: ${sol.txSig}`);
-        }
-        if (!sol.success && sol.error) {
-          logger.warn(`      Error: ${sol.error}`);
+        logger.warn(`   Direction: ${direction.toUpperCase()}`);
+        if (direction === 'reverse') {
+          logger.warn(`   🔷 GalaChain (BUY): ${gc.success ? '✅ Success' : '❌ Failed'}`);
+          if (gc.success && gc.txHash) {
+            logger.warn(`      TX Hash: ${gc.txHash}`);
+          }
+          if (!gc.success && gc.error) {
+            logger.warn(`      Error: ${gc.error}`);
+          }
+          logger.warn(`   🔸 Solana (SELL): ${sol.success ? '✅ Success' : '❌ Failed'}`);
+          if (sol.success && sol.txSig) {
+            logger.warn(`      TX Signature: ${sol.txSig}`);
+          }
+          if (!sol.success && sol.error) {
+            logger.warn(`      Error: ${sol.error}`);
+          }
+        } else {
+          logger.warn(`   🔷 GalaChain (SELL): ${gc.success ? '✅ Success' : '❌ Failed'}`);
+          if (gc.success && gc.txHash) {
+            logger.warn(`      TX Hash: ${gc.txHash}`);
+          }
+          if (!gc.success && gc.error) {
+            logger.warn(`      Error: ${gc.error}`);
+          }
+          logger.warn(`   🔸 Solana (BUY): ${sol.success ? '✅ Success' : '❌ Failed'}`);
+          if (sol.success && sol.txSig) {
+            logger.warn(`      TX Signature: ${sol.txSig}`);
+          }
+          if (!sol.success && sol.error) {
+            logger.warn(`      Error: ${sol.error}`);
+          }
         }
       }
 
@@ -179,6 +217,7 @@ export class TradeExecutor {
       tradeLogger.logTrade(logEntry);
 
       return {
+        direction,
         executed: true,
         success: gc.success && sol.success,
         gcResult: gc,
@@ -209,20 +248,23 @@ export class TradeExecutor {
     token: TokenConfig,
     gcQuote: GalaChainQuote,
     solQuote: SolanaQuote,
+    direction: 'forward' | 'reverse',
     logEntry: any,
     tradeLogger: ReturnType<typeof getTradeLogger>,
     startTime: number
   ): Promise<TradeExecutionResult> {
     try {
-      await this.coordinator.dryRun(token.symbol);
+      await this.coordinator.dryRun(token.symbol, direction);
       const executionDurationMs = Date.now() - startTime;
 
       logEntry.executionDurationMs = executionDurationMs;
 
-      const strategy = 'Would SELL on GalaChain and BUY on Solana';
+      const strategy = direction === 'reverse'
+        ? 'Would BUY on GalaChain and SELL on Solana'
+        : 'Would SELL on GalaChain and BUY on Solana';
       logger.info(`🧪 DRY-RUN completed`, {
         token: token.symbol,
-        direction: 'forward',
+        direction,
         note: 'No actual trades executed - simulation only',
         strategy
       });
@@ -231,6 +273,7 @@ export class TradeExecutor {
       tradeLogger.logTrade(logEntry);
 
       return {
+        direction,
         executed: false,
         executionDurationMs
       };

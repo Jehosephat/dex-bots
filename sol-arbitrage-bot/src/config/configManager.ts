@@ -360,4 +360,22 @@ export class ConfigManager implements IConfigService {
       DISCORD_WEBHOOK_URL: this.envConfig.DISCORD_WEBHOOK_URL ? '***' : undefined
     };
   }
+  
+  /**
+   * Get direction configuration for bidirectional arbitrage
+   */
+  getDirectionConfig(): import('../types/direction').DirectionConfig {
+    const trading = this.getTradingConfig();
+    return {
+      forward: {
+        enabled: true, // Always enabled
+        minEdgeBps: trading.minEdgeBps
+      },
+      reverse: {
+        enabled: trading.enableReverseArbitrage || false,
+        minEdgeBps: trading.reverseArbitrageMinEdgeBps || trading.minEdgeBps
+      },
+      priority: trading.arbitrageDirection || 'forward'
+    };
+  }
 }

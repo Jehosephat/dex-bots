@@ -15,6 +15,7 @@ import { RiskManager } from '../execution/riskManager';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { RateConverter, RateConversionResult } from './rateConverter';
 import { getErrorHandler } from '../utils/errorHandler';
+import { ArbitrageDirection, DirectionUtils } from '../types/direction';
 
 /**
  * Result of token evaluation
@@ -22,6 +23,9 @@ import { getErrorHandler } from '../utils/errorHandler';
 export interface TokenEvaluationResult {
   /** Token that was evaluated */
   token: TokenConfig;
+  
+  /** Arbitrage direction ('forward' or 'reverse') */
+  direction?: 'forward' | 'reverse';
   
   /** Whether evaluation was successful */
   success: boolean;
@@ -65,29 +69,81 @@ export class TokenEvaluator {
   }
 
   /**
-   * Evaluate a token for arbitrage opportunity
+   * Evaluate a token for arbitrage opportunity (bidirectional)
    */
   async evaluateToken(token: TokenConfig): Promise<TokenEvaluationResult> {
     try {
       logger.info(`\n${'━'.repeat(60)}`);
       logger.info(`📊 EVALUATING: ${token.symbol} | Trade Size: ${token.tradeSize}`);
 
-      // Fetch quotes for FORWARD direction (SELL token on GC → BUY token on SOL)
+      // Get direction configuration
+      const directionConfig = this.configService.getDirectionConfig();
+
+      // Evaluate forward direction (always)
+      const forwardEvaluation = await this.evaluateDirection(token, 'forward');
+
+      // Evaluate reverse direction (if enabled)
+      let reverseEvaluation: TokenEvaluationResult | null = null;
+      if (directionConfig.reverse.enabled) {
+        reverseEvaluation = await this.evaluateDirection(token, 'reverse');
+      }
+
+      // Select best direction based on configuration
+      const selectedEvaluation = this.selectBestDirection(
+        forwardEvaluation,
+        reverseEvaluation,
+        directionConfig
+      );
+
+      return selectedEvaluation;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await this.errorHandler.handleError(
+        error,
+        undefined,
+        undefined,
+        { operation: 'evaluateToken', token: token.symbol }
+      );
+      
+      return {
+        token,
+        direction: 'forward',
+        success: false,
+        gcQuote: null,
+        solQuote: null,
+        rateConversion: null,
+        riskResult: null,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Evaluate a token for a specific direction
+   */
+  private async evaluateDirection(
+    token: TokenConfig,
+    direction: ArbitrageDirection
+  ): Promise<TokenEvaluationResult> {
+    const reverse = direction === 'reverse';
+    const directionLabel = DirectionUtils.getLabel(direction);
+
+    try {
+      logger.debug(`   Evaluating ${directionLabel} direction for ${token.symbol}`);
+
+      // Fetch quotes for the specified direction
       const [gcQuote, solQuote] = await Promise.all([
-        this.gcProvider.getQuote(token.symbol, token.tradeSize, false),
-        this.solProvider.getQuote(token.symbol, token.tradeSize, false)
+        this.gcProvider.getQuote(token.symbol, token.tradeSize, reverse),
+        this.solProvider.getQuote(token.symbol, token.tradeSize, reverse)
       ]);
 
       // Check if we have both quotes
       if (!gcQuote || !solQuote) {
-        const error = `Missing quote(s) - hasGcQuote: ${!!gcQuote}, hasSolQuote: ${!!solQuote}`;
-        logger.warn(`⚠️ ${error}, skipping token`, {
-          token: token.symbol,
-          hasGcQuote: !!gcQuote,
-          hasSolQuote: !!solQuote
-        });
+        const error = `Missing quote(s) for ${directionLabel} - hasGcQuote: ${!!gcQuote}, hasSolQuote: ${!!solQuote}`;
+        logger.debug(`   ⚠️ ${error}`);
         return {
           token,
+          direction,
           success: false,
           gcQuote: gcQuote as GalaChainQuote | null,
           solQuote: solQuote as SolanaQuote | null,
@@ -108,10 +164,11 @@ export class TokenEvaluator {
       );
 
       if (!rateConversion || rateConversion.rate.isZero() || rateConversion.rate.isNaN()) {
-        const error = 'Invalid conversion rate';
-        logger.warn(`⚠️ ${error}, skipping ${token.symbol}`);
+        const error = `Invalid conversion rate for ${directionLabel}`;
+        logger.debug(`   ⚠️ ${error}`);
         return {
           token,
+          direction,
           success: false,
           gcQuote: galaQuote,
           solQuote: solQuoteResult,
@@ -121,18 +178,31 @@ export class TokenEvaluator {
         };
       }
 
-      // Evaluate risk
+      // Evaluate risk (direction-aware)
       let riskResult;
       try {
-        riskResult = this.riskManager.evaluate(
-          token,
-          galaQuote,
-          solQuoteResult,
-          rateConversion.rate,
-          rateConversion.galaUsdPrice
-        );
+        // Use direction-aware risk evaluation if available, otherwise fallback
+        if (this.riskManager.evaluateDirection) {
+          riskResult = this.riskManager.evaluateDirection(
+            token,
+            galaQuote,
+            solQuoteResult,
+            rateConversion.rate,
+            direction,
+            rateConversion.galaUsdPrice
+          );
+        } else {
+          // Fallback to forward evaluation for now
+          riskResult = this.riskManager.evaluate(
+            token,
+            galaQuote,
+            solQuoteResult,
+            rateConversion.rate,
+            rateConversion.galaUsdPrice
+          );
+        }
       } catch (evalError) {
-        logger.error(`❌ ERROR in risk.evaluate() for ${token.symbol}`, {
+        logger.error(`❌ ERROR in risk.evaluate() for ${token.symbol} (${directionLabel})`, {
           error: evalError instanceof Error ? evalError.message : String(evalError)
         });
         riskResult = {
@@ -144,6 +214,7 @@ export class TokenEvaluator {
 
       return {
         token,
+        direction,
         success: true,
         gcQuote: galaQuote,
         solQuote: solQuoteResult,
@@ -152,15 +223,12 @@ export class TokenEvaluator {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.errorHandler.handleError(
-        error,
-        undefined,
-        undefined,
-        { operation: 'evaluateToken', token: token.symbol }
-      );
-      
+      logger.error(`❌ Error evaluating ${directionLabel} direction for ${token.symbol}`, {
+        error: errorMessage
+      });
       return {
         token,
+        direction,
         success: false,
         gcQuote: null,
         solQuote: null,
@@ -172,6 +240,55 @@ export class TokenEvaluator {
   }
 
   /**
+   * Select best direction based on configuration and edge comparison
+   */
+  private selectBestDirection(
+    forward: TokenEvaluationResult,
+    reverse: TokenEvaluationResult | null,
+    config: import('../types/direction').DirectionConfig
+  ): TokenEvaluationResult {
+    // If direction is forced, return that
+    if (config.priority === 'forward') {
+      return { ...forward, direction: 'forward' };
+    }
+    if (config.priority === 'reverse' && reverse) {
+      return reverse;
+    }
+
+    // If "best", compare edges
+    if (config.priority === 'best') {
+      const forwardEdge = forward.riskResult?.edge?.netEdgeBps || -Infinity;
+      const reverseEdge = reverse?.riskResult?.edge?.netEdgeBps || -Infinity;
+      const forwardProceed = forward.riskResult?.shouldProceed || false;
+      const reverseProceed = reverse?.riskResult?.shouldProceed || false;
+
+      // Prefer forward if both equal (default)
+      if (forwardEdge >= reverseEdge && forwardProceed) {
+        logger.debug(`   Selected FORWARD direction (edge: ${forwardEdge.toFixed(2)} bps)`);
+        return { ...forward, direction: 'forward' };
+      }
+      if (reverseEdge > forwardEdge && reverseProceed) {
+        logger.debug(`   Selected REVERSE direction (edge: ${reverseEdge.toFixed(2)} bps)`);
+        return reverse!;
+      }
+
+      // If only one meets threshold, use that one
+      if (forwardProceed && !reverseProceed) {
+        logger.debug(`   Selected FORWARD direction (only direction meeting threshold)`);
+        return { ...forward, direction: 'forward' };
+      }
+      if (reverseProceed && !forwardProceed) {
+        logger.debug(`   Selected REVERSE direction (only direction meeting threshold)`);
+        return reverse!;
+      }
+    }
+
+    // Default to forward
+    logger.debug(`   Selected FORWARD direction (default)`);
+    return { ...forward, direction: 'forward' };
+  }
+
+  /**
    * Log evaluation results
    */
   logEvaluationResults(result: TokenEvaluationResult): void {
@@ -179,40 +296,59 @@ export class TokenEvaluator {
       return;
     }
 
-    const { token, gcQuote, solQuote } = result;
+    const { token, gcQuote, solQuote, direction } = result;
     const tradingConfig = this.configService.getTradingConfig();
+    const directionLabel = DirectionUtils.getLabel(direction);
+    const isReverse = direction === 'reverse';
 
     // Log prices
     const gcProceeds = gcQuote.price.multipliedBy(token.tradeSize);
     const solCost = solQuote.price.multipliedBy(token.tradeSize);
 
-    logger.info(`\n💰 MARKET PRICES`);
-    const gcAction = token.gcQuoteVia === 'GALA'
-      ? `SELL GALA → BUY ${token.symbol}`
-      : `SELL ${token.symbol}`;
-    const solAction = token.solQuoteVia === 'GALA'
-      ? `SELL ${token.symbol} → BUY GALA`
-      : `BUY ${token.symbol}`;
-
-    logger.info(`   🔷 GalaChain (${gcAction})`);
-    logger.info(`      Price:    ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
-    logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-    if (token.gcQuoteVia === 'GALA') {
+    logger.info(`\n💰 MARKET PRICES (${directionLabel})`);
+    
+    if (isReverse) {
+      // REVERSE: BUY on GC, SELL on SOL
+      logger.info(`   🔷 GalaChain (BUY ${token.symbol} with GALA)`);
+      logger.info(`      Price:    ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
+      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
       logger.info(`      Cost:     ${gcProceeds.toFixed(8)} ${gcQuote.currency} (to buy ${token.tradeSize} ${token.symbol})`);
-    } else {
-      logger.info(`      Proceeds: ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
-    }
-    logger.info(`      Impact:   ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+      logger.info(`      Impact:   ${gcQuote.priceImpactBps.toFixed(2)} bps`);
 
-    logger.info(`   🔸 Solana (${solAction})`);
-    logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
-    logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
-    if (token.solQuoteVia === 'GALA') {
+      logger.info(`   🔸 Solana (SELL ${token.symbol} for ${solQuote.currency})`);
+      logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
+      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
       logger.info(`      Proceeds: ${solCost.toFixed(8)} ${solQuote.currency} (from selling ${token.tradeSize} ${token.symbol})`);
+      logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
     } else {
-      logger.info(`      Cost:     ${solCost.toFixed(8)} ${solQuote.currency}`);
+      // FORWARD: SELL on GC, BUY on SOL
+      const gcAction = token.gcQuoteVia === 'GALA'
+        ? `SELL GALA → BUY ${token.symbol}`
+        : `SELL ${token.symbol}`;
+      const solAction = token.solQuoteVia === 'GALA'
+        ? `SELL ${token.symbol} → BUY GALA`
+        : `BUY ${token.symbol}`;
+
+      logger.info(`   🔷 GalaChain (${gcAction})`);
+      logger.info(`      Price:    ${gcQuote.price.toFixed(8)} ${gcQuote.currency} per ${token.symbol}`);
+      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
+      if (token.gcQuoteVia === 'GALA') {
+        logger.info(`      Cost:     ${gcProceeds.toFixed(8)} ${gcQuote.currency} (to buy ${token.tradeSize} ${token.symbol})`);
+      } else {
+        logger.info(`      Proceeds: ${gcProceeds.toFixed(8)} ${gcQuote.currency}`);
+      }
+      logger.info(`      Impact:   ${gcQuote.priceImpactBps.toFixed(2)} bps`);
+
+      logger.info(`   🔸 Solana (${solAction})`);
+      logger.info(`      Price:    ${solQuote.price.toFixed(8)} ${solQuote.currency} per ${token.symbol}`);
+      logger.info(`      Size:     ${token.tradeSize} ${token.symbol}`);
+      if (token.solQuoteVia === 'GALA') {
+        logger.info(`      Proceeds: ${solCost.toFixed(8)} ${solQuote.currency} (from selling ${token.tradeSize} ${token.symbol})`);
+      } else {
+        logger.info(`      Cost:     ${solCost.toFixed(8)} ${solQuote.currency}`);
+      }
+      logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
     }
-    logger.info(`      Impact:   ${solQuote.priceImpactBps.toFixed(2)} bps`);
 
     // Log risk evaluation result
     if (!result.riskResult || !result.riskResult.shouldProceed) {
@@ -233,19 +369,35 @@ export class TokenEvaluator {
       const isProfitable = edge.isProfitable;
       const meetsThreshold = edge.meetsThreshold;
       const impactAcceptable = edge.priceImpactAcceptable;
+      const minEdgeBps = isReverse 
+        ? (tradingConfig.reverseArbitrageMinEdgeBps || tradingConfig.minEdgeBps)
+        : tradingConfig.minEdgeBps;
 
-      logger.info(`\n🧮 EDGE CALCULATION`);
-      logger.info(`   📥 INCOME:`);
-      logger.info(`      🔷 GalaChain Proceeds:  ${edge.galaChainProceeds.toFixed(8)} GALA`);
-      logger.info(`   📤 COSTS:`);
-      logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
-      logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
-      logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
+      logger.info(`\n🧮 EDGE CALCULATION (${directionLabel})`);
+      
+      if (isReverse) {
+        // REVERSE: SOL proceeds - GC cost
+        logger.info(`   📥 INCOME:`);
+        logger.info(`      🔸 Solana Proceeds:    ${edge.galaChainProceeds.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
+        logger.info(`   📤 COSTS:`);
+        logger.info(`      🔷 GalaChain Cost:    ${edge.solanaCostGala.toFixed(8)} GALA`);
+        logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
+        logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
+      } else {
+        // FORWARD: GC proceeds - SOL cost
+        logger.info(`   📥 INCOME:`);
+        logger.info(`      🔷 GalaChain Proceeds:  ${edge.galaChainProceeds.toFixed(8)} GALA`);
+        logger.info(`   📤 COSTS:`);
+        logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA (${solCost.toFixed(8)} ${solQuote.currency})`);
+        logger.info(`      🌉 Bridge Cost (amort): ${edge.bridgeCost.toFixed(8)} GALA (amortized per trade)`);
+        logger.info(`      🛡️  Risk Buffer:        ${edge.riskBuffer.toFixed(8)} GALA`);
+      }
+      
       logger.info(`      ────────────────────────────`);
       logger.info(`      💰 Total Cost:         ${edge.totalCost.toFixed(8)} GALA`);
       logger.info(`   ════════════════════════════════`);
       logger.info(`   💵 NET EDGE:              ${edge.netEdge.toFixed(8)} GALA (${edge.netEdgeBps.toFixed(2)} bps)`);
-      logger.info(`   📊 Threshold:             ${tradingConfig.minEdgeBps} bps minimum`);
+      logger.info(`   📊 Threshold:             ${minEdgeBps} bps minimum`);
       logger.info(`   ✅ Meets Threshold:        ${meetsThreshold ? 'YES ✓' : 'NO ✗'}`);
       logger.info(`   💹 Profitable:             ${isProfitable ? 'YES ✓' : 'NO ✗'}`);
       logger.info(`\n   📉 PRICE IMPACT:`);
@@ -257,7 +409,7 @@ export class TokenEvaluator {
 
     // Log decision
     logger.info(`\n${'═'.repeat(60)}`);
-    logger.info(`✅ DECISION: PROCEED WITH TRADE ${token.symbol}`);
+    logger.info(`✅ DECISION: PROCEED WITH ${directionLabel} TRADE ${token.symbol}`);
     if (result.riskResult.edge) {
       logger.info(`   Expected Edge: ${result.riskResult.edge.netEdge.toFixed(8)} GALA (${result.riskResult.edge.netEdgeBps.toFixed(2)} bps)`);
     }

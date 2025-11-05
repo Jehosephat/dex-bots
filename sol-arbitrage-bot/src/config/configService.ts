@@ -87,5 +87,10 @@ export interface IConfigService {
    * Reload configuration from files
    */
   reloadConfig(): Promise<void>;
+  
+  /**
+   * Get direction configuration for bidirectional arbitrage
+   */
+  getDirectionConfig(): import('../types/direction').DirectionConfig;
 }
 

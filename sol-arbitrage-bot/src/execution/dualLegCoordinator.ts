@@ -5,6 +5,7 @@ import { SolanaPriceProvider } from '../core/priceProviders/solana';
 import { GalaChainExecutor, GalaChainExecutionResult } from './galaChainExecutor';
 import { SolanaExecutor, SolanaExecutionResult } from './solanaExecutor';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
+import { ArbitrageDirection } from '../types/direction';
 import logger from '../utils/logger';
 import { sendAlert } from '../utils/alerts';
 import { getErrorHandler } from '../utils/errorHandler';
@@ -34,7 +35,7 @@ export class DualLegCoordinator {
   /**
    * Prepare both legs (dry-run): GC sell and SOL buy for the token's configured tradeSize.
    */
-  async dryRun(symbol: string): Promise<DualLegDryRunResult | null> {
+  async dryRun(symbol: string, direction: ArbitrageDirection = 'forward'): Promise<DualLegDryRunResult | null> {
     // Instantiate executors after config is initialized to avoid early access
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
@@ -53,9 +54,10 @@ export class DualLegCoordinator {
     await this.gcProvider.initialize();
     await this.solProvider.initialize();
 
+    const reverse = direction === 'reverse';
     const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
-      this.gcProvider.getQuote(symbol, token.tradeSize),
-      this.solProvider.getQuote(symbol, token.tradeSize)
+      this.gcProvider.getQuote(symbol, token.tradeSize, reverse),
+      this.solProvider.getQuote(symbol, token.tradeSize, reverse)
     ]);
 
     if (!gcQuoteGeneric || gcQuoteGeneric.currency !== 'GALA') {
@@ -114,7 +116,7 @@ export class DualLegCoordinator {
    * Execute both legs live with simple failure handling.
    * GC sell and SOL buy are launched near-simultaneously.
    */
-  async executeLive(symbol: string): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
+  async executeLive(symbol: string, direction: ArbitrageDirection = 'forward'): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
 
@@ -144,16 +146,17 @@ export class DualLegCoordinator {
     await this.solProvider.initialize();
 
     // Fetch fresh quotes for the configured trade size with error handling
+    const reverse = direction === 'reverse';
     const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
       this.errorHandler.executeWithProtection(
-        () => this.gcProvider.getQuote(symbol, token.tradeSize),
+        () => this.gcProvider.getQuote(symbol, token.tradeSize, reverse),
         'galachain-price-provider',
-        `GC quote for ${symbol}`
+        `GC quote for ${symbol} (${direction})`
       ),
       this.errorHandler.executeWithProtection(
-        () => this.solProvider.getQuote(symbol, token.tradeSize),
+        () => this.solProvider.getQuote(symbol, token.tradeSize, reverse),
         'solana-price-provider',
-        `SOL quote for ${symbol}`
+        `SOL quote for ${symbol} (${direction})`
       )
     ]);
     if (!gcQuoteGeneric) {
@@ -190,20 +193,38 @@ export class DualLegCoordinator {
     }
 
     // Fire both legs nearly concurrently with error handling
+    // For reverse: BUY on GC, SELL on SOL
+    // For forward: SELL on GC, BUY on SOL
     const [gcRes, solRes] = await Promise.allSettled([
       this.errorHandler.executeWithProtection(
-        () => this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote),
+        () => {
+          if (direction === 'reverse') {
+            // Reverse: BUY on GalaChain
+            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, gcQuote);
+          } else {
+            // Forward: SELL on GalaChain
+            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote);
+          }
+        },
         'galachain-executor',
-        `GC execution for ${symbol}`
+        `GC execution for ${symbol} (${direction})`
       ),
       this.errorHandler.executeWithProtection(
-        () => this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, solQuote),
+        () => {
+          if (direction === 'reverse') {
+            // Reverse: SELL on Solana
+            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, solQuote);
+          } else {
+            // Forward: BUY on Solana
+            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, solQuote);
+          }
+        },
         'solana-executor',
-        `SOL execution for ${symbol}`
+        `SOL execution for ${symbol} (${direction})`
       )
     ]);
 
-    const gc: GalaChainExecutionResult = gcRes.status === 'fulfilled' ? gcRes.value : {
+    const gc: GalaChainExecutionResult = gcRes.status === 'fulfilled' ? (gcRes.value as GalaChainExecutionResult) : {
       success: false,
       params: {
         symbol,
@@ -215,7 +236,7 @@ export class DualLegCoordinator {
       error: (gcRes as PromiseRejectedResult).reason?.message || String((gcRes as PromiseRejectedResult).reason)
     };
 
-    const sol: SolanaExecutionResult = solRes.status === 'fulfilled' ? solRes.value : {
+    const sol: SolanaExecutionResult = solRes.status === 'fulfilled' ? (solRes.value as SolanaExecutionResult) : {
       success: false,
       params: {
         symbol,
