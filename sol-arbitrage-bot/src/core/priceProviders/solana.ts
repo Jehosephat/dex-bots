@@ -14,6 +14,10 @@ import { IConfigService } from '../../config';
 import logger from '../../utils/logger';
 import { getErrorHandler } from '../../utils/errorHandler';
 import { ExternalApiError, ValidationError, NetworkError } from '../../utils/errors';
+import { QuoteValidator } from '../../core/quoteValidator';
+import { getPriceCache } from '../../core/priceCache';
+import { StrategyManager } from './strategies/strategyManager';
+import { SolanaStandardQuoteStrategy } from './strategies/solanaStandardQuoteStrategy';
 import { 
   calculatePriceImpactBps,
   calculateBps,
@@ -30,13 +34,22 @@ import {
 export class SolanaPriceProvider extends BasePriceProvider {
   private jupiterApiUrl = process.env.JUPITER_API_BASE || 'https://lite-api.jup.ag/swap/v1';
   private coinGeckoApiUrl = 'https://api.coingecko.com/api/v3';
-  private solUsdPrice: number = 0;
-  private solUsdPriceLastUpdate: number = 0;
-  private solUsdPriceCacheDuration: number = 60000; // Cache for 60 seconds
   private errorHandler = getErrorHandler();
+  private quoteValidator: QuoteValidator;
+  private priceCache = getPriceCache();
+  private strategyManager: StrategyManager;
 
   constructor(private configService: IConfigService) {
     super();
+    this.quoteValidator = new QuoteValidator();
+    
+    // Initialize strategy manager with bound methods
+    this.strategyManager = StrategyManager.createSolanaStrategyManager(
+      this.jupiterApiUrl,
+      (tokenSymbol: string, amount: number, reverse: boolean) => this.getJupiterQuote(tokenSymbol, amount, reverse),
+      (tokenSymbol: string) => this.getSpotPrice(tokenSymbol),
+      this.configService
+    );
   }
 
   async initialize(): Promise<void> {
@@ -82,220 +95,39 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new ValidationError(`Invalid amount: ${amount}`, { symbol, amount });
       }
 
-      // Update SOL/USD price if needed
+      // Update SOL/USD price if needed (using cache)
       await this.updateSOLUSDPrice();
 
-      // Special case: SOL token - quote SOL → GALA on Solana (buying GALA with SOL)
-      // For forward arbitrage: BUY GALA using SOL on Solana
-      if (symbol === 'SOL' && (tokenConfig.solQuoteVia || 'SOL') === 'SOL') {
-        // Always quote SOL → GALA (selling SOL to get GALA)
-        const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
-        const solMint = 'So11111111111111111111111111111111111111112'; // Native SOL
-        const rawAmount = toRawAmount(new BigNumber(amount), 9).toString(); // SOL has 9 decimals
-        
-        try {
-          const response = await this.errorHandler.executeWithProtection(
-            () => axios.get(`${this.jupiterApiUrl}/quote`, {
-              params: {
-                inputMint: solMint,
-                outputMint: galaMint,
-                amount: rawAmount,
-                slippageBps: 50,
-                swapMode: 'ExactIn'
-              },
-              timeout: 10000
-            }),
-            'jupiter-api',
-            `SOL→GALA quote for ${symbol}`
-          );
-
-          if (response.data?.outAmount) {
-            // GALA has 8 decimals
-            const solAmount = new BigNumber(amount);
-            const galaAmount = toTokenAmount(new BigNumber(response.data.outAmount), 8);
-            const price = galaAmount.div(solAmount); // GALA per SOL
-            
-            const solanaQuote: SolanaQuote = {
-              symbol,
-              price,
-              currency: 'GALA', // Return price in GALA, not SOL
-              tradeSize: amount,
-              priceImpactBps: (response.data.priceImpactPct || 0) * 100,
-              minOutput: galaAmount.multipliedBy(0.99),
-              provider: this.getName(),
-              timestamp: Date.now(),
-              expiresAt: Date.now() + 30000,
-              isValid: true,
-              priorityFee: this.calculatePriorityFee(response.data.priceImpactPct || 0),
-              jupiterRoute: response.data.routePlan ? {
-                routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
-                inputMint: solMint,
-                outputMint: galaMint,
-                steps: response.data.routePlan || [],
-                totalPriceImpact: response.data.priceImpactPct || 0,
-                totalFee: response.data.platformFee?.amount || 0
-              } : undefined
-            };
-            
-            this.updateTimestamp();
-            this.clearError();
-            logger.debug(`📊 Solana quote for ${symbol} (SOL→GALA): ${price.toString()} GALA per SOL`);
-            return solanaQuote;
-          }
-        } catch (error) {
-          await this.errorHandler.handleError(
-            error,
-            undefined,
-            undefined,
-            { operation: 'getQuote', symbol, quoteType: 'SOL→GALA', provider: 'solana' }
-          );
-          return null;
-        }
-      }
-
-      // Special case: Any token with solQuoteVia === 'GALA' - quote Token → GALA on Solana (selling token to get GALA)
-      // For forward arbitrage: Get GALA by selling token on Solana
-      // This applies to MEW, USDUC, and any other token that uses GALA as the quote currency
-      if ((tokenConfig.solQuoteVia || 'SOL') === 'GALA') {
-        const galaMint = 'eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6'; // GALA on Solana
-        const tokenMint = tokenConfig.solanaMint;
-        if (!tokenMint) {
-          logger.warn(`No Solana mint found for ${symbol}`);
-          return null;
-        }
-        
-        const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
-        
-        try {
-          const response = await this.errorHandler.executeWithProtection(
-            () => axios.get(`${this.jupiterApiUrl}/quote`, {
-              params: {
-                inputMint: tokenMint,
-                outputMint: galaMint,
-                amount: rawAmount,
-                slippageBps: 50,
-                swapMode: 'ExactIn'
-              },
-              timeout: 10000
-            }),
-            'jupiter-api',
-            `${symbol}→GALA quote`
-          );
-
-          if (response.data?.outAmount) {
-            // GALA has 8 decimals
-            const tokenAmount = new BigNumber(amount);
-            const galaAmount = toTokenAmount(new BigNumber(response.data.outAmount), 8);
-            const price = galaAmount.div(tokenAmount); // GALA per token
-            
-            const solanaQuote: SolanaQuote = {
-              symbol,
-              price,
-              currency: 'GALA', // Return price in GALA
-              tradeSize: amount,
-              priceImpactBps: (response.data.priceImpactPct || 0) * 100,
-              minOutput: galaAmount.multipliedBy(0.99),
-              provider: this.getName(),
-              timestamp: Date.now(),
-              expiresAt: Date.now() + 30000,
-              isValid: true,
-              priorityFee: this.calculatePriorityFee(response.data.priceImpactPct || 0),
-              jupiterRoute: response.data.routePlan ? {
-                routeId: response.data.routePlan[0]?.swapInfo?.label || 'unknown',
-                inputMint: tokenMint,
-                outputMint: galaMint,
-                steps: response.data.routePlan || [],
-                totalPriceImpact: response.data.priceImpactPct || 0,
-                totalFee: response.data.platformFee?.amount || 0
-              } : undefined
-            };
-            
-            this.updateTimestamp();
-            this.clearError();
-            logger.debug(`📊 Solana quote for ${symbol} (${symbol}→GALA): ${price.toString()} GALA per ${symbol}`);
-            return solanaQuote;
-          }
-        } catch (error) {
-          await this.errorHandler.handleError(
-            error,
-            undefined,
-            undefined,
-            { operation: 'getQuote', symbol, quoteType: `${symbol}→GALA`, provider: 'solana' }
-          );
-          return null;
-        }
-      }
-
-      // Get quote based on direction with error handling
-      // reverse=false: SOL → Token (buying token with SOL/USDC)
-      // reverse=true: Token → SOL (selling token for SOL/USDC)
-      const quote = await this.errorHandler.executeWithProtection(
-        () => this.getJupiterQuote(symbol, amount, reverse),
-        'jupiter-api',
-        `Jupiter quote for ${symbol}`
-      );
-
-      if (!quote) {
+      // Get strategy for this token
+      const strategy = this.strategyManager.getStrategy(tokenConfig, reverse);
+      if (!strategy) {
+        logger.warn(`No strategy found for token ${symbol}`, { solQuoteVia: tokenConfig.solQuoteVia });
         return null;
       }
 
-      // Calculate price and price impact
-      const quoteTokenConfig = this.configService.getQuoteTokenConfig(tokenConfig.solQuoteVia);
-      const inputAmount = toTokenAmount(new BigNumber(quote.inputAmount), reverse ? tokenConfig.decimals : (quoteTokenConfig?.decimals || 9));
-      const outputAmount = toTokenAmount(new BigNumber(quote.outputAmount), reverse ? (quoteTokenConfig?.decimals || 9) : tokenConfig.decimals);
-      
-      // Price calculation:
-      // reverse=false: buying token with quoteToken, price = inputAmount (quoteToken) / outputAmount (token) = quoteToken per token
-      // reverse=true: selling token for quoteToken, price = outputAmount (quoteToken) / inputAmount (token) = quoteToken per token
-      const price = reverse ? outputAmount.div(inputAmount) : inputAmount.div(outputAmount);
-      
-      // Calculate price impact
-      // For reverse quotes, Jupiter provides priceImpact directly, use that
-      // For forward quotes, calculate from spot price
-      let priceImpactBps: number;
-      if (reverse) {
-        // Use Jupiter's price impact if available (it's in percentage, convert to bps)
-        priceImpactBps = (quote.priceImpact || 0) * 100; // Convert percentage to bps
-        if (priceImpactBps === 0) {
-          // Fallback: calculate from spot price (inverted since we're selling)
-          const spotPrice = await this.getSpotPrice(symbol);
-          // For selling: spot price is for buying (quoteToken/token), we need inverse
-          if (!spotPrice.isZero()) {
-            const inverseSpotPrice = new BigNumber(1).div(spotPrice); // tokens per quoteToken
-            const effectivePrice = inputAmount.div(outputAmount); // tokens per quoteToken (inverse of price)
-            priceImpactBps = calculateBps(effectivePrice, inverseSpotPrice);
-          }
-        }
+      // Get quote using strategy
+      let quote: PriceQuote | null;
+      if (strategy instanceof SolanaStandardQuoteStrategy) {
+        // Standard strategy needs reverse parameter
+        quote = await (strategy as any).getQuoteWithReverse(symbol, amount, tokenConfig, reverse);
       } else {
-        // Forward: calculate from spot price
-        const spotPrice = await this.getSpotPrice(symbol);
-        priceImpactBps = calculatePriceImpactBps(outputAmount, inputAmount, spotPrice); // tokens received, quoteToken paid, spot price
+        quote = await strategy.getQuote(symbol, amount, tokenConfig);
       }
 
-      // Calculate priority fee
-      const priorityFee = this.calculatePriorityFee(quote.priceImpact);
+      // Validate quote
+      if (quote) {
+        const validation = this.quoteValidator.validate(quote, `Solana quote for ${symbol}`);
+        if (!validation.isValid) {
+          logger.warn(`Quote validation failed for ${symbol}`, { errors: validation.errors });
+          return null;
+        }
+        
+        this.updateTimestamp();
+        this.clearError();
+        return quote;
+      }
 
-      const solanaQuote: SolanaQuote = {
-        symbol,
-        price,
-        currency: tokenConfig.solQuoteVia,
-        tradeSize: amount,
-        priceImpactBps,
-        minOutput: outputAmount.multipliedBy(0.99), // 1% slippage protection
-        provider: this.getName(),
-        timestamp: Date.now(),
-        expiresAt: Date.now() + 30000, // 30 seconds
-        isValid: true,
-        priorityFee,
-        jupiterRoute: quote.route
-      };
-
-      this.updateTimestamp();
-      this.clearError();
-
-      logger.debug(`📊 Solana quote for ${symbol}: ${price.toString()} ${tokenConfig.solQuoteVia} (impact: ${priceImpactBps}bps)`);
-      return solanaQuote;
-
+      return null;
     } catch (error) {
       const botError = await this.errorHandler.handleError(
         error,
@@ -445,11 +277,9 @@ export class SolanaPriceProvider extends BasePriceProvider {
   }
 
   private async updateSOLUSDPrice(): Promise<void> {
-    const now = Date.now();
-    
-    // Check if cached price is still valid
-    if (this.solUsdPrice > 0 && (now - this.solUsdPriceLastUpdate) < this.solUsdPriceCacheDuration) {
-      logger.debug(`Using cached SOL/USD price: $${this.solUsdPrice.toFixed(2)}`);
+    // Check cache first
+    const cachedPrice = this.priceCache.get('SOL/USD', 60000); // 60 second TTL
+    if (cachedPrice !== null) {
       return;
     }
 
@@ -481,9 +311,9 @@ export class SolanaPriceProvider extends BasePriceProvider {
         const usdcAmount = new BigNumber(response.data.outAmount).dividedBy(1_000_000); // Convert from raw USDC (6 decimals)
         
         // Price = USDC received / SOL spent
-        this.solUsdPrice = usdcAmount.toNumber();
-        this.solUsdPriceLastUpdate = now;
-        logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)} [Source: SOL/USDC pool on Jupiter]`);
+        const solUsdPrice = usdcAmount.toNumber();
+        this.priceCache.set('SOL/USD', solUsdPrice, 'SOL/USDC pool on Jupiter');
+        logger.info(`💰 SOL/USD price: $${solUsdPrice.toFixed(2)} [Source: SOL/USDC pool on Jupiter]`);
         return;
       }
     } catch (jupiterError) {
@@ -510,9 +340,9 @@ export class SolanaPriceProvider extends BasePriceProvider {
       );
 
       if (response.data?.solana?.usd) {
-        this.solUsdPrice = response.data.solana.usd;
-        this.solUsdPriceLastUpdate = now;
-        logger.info(`💰 SOL/USD price: $${this.solUsdPrice.toFixed(2)} [Source: CoinGecko]`);
+        const solUsdPrice = response.data.solana.usd;
+        this.priceCache.set('SOL/USD', solUsdPrice, 'CoinGecko');
+        logger.info(`💰 SOL/USD price: $${solUsdPrice.toFixed(2)} [Source: CoinGecko]`);
         return;
       }
     } catch (error) {
@@ -527,9 +357,11 @@ export class SolanaPriceProvider extends BasePriceProvider {
     }
 
     // Last resort: use fallback if no price sources worked
-    if (this.solUsdPrice === 0) {
-      this.solUsdPrice = 225; // Fallback price
-      logger.warn(`Using fallback SOL/USD price: $${this.solUsdPrice}`);
+    const finalCachedPrice = this.priceCache.get('SOL/USD');
+    if (finalCachedPrice === null) {
+      const fallbackPrice = 225; // Fallback price
+      this.priceCache.set('SOL/USD', fallbackPrice, 'fallback');
+      logger.warn(`Using fallback SOL/USD price: $${fallbackPrice}`);
     }
   }
 
@@ -537,6 +369,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
    * Get current SOL/USD price
    */
   getSOLUSDPrice(): number {
-    return this.solUsdPrice;
+    const cachedPrice = this.priceCache.get('SOL/USD');
+    return cachedPrice !== null ? cachedPrice : 225; // Fallback to 225 if not cached
   }
 }
