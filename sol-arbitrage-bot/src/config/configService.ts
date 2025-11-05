@@ -92,5 +92,10 @@ export interface IConfigService {
    * Get direction configuration for bidirectional arbitrage
    */
   getDirectionConfig(): import('../types/direction').DirectionConfig;
+  
+  /**
+   * Get strategies configuration (if available)
+   */
+  getStrategiesConfig(): Record<string, any> | undefined;
 }
 

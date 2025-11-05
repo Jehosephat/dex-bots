@@ -80,7 +80,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
     return 'solana';
   }
 
-  async getQuote(symbol: string, amount: number, reverse: boolean = false): Promise<PriceQuote | null> {
+  async getQuote(symbol: string, amount: number, reverse: boolean = false, quoteCurrency?: string): Promise<PriceQuote | null> {
     try {
       if (!this.isReady()) {
         throw new ValidationError('Provider not ready', { symbol, provider: 'solana' });
@@ -98,8 +98,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
       // Update SOL/USD price if needed (using cache)
       await this.updateSOLUSDPrice();
 
+      // Create temporary token config with override quote currency (for strategies)
+      const tempTokenConfig = quoteCurrency 
+        ? { ...tokenConfig, solQuoteVia: quoteCurrency }
+        : tokenConfig;
+
       // Get strategy for this token
-      const strategy = this.strategyManager.getStrategy(tokenConfig, reverse);
+      const strategy = this.strategyManager.getStrategy(tempTokenConfig, reverse);
       if (!strategy) {
         logger.warn(`No strategy found for token ${symbol}`, { solQuoteVia: tokenConfig.solQuoteVia });
         return null;

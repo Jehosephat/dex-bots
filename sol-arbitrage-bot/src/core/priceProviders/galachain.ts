@@ -61,7 +61,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
     return 'galachain';
   }
 
-  async getQuote(symbol: string, amount: number, reverse: boolean = false): Promise<PriceQuote | null> {
+  async getQuote(symbol: string, amount: number, reverse: boolean = false, quoteCurrency?: string): Promise<PriceQuote | null> {
     try {
       if (!this.isReady()) {
         throw new Error('Provider not ready');
@@ -77,7 +77,8 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       }
 
       // Get quote via the configured quote token (usually GALA)
-      const quoteVia = tokenConfig.gcQuoteVia || 'GALA';
+      // Allow quoteCurrency parameter to override token config (for strategies)
+      const quoteVia = quoteCurrency || tokenConfig.gcQuoteVia || 'GALA';
       const quoteTokenConfig = this.configService.getQuoteTokenConfig(quoteVia);
       if (!quoteTokenConfig) {
         throw new Error(`Quote token ${quoteVia} not configured`);

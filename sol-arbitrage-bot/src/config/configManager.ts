@@ -38,10 +38,12 @@ export class ConfigManager implements IConfigService {
   private envConfig: EnvironmentConfig;
   private configPath: string;
   private tokensPath: string;
+  private strategiesPath: string;
 
-  constructor(configPath?: string, tokensPath?: string) {
+  constructor(configPath?: string, tokensPath?: string, strategiesPath?: string) {
     this.configPath = configPath || join(process.cwd(), 'config', 'config.json');
     this.tokensPath = tokensPath || join(process.cwd(), 'config', 'tokens.json');
+    this.strategiesPath = strategiesPath || join(process.cwd(), 'config', 'strategies.json');
     this.envConfig = this.loadEnvironmentConfig();
     this.config = this.loadConfig();
   }
@@ -57,11 +59,25 @@ export class ConfigManager implements IConfigService {
       // Load tokens configuration
       const tokensConfig = this.loadJsonConfig(this.tokensPath);
       
+      // Load strategies configuration (optional)
+      let strategiesConfig: any = {};
+      if (existsSync(this.strategiesPath)) {
+        try {
+          const strategiesData = this.loadJsonConfig(this.strategiesPath);
+          strategiesConfig = strategiesData.strategies || {};
+        } catch (error) {
+          logger.warn('Failed to load strategies.json, continuing without strategies', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
       // Merge configurations
       const mergedConfig: any = {
         ...baseConfig,
         tokens: tokensConfig.tokens || baseConfig.tokens || {},
-        quoteTokens: tokensConfig.quoteTokens || baseConfig.quoteTokens || {}
+        quoteTokens: tokensConfig.quoteTokens || baseConfig.quoteTokens || {},
+        strategies: strategiesConfig || baseConfig.strategies || undefined
       };
 
       // Apply environment variable overrides
@@ -361,6 +377,13 @@ export class ConfigManager implements IConfigService {
     };
   }
   
+  /**
+   * Get strategies configuration (if available)
+   */
+  getStrategiesConfig(): Record<string, any> | undefined {
+    return this.config.strategies;
+  }
+
   /**
    * Get direction configuration for bidirectional arbitrage
    */

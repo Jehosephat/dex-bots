@@ -67,6 +67,7 @@ export interface BotConfig {
   bridging: BridgingConfig;
   monitoring: MonitoringConfig;
   networks: NetworksConfig;
+  strategies?: Record<string, any>; // Optional strategies configuration
 }
 
 export interface EnvironmentConfig {

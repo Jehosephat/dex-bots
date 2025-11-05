@@ -105,6 +105,26 @@ export const monitoringConfigSchema = z.object({
 });
 
 /**
+ * Arbitrage strategy configuration schema
+ */
+export const arbitrageStrategySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  galaChainSide: z.object({
+    quoteCurrency: z.string().min(1),
+    operation: z.enum(['buy', 'sell']),
+  }),
+  solanaSide: z.object({
+    quoteCurrency: z.string().min(1),
+    operation: z.enum(['buy', 'sell']),
+  }),
+  enabled: z.boolean(),
+  minEdgeBps: bpsSchema.optional(),
+  priority: z.number().int().optional(),
+});
+
+/**
  * Network configuration schema
  */
 export const networkConfigSchema = z.object({
@@ -130,6 +150,7 @@ export const botConfigSchema = z.object({
   bridging: bridgingConfigSchema,
   monitoring: monitoringConfigSchema,
   networks: networksConfigSchema,
+  strategies: z.record(z.string(), arbitrageStrategySchema).optional(),
 });
 
 /**
