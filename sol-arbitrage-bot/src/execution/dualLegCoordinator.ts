@@ -7,6 +7,8 @@ import { SolanaExecutor, SolanaExecutionResult } from './solanaExecutor';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import logger from '../utils/logger';
 import { sendAlert } from '../utils/alerts';
+import { getErrorHandler } from '../utils/errorHandler';
+import { ExecutionError, ValidationError } from '../utils/errors';
 
 export interface DualLegDryRunResult {
   symbol: string;
@@ -22,6 +24,7 @@ export class DualLegCoordinator {
   private solProvider: SolanaPriceProvider;
   private gcExecutor?: GalaChainExecutor;
   private solExecutor?: SolanaExecutor;
+  private errorHandler = getErrorHandler();
 
   constructor(private configService: IConfigService) {
     this.gcProvider = new GalaChainPriceProvider(configService);
@@ -38,7 +41,12 @@ export class DualLegCoordinator {
 
     const token = this.configService.getTokenConfig(symbol);
     if (!token) {
-      logger.error('❌ Token not configured', { symbol });
+      await this.errorHandler.handleError(
+        new ValidationError(`Token ${symbol} not configured`, { symbol }),
+        undefined,
+        undefined,
+        { operation: 'dryRun', symbol }
+      );
       return null;
     }
 
@@ -112,12 +120,12 @@ export class DualLegCoordinator {
 
     const token = this.configService.getTokenConfig(symbol);
     if (!token) {
-      throw new Error(`Token not configured: ${symbol}`);
+      throw new ValidationError(`Token not configured: ${symbol}`, { symbol });
     }
 
     // Global safety toggles
     if ((process.env.PAUSE || '').toLowerCase() === 'true') {
-      throw new Error('Trading is paused via PAUSE env');
+      throw new ExecutionError('Trading is paused via PAUSE env', { symbol }, false);
     }
     const start = process.env.TRADE_WINDOW_START || '00:00';
     const end = process.env.TRADE_WINDOW_END || '23:59';
@@ -129,19 +137,31 @@ export class DualLegCoordinator {
     const curMin = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
     const inWindow = curMin >= toMinutes(start) && curMin <= toMinutes(end);
     if (!inWindow) {
-      throw new Error(`Outside TRADE_WINDOW (${start}-${end} UTC)`);
+      throw new ExecutionError(`Outside TRADE_WINDOW (${start}-${end} UTC)`, { symbol, start, end }, false);
     }
 
     await this.gcProvider.initialize();
     await this.solProvider.initialize();
 
-    // Fetch fresh quotes for the configured trade size
+    // Fetch fresh quotes for the configured trade size with error handling
     const [gcQuoteGeneric, solQuoteGeneric] = await Promise.all([
-      this.gcProvider.getQuote(symbol, token.tradeSize),
-      this.solProvider.getQuote(symbol, token.tradeSize)
+      this.errorHandler.executeWithProtection(
+        () => this.gcProvider.getQuote(symbol, token.tradeSize),
+        'galachain-price-provider',
+        `GC quote for ${symbol}`
+      ),
+      this.errorHandler.executeWithProtection(
+        () => this.solProvider.getQuote(symbol, token.tradeSize),
+        'solana-price-provider',
+        `SOL quote for ${symbol}`
+      )
     ]);
-    if (!gcQuoteGeneric) throw new Error('Missing GalaChain quote');
-    if (!solQuoteGeneric) throw new Error('Missing Solana quote');
+    if (!gcQuoteGeneric) {
+      throw new ExecutionError('Missing GalaChain quote', { symbol, tradeSize: token.tradeSize }, false);
+    }
+    if (!solQuoteGeneric) {
+      throw new ExecutionError('Missing Solana quote', { symbol, tradeSize: token.tradeSize }, false);
+    }
 
     const gcQuote = gcQuoteGeneric as GalaChainQuote;
     const solQuote = solQuoteGeneric as SolanaQuote;
@@ -160,15 +180,27 @@ export class DualLegCoordinator {
           notionalUsd = costSol * solUsd;
         }
         if (notionalUsd > cap) {
-          throw new Error(`Per-trade notional ${notionalUsd.toFixed(2)} exceeds cap ${cap}`);
+          throw new ExecutionError(
+            `Per-trade notional ${notionalUsd.toFixed(2)} exceeds cap ${cap}`,
+            { symbol, notionalUsd, cap },
+            false
+          );
         }
       }
     }
 
-    // Fire both legs nearly concurrently
+    // Fire both legs nearly concurrently with error handling
     const [gcRes, solRes] = await Promise.allSettled([
-      this.gcExecutor.executeFromQuoteLive(symbol, token.tradeSize, gcQuote),
-      this.solExecutor.executeFromQuoteLive(symbol, token.tradeSize, solQuote)
+      this.errorHandler.executeWithProtection(
+        () => this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, gcQuote),
+        'galachain-executor',
+        `GC execution for ${symbol}`
+      ),
+      this.errorHandler.executeWithProtection(
+        () => this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, solQuote),
+        'solana-executor',
+        `SOL execution for ${symbol}`
+      )
     ]);
 
     const gc: GalaChainExecutionResult = gcRes.status === 'fulfilled' ? gcRes.value : {
@@ -198,9 +230,21 @@ export class DualLegCoordinator {
 
     // Simple failure handling: if one leg failed and the other succeeded, log and caller can cooldown
     if (gc.success && !sol.success) {
+      await this.errorHandler.handleError(
+        new ExecutionError('Dual-leg partial success: SOL failed', { symbol, gcTx: gc.txHash, solError: sol.error }, false),
+        undefined,
+        undefined,
+        { operation: 'executeLive', symbol, leg: 'solana' }
+      );
       logger.warn('⚠️ Dual-leg: GC succeeded but SOL failed - consider cooldown', { symbol, gcTx: gc.txHash, solError: sol.error });
       sendAlert('Dual-leg partial success: SOL failed', { symbol, gcTx: gc.txHash, solError: sol.error }, 'warn').catch(() => {});
     } else if (!gc.success && sol.success) {
+      await this.errorHandler.handleError(
+        new ExecutionError('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, false),
+        undefined,
+        undefined,
+        { operation: 'executeLive', symbol, leg: 'galachain' }
+      );
       logger.warn('⚠️ Dual-leg: SOL succeeded but GC failed - consider cooldown', { symbol, solTx: sol.txSig, gcError: gc.error });
       sendAlert('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, 'warn').catch(() => {});
     }

@@ -12,6 +12,8 @@ import { PriceQuote, SolanaQuote } from '../../types/core';
 import { TokenConfig } from '../../types/config';
 import { IConfigService } from '../../config';
 import logger from '../../utils/logger';
+import { getErrorHandler } from '../../utils/errorHandler';
+import { ExternalApiError, ValidationError, NetworkError } from '../../utils/errors';
 import { 
   calculatePriceImpactBps,
   calculateBps,
@@ -31,6 +33,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
   private solUsdPrice: number = 0;
   private solUsdPriceLastUpdate: number = 0;
   private solUsdPriceCacheDuration: number = 60000; // Cache for 60 seconds
+  private errorHandler = getErrorHandler();
 
   constructor(private configService: IConfigService) {
     super();
@@ -38,16 +41,25 @@ export class SolanaPriceProvider extends BasePriceProvider {
 
   async initialize(): Promise<void> {
     try {
-      // Fetch initial SOL/USD price
-      await this.updateSOLUSDPrice();
+      // Fetch initial SOL/USD price with error handling
+      await this.errorHandler.executeWithProtection(
+        () => this.updateSOLUSDPrice(),
+        'solana-price-provider',
+        'initialize'
+      );
       this.isInitialized = true;
       this.clearError();
       logger.info('✅ Solana price provider initialized');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const botError = await this.errorHandler.handleError(
+        error,
+        undefined,
+        undefined,
+        { operation: 'initialize', provider: 'solana' }
+      );
+      const errorMessage = botError.message;
       this.setError(errorMessage);
-      logger.error('❌ Failed to initialize Solana price provider', { error: errorMessage });
-      throw error;
+      throw new ExternalApiError(errorMessage, 'SolanaPriceProvider', undefined, { operation: 'initialize' });
     }
   }
 
@@ -58,16 +70,16 @@ export class SolanaPriceProvider extends BasePriceProvider {
   async getQuote(symbol: string, amount: number, reverse: boolean = false): Promise<PriceQuote | null> {
     try {
       if (!this.isReady()) {
-        throw new Error('Provider not ready');
+        throw new ValidationError('Provider not ready', { symbol, provider: 'solana' });
       }
 
       const tokenConfig = this.configService.getTokenConfig(symbol);
       if (!tokenConfig) {
-        throw new Error(`Token ${symbol} not configured`);
+        throw new ValidationError(`Token ${symbol} not configured`, { symbol });
       }
 
       if (!isValidTokenAmount(new BigNumber(amount))) {
-        throw new Error(`Invalid amount: ${amount}`);
+        throw new ValidationError(`Invalid amount: ${amount}`, { symbol, amount });
       }
 
       // Update SOL/USD price if needed
@@ -82,16 +94,20 @@ export class SolanaPriceProvider extends BasePriceProvider {
         const rawAmount = toRawAmount(new BigNumber(amount), 9).toString(); // SOL has 9 decimals
         
         try {
-          const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
-            params: {
-              inputMint: solMint,
-              outputMint: galaMint,
-              amount: rawAmount,
-              slippageBps: 50,
-              swapMode: 'ExactIn'
-            },
-            timeout: 10000
-          });
+          const response = await this.errorHandler.executeWithProtection(
+            () => axios.get(`${this.jupiterApiUrl}/quote`, {
+              params: {
+                inputMint: solMint,
+                outputMint: galaMint,
+                amount: rawAmount,
+                slippageBps: 50,
+                swapMode: 'ExactIn'
+              },
+              timeout: 10000
+            }),
+            'jupiter-api',
+            `SOL→GALA quote for ${symbol}`
+          );
 
           if (response.data?.outAmount) {
             // GALA has 8 decimals
@@ -127,9 +143,12 @@ export class SolanaPriceProvider extends BasePriceProvider {
             return solanaQuote;
           }
         } catch (error) {
-          logger.warn('Failed to get SOL→GALA quote on Solana', {
-            error: error instanceof Error ? error.message : String(error)
-          });
+          await this.errorHandler.handleError(
+            error,
+            undefined,
+            undefined,
+            { operation: 'getQuote', symbol, quoteType: 'SOL→GALA', provider: 'solana' }
+          );
           return null;
         }
       }
@@ -148,16 +167,20 @@ export class SolanaPriceProvider extends BasePriceProvider {
         const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
         
         try {
-          const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
-            params: {
-              inputMint: tokenMint,
-              outputMint: galaMint,
-              amount: rawAmount,
-              slippageBps: 50,
-              swapMode: 'ExactIn'
-            },
-            timeout: 10000
-          });
+          const response = await this.errorHandler.executeWithProtection(
+            () => axios.get(`${this.jupiterApiUrl}/quote`, {
+              params: {
+                inputMint: tokenMint,
+                outputMint: galaMint,
+                amount: rawAmount,
+                slippageBps: 50,
+                swapMode: 'ExactIn'
+              },
+              timeout: 10000
+            }),
+            'jupiter-api',
+            `${symbol}→GALA quote`
+          );
 
           if (response.data?.outAmount) {
             // GALA has 8 decimals
@@ -193,17 +216,24 @@ export class SolanaPriceProvider extends BasePriceProvider {
             return solanaQuote;
           }
         } catch (error) {
-          logger.warn(`Failed to get ${symbol}→GALA quote on Solana`, {
-            error: error instanceof Error ? error.message : String(error)
-          });
+          await this.errorHandler.handleError(
+            error,
+            undefined,
+            undefined,
+            { operation: 'getQuote', symbol, quoteType: `${symbol}→GALA`, provider: 'solana' }
+          );
           return null;
         }
       }
 
-      // Get quote based on direction
+      // Get quote based on direction with error handling
       // reverse=false: SOL → Token (buying token with SOL/USDC)
       // reverse=true: Token → SOL (selling token for SOL/USDC)
-      const quote = await this.getJupiterQuote(symbol, amount, reverse);
+      const quote = await this.errorHandler.executeWithProtection(
+        () => this.getJupiterQuote(symbol, amount, reverse),
+        'jupiter-api',
+        `Jupiter quote for ${symbol}`
+      );
 
       if (!quote) {
         return null;
@@ -267,13 +297,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
       return solanaQuote;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.setError(errorMessage);
-      logger.error(`❌ Failed to get Solana quote for ${symbol}`, { 
-        symbol, 
-        amount, 
-        error: errorMessage 
-      });
+      const botError = await this.errorHandler.handleError(
+        error,
+        undefined,
+        undefined,
+        { operation: 'getQuote', symbol, amount, reverse, provider: 'solana' }
+      );
+      this.setError(botError.message);
       return null;
     }
   }
@@ -335,17 +365,21 @@ export class SolanaPriceProvider extends BasePriceProvider {
         rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
       }
 
-      // Get quote from Jupiter
-      const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
-        params: {
-          inputMint,
-          outputMint,
-          amount: rawAmount,
-          slippageBps: 50, // 0.5% slippage
-          swapMode
-        },
-        timeout: 10000
-      });
+      // Get quote from Jupiter with error handling
+      const response = await this.errorHandler.executeWithProtection(
+        () => axios.get(`${this.jupiterApiUrl}/quote`, {
+          params: {
+            inputMint,
+            outputMint,
+            amount: rawAmount,
+            slippageBps: 50, // 0.5% slippage
+            swapMode
+          },
+          timeout: 10000
+        }),
+        'jupiter-api',
+        `Jupiter quote ${inputMint}→${outputMint}`
+      );
 
       if (!response.data || !response.data.outAmount) {
         return null;
@@ -366,8 +400,12 @@ export class SolanaPriceProvider extends BasePriceProvider {
       };
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn('⚠️ Jupiter quote failed', { tokenSymbol, amount, error: errorMessage });
+      await this.errorHandler.handleError(
+        error,
+        undefined,
+        undefined,
+        { operation: 'getJupiterQuote', tokenSymbol, amount, reverse }
+      );
       return null;
     }
   }
@@ -422,16 +460,20 @@ export class SolanaPriceProvider extends BasePriceProvider {
       const amount = 1; // 1 SOL
       const rawAmount = (amount * 1_000_000_000).toString(); // Convert to lamports
       
-      const response = await axios.get(`${this.jupiterApiUrl}/quote`, {
-        params: {
-          inputMint: solMint,
-          outputMint: usdcMint,
-          amount: rawAmount,
-          slippageBps: 50,
-          swapMode: 'ExactIn'
-        },
-        timeout: 5000
-      });
+      const response = await this.errorHandler.executeWithProtection(
+        () => axios.get(`${this.jupiterApiUrl}/quote`, {
+          params: {
+            inputMint: solMint,
+            outputMint: usdcMint,
+            amount: rawAmount,
+            slippageBps: 50,
+            swapMode: 'ExactIn'
+          },
+          timeout: 5000
+        }),
+        'jupiter-api',
+        'SOL/USDC price update'
+      );
 
       if (response.data?.outAmount) {
         // USDC has 6 decimals, SOL has 9 decimals
@@ -445,20 +487,27 @@ export class SolanaPriceProvider extends BasePriceProvider {
         return;
       }
     } catch (jupiterError) {
-      logger.debug('Failed to get SOL/USD from Jupiter pool, trying CoinGecko', {
-        error: jupiterError instanceof Error ? jupiterError.message : String(jupiterError)
-      });
+      await this.errorHandler.handleError(
+        jupiterError,
+        undefined,
+        undefined,
+        { operation: 'updateSOLUSDPrice', source: 'jupiter' }
+      );
     }
 
     // Fallback to CoinGecko
     try {
-      const response = await axios.get(`${this.coinGeckoApiUrl}/simple/price`, {
-        params: {
-          ids: 'solana',
-          vs_currencies: 'usd'
-        },
-        timeout: 10000
-      });
+      const response = await this.errorHandler.executeWithProtection(
+        () => axios.get(`${this.coinGeckoApiUrl}/simple/price`, {
+          params: {
+            ids: 'solana',
+            vs_currencies: 'usd'
+          },
+          timeout: 10000
+        }),
+        'coingecko-api',
+        'SOL/USD price update'
+      );
 
       if (response.data?.solana?.usd) {
         this.solUsdPrice = response.data.solana.usd;
@@ -467,11 +516,14 @@ export class SolanaPriceProvider extends BasePriceProvider {
         return;
       }
     } catch (error) {
-      // Keep this quiet to avoid noisy stack traces (e.g., CG 429). Use concise message and fallback once.
-      const msg = (error instanceof Error && (error as any).response?.status === 429)
-        ? 'Coingecko rate limited (429)'
-        : (error instanceof Error ? error.message : String(error));
-      logger.warn('⚠️ Failed to fetch SOL/USD price, using fallback', { reason: msg });
+      // Handle CoinGecko errors (rate limiting is common)
+      const statusCode = (error as any)?.response?.status;
+      await this.errorHandler.handleError(
+        error,
+        undefined,
+        statusCode === 429 ? undefined : undefined,
+        { operation: 'updateSOLUSDPrice', source: 'coingecko', statusCode }
+      );
     }
 
     // Last resort: use fallback if no price sources worked
