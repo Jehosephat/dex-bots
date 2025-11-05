@@ -59,6 +59,112 @@
       },
       "enabled": true,
       "priority": 4
+    },
+    "forward-gala-gala": {
+      "id": "forward-gala-gala",
+      "name": "Forward: GALA on GC, GALA on SOL",
+      "description": "SELL token for GALA on GalaChain → BUY token with GALA on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "GALA",
+        "operation": "sell"
+      },
+      "solanaSide": {
+        "quoteCurrency": "GALA",
+        "operation": "buy"
+      },
+      "enabled": true,
+      "priority": 5
+    },
+    "reverse-gala-gala": {
+      "id": "reverse-gala-gala",
+      "name": "Reverse: GALA on GC, GALA on SOL",
+      "description": "BUY token with GALA on GalaChain → SELL token for GALA on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "GALA",
+        "operation": "buy"
+      },
+      "solanaSide": {
+        "quoteCurrency": "GALA",
+        "operation": "sell"
+      },
+      "enabled": true,
+      "priority": 6
+    },
+    "forward-usdc-usdc": {
+      "id": "forward-usdc-usdc",
+      "name": "Forward: USDC on GC, USDC on SOL",
+      "description": "SELL token for USDC on GalaChain → BUY token with USDC on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "USDC",
+        "operation": "sell"
+      },
+      "solanaSide": {
+        "quoteCurrency": "USDC",
+        "operation": "buy"
+      },
+      "enabled": false,
+      "priority": 7
+    },
+    "reverse-usdc-usdc": {
+      "id": "reverse-usdc-usdc",
+      "name": "Reverse: USDC on GC, USDC on SOL",
+      "description": "BUY token with USDC on GalaChain → SELL token for USDC on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "USDC",
+        "operation": "buy"
+      },
+      "solanaSide": {
+        "quoteCurrency": "USDC",
+        "operation": "sell"
+      },
+      "enabled": false,
+      "priority": 8
+    },
+    "forward-gala-usdc-reverse": {
+      "id": "forward-gala-usdc-reverse",
+      "name": "Forward: GALA on GC, USDC on SOL (Alt)",
+      "description": "SELL token for GALA on GalaChain → BUY token with USDC on Solana (alternative execution)",
+      "galaChainSide": {
+        "quoteCurrency": "GALA",
+        "operation": "sell"
+      },
+      "solanaSide": {
+        "quoteCurrency": "USDC",
+        "operation": "buy"
+      },
+      "enabled": false,
+      "priority": 9,
+      "minEdgeBps": 25
+    },
+    "forward-sol-usdc": {
+      "id": "forward-sol-usdc",
+      "name": "Forward: SOL on GC, USDC on SOL",
+      "description": "SELL token for SOL on GalaChain → BUY token with USDC on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "SOL",
+        "operation": "sell"
+      },
+      "solanaSide": {
+        "quoteCurrency": "USDC",
+        "operation": "buy"
+      },
+      "enabled": false,
+      "priority": 10
+    },
+    "reverse-sol-usdc": {
+      "id": "reverse-sol-usdc",
+      "name": "Reverse: SOL on GC, USDC on SOL",
+      "description": "BUY token with SOL on GalaChain → SELL token for USDC on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "SOL",
+        "operation": "buy"
+      },
+      "solanaSide": {
+        "quoteCurrency": "USDC",
+        "operation": "sell"
+      },
+      "enabled": false,
+      "priority": 11
     }
   }
 }
