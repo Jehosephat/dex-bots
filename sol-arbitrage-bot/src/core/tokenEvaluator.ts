@@ -16,6 +16,7 @@ import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { RateConverter, RateConversionResult } from './rateConverter';
 import { getErrorHandler } from '../utils/errorHandler';
 import { ArbitrageDirection, DirectionUtils } from '../types/direction';
+import { StrategyRegistry, StrategyEvaluator, StrategyEvaluationResult } from './strategies';
 
 /**
  * Result of token evaluation
@@ -58,6 +59,9 @@ export class TokenEvaluator {
   private rateConverter: RateConverter;
   private riskManager: RiskManager;
   private errorHandler = getErrorHandler();
+  private strategyRegistry: StrategyRegistry | null = null;
+  private strategyEvaluator: StrategyEvaluator | null = null;
+  private useStrategies: boolean = false;
 
   constructor(
     private configService: IConfigService,
@@ -66,69 +70,59 @@ export class TokenEvaluator {
   ) {
     this.rateConverter = new RateConverter(gcProvider, solProvider);
     this.riskManager = new RiskManager(undefined, configService);
+    
+    // Initialize strategy system if strategies are configured
+    this.initializeStrategies();
   }
 
   /**
-   * Evaluate a token for arbitrage opportunity (bidirectional)
+   * Initialize strategy system if strategies are configured
+   */
+  private initializeStrategies(): void {
+    try {
+      const strategiesConfig = this.configService.getStrategiesConfig();
+      if (strategiesConfig && Object.keys(strategiesConfig).length > 0) {
+        this.strategyRegistry = new StrategyRegistry();
+        this.strategyRegistry.loadFromConfig(strategiesConfig);
+        this.strategyEvaluator = new StrategyEvaluator(
+          this.configService,
+          this.gcProvider,
+          this.solProvider,
+          this.strategyRegistry
+        );
+        this.useStrategies = true;
+        logger.info(`✅ Strategy system initialized with ${this.strategyRegistry.getEnabledCount()} enabled strategy(ies)`);
+      } else {
+        logger.debug('No strategies configured, using default forward/reverse evaluation');
+      }
+    } catch (error) {
+      logger.warn('Failed to initialize strategy system, falling back to default evaluation', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      this.useStrategies = false;
+    }
+  }
+
+  /**
+   * Evaluate a token for arbitrage opportunity (bidirectional or strategy-based)
    */
   async evaluateToken(token: TokenConfig): Promise<TokenEvaluationResult> {
     try {
       logger.info(`\n${'━'.repeat(60)}`);
       logger.info(`📊 EVALUATING: ${token.symbol} | Trade Size: ${token.tradeSize}`);
 
-      // Get direction configuration
-      const directionConfig = this.configService.getDirectionConfig();
-
-      // Evaluate forward direction (always)
-      logger.debug(`   📈 Evaluating FORWARD direction...`);
-      const forwardEvaluation = await this.evaluateDirection(token, 'forward');
-
-      // Evaluate reverse direction (if enabled)
-      let reverseEvaluation: TokenEvaluationResult | null = null;
-      if (directionConfig.reverse.enabled) {
-        logger.debug(`   📉 Evaluating REVERSE direction...`);
-        reverseEvaluation = await this.evaluateDirection(token, 'reverse');
-      } else {
-        logger.debug(`   ⏭️  REVERSE direction disabled in config`);
+      // Use strategy-based evaluation if strategies are configured
+      if (this.useStrategies && this.strategyEvaluator) {
+        return await this.evaluateWithStrategies(token);
       }
 
-      // Log both evaluations before selecting
-      if (reverseEvaluation) {
-        logger.info(`\n   📊 Direction Comparison:`);
-        logger.info(`      FORWARD: ${forwardEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${forwardEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
-        logger.info(`      REVERSE: ${reverseEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${reverseEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
-      }
-
-      // Select best direction based on configuration
-      const selectedEvaluation = this.selectBestDirection(
-        forwardEvaluation,
-        reverseEvaluation,
-        directionConfig
-      );
-
-      if (reverseEvaluation && selectedEvaluation.direction !== forwardEvaluation.direction) {
-        logger.debug(`   ✅ Selected REVERSE direction (better edge)`);
-      } else if (reverseEvaluation) {
-        logger.debug(`   ✅ Selected FORWARD direction`);
-      }
-
-      // Store both evaluations for logging purposes
-      (selectedEvaluation as any).forwardEvaluation = forwardEvaluation;
-      (selectedEvaluation as any).reverseEvaluation = reverseEvaluation;
-
-      return selectedEvaluation;
+      // Fall back to default forward/reverse evaluation
+      return await this.evaluateWithDirections(token);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.errorHandler.handleError(
-        error,
-        undefined,
-        undefined,
-        { operation: 'evaluateToken', token: token.symbol }
-      );
-      
+      logger.error(`❌ ERROR evaluating ${token.symbol}`, { error: errorMessage });
       return {
         token,
-        direction: 'forward',
         success: false,
         gcQuote: null,
         solQuote: null,
@@ -137,6 +131,108 @@ export class TokenEvaluator {
         error: errorMessage
       };
     }
+  }
+
+  /**
+   * Evaluate using strategy system
+   */
+  private async evaluateWithStrategies(token: TokenConfig): Promise<TokenEvaluationResult> {
+    if (!this.strategyEvaluator) {
+      throw new Error('Strategy evaluator not initialized');
+    }
+
+    // Evaluate all strategies
+    const comparison = await this.strategyEvaluator.compareStrategies(token);
+    
+    if (!comparison.bestStrategy) {
+      // No profitable strategy found
+      logger.info(`\n   ⚠️  No profitable strategies found for ${token.symbol}`);
+      logger.info(`      All ${comparison.strategies.length} strategies evaluated, none met profitability criteria`);
+      return {
+        token,
+        success: false,
+        gcQuote: null,
+        solQuote: null,
+        rateConversion: null,
+        riskResult: null,
+        error: 'No profitable strategies'
+      };
+    }
+
+    // Convert StrategyEvaluationResult to TokenEvaluationResult
+    const bestStrategy = comparison.bestStrategy;
+    const strategy = bestStrategy.strategy;
+    
+    // Determine direction based on strategy operations
+    const direction: 'forward' | 'reverse' = 
+      (strategy.galaChainSide.operation === 'sell' && strategy.solanaSide.operation === 'buy')
+        ? 'forward'
+        : 'reverse';
+
+    const result: TokenEvaluationResult = {
+      token,
+      direction,
+      success: bestStrategy.success,
+      gcQuote: bestStrategy.gcQuote,
+      solQuote: bestStrategy.solQuote,
+      rateConversion: bestStrategy.rateConversion,
+      riskResult: bestStrategy.riskResult,
+      error: bestStrategy.error
+    };
+
+    // Store strategy information for logging
+    (result as any).strategy = strategy;
+    (result as any).allStrategies = comparison.strategies;
+
+    // Strategy selection already logged by StrategyEvaluator
+    return result;
+  }
+
+  /**
+   * Evaluate using default forward/reverse directions
+   */
+  private async evaluateWithDirections(token: TokenConfig): Promise<TokenEvaluationResult> {
+    // Get direction configuration
+    const directionConfig = this.configService.getDirectionConfig();
+
+    // Evaluate forward direction (always)
+    logger.debug(`   📈 Evaluating FORWARD direction...`);
+    const forwardEvaluation = await this.evaluateDirection(token, 'forward');
+
+    // Evaluate reverse direction (if enabled)
+    let reverseEvaluation: TokenEvaluationResult | null = null;
+    if (directionConfig.reverse.enabled) {
+      logger.debug(`   📉 Evaluating REVERSE direction...`);
+      reverseEvaluation = await this.evaluateDirection(token, 'reverse');
+    } else {
+      logger.debug(`   ⏭️  REVERSE direction disabled in config`);
+    }
+
+    // Log both evaluations before selecting
+    if (reverseEvaluation) {
+      logger.info(`\n   📊 Direction Comparison:`);
+      logger.info(`      FORWARD: ${forwardEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${forwardEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
+      logger.info(`      REVERSE: ${reverseEvaluation.riskResult?.shouldProceed ? '✅ PASS' : '❌ FAIL'} (Edge: ${reverseEvaluation.riskResult?.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
+    }
+
+    // Select best direction based on configuration
+    const selectedEvaluation = this.selectBestDirection(
+      forwardEvaluation,
+      reverseEvaluation,
+      directionConfig
+    );
+
+    if (reverseEvaluation && selectedEvaluation.direction !== forwardEvaluation.direction) {
+      logger.debug(`   ✅ Selected REVERSE direction (better edge)`);
+    } else if (reverseEvaluation) {
+      logger.debug(`   ✅ Selected FORWARD direction`);
+    }
+
+    // Store both evaluations for logging purposes
+    (selectedEvaluation as any).forwardEvaluation = forwardEvaluation;
+    (selectedEvaluation as any).reverseEvaluation = reverseEvaluation;
+
+    return selectedEvaluation;
   }
 
   /**
@@ -316,12 +412,22 @@ export class TokenEvaluator {
 
   /**
    * Log evaluation results
-   * Logs both forward and reverse results if both were evaluated
+   * Logs strategy results or forward/reverse results depending on evaluation mode
    */
   logEvaluationResults(result: TokenEvaluationResult): void {
     const tradingConfig = this.configService.getTradingConfig();
     
-    // Get both evaluations if available
+    // Check if this is a strategy-based result
+    const strategy = (result as any).strategy;
+    const allStrategies = (result as any).allStrategies as StrategyEvaluationResult[] | undefined;
+    
+    if (strategy && allStrategies) {
+      // Log strategy-based results
+      this.logStrategyResults(result, allStrategies, tradingConfig);
+      return;
+    }
+    
+    // Log forward/reverse direction-based results
     const forwardEvaluation = (result as any).forwardEvaluation as TokenEvaluationResult | undefined;
     const reverseEvaluation = (result as any).reverseEvaluation as TokenEvaluationResult | undefined;
     
@@ -335,6 +441,53 @@ export class TokenEvaluator {
       logger.info(`\n${'━'.repeat(60)}`);
       logger.info(`📊 REVERSE Evaluation Results:`);
       this.logDirectionResults(reverseEvaluation, tradingConfig);
+    }
+  }
+
+  /**
+   * Log strategy-based evaluation results
+   */
+  private logStrategyResults(
+    result: TokenEvaluationResult,
+    allStrategies: StrategyEvaluationResult[],
+    tradingConfig: any
+  ): void {
+    const strategy = (result as any).strategy;
+    
+    logger.info(`\n${'━'.repeat(60)}`);
+    logger.info(`📊 Strategy Evaluation Results`);
+    logger.info(`   ⭐ Selected: ${strategy.name}`);
+    
+    // Show strategy operations clearly
+    const gcOp = strategy.galaChainSide.operation.toUpperCase();
+    const solOp = strategy.solanaSide.operation.toUpperCase();
+    logger.info(`   🔷 GalaChain: ${gcOp} ${result.token.symbol} → Receive ${strategy.galaChainSide.quoteCurrency}`);
+    logger.info(`   🔸 Solana: ${solOp} ${result.token.symbol} → Spend ${strategy.solanaSide.quoteCurrency}`);
+    
+    // Log all strategy results for comparison in a cleaner format
+    if (allStrategies.length > 1) {
+      logger.info(`\n   📊 All Strategies Evaluated:`);
+      allStrategies.forEach((s, i) => {
+        const edge = s.edge?.netEdgeBps?.toFixed(2) || 'N/A';
+        const isSelected = s.strategy.id === strategy.id;
+        
+        if (s.success && s.riskResult?.shouldProceed && s.edge?.isProfitable && s.edge?.meetsThreshold) {
+          const marker = isSelected ? '⭐' : '✅';
+          logger.info(`      ${marker} ${s.strategy.name}: Edge ${edge} bps`);
+        } else if (s.success) {
+          const reason = s.riskResult?.reasons?.[0] || 'Edge too low';
+          logger.debug(`      ❌ ${s.strategy.name}: ${reason}`);
+        } else {
+          const error = s.error?.split(':')[0] || 'Failed';
+          logger.debug(`      ⚠️  ${s.strategy.name}: ${error}`);
+        }
+      });
+    }
+    
+    // Log detailed results for selected strategy
+    if (result.success && result.gcQuote && result.solQuote) {
+      logger.info(`\n${'━'.repeat(60)}`);
+      this.logDirectionResults(result, tradingConfig);
     }
   }
   

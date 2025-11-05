@@ -141,12 +141,11 @@ export class QuoteValidator {
     const isValid = errors.length === 0;
 
     if (!isValid && context) {
-      logger.warn(`⚠️ Quote validation failed for ${context}`, {
-        errors,
-        warnings,
-        age,
-        symbol: quote.symbol
-      });
+      // Format errors more readably
+      const errorSummary = errors.length > 0 
+        ? errors.slice(0, 2).join('; ') + (errors.length > 2 ? ` (+${errors.length - 2} more)` : '')
+        : 'Validation failed';
+      logger.debug(`   ⚠️  Quote validation failed: ${errorSummary}`);
     }
 
     return {

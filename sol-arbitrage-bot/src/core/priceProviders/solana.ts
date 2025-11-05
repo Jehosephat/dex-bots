@@ -123,7 +123,7 @@ export class SolanaPriceProvider extends BasePriceProvider {
       if (quote) {
         const validation = this.quoteValidator.validate(quote, `Solana quote for ${symbol}`);
         if (!validation.isValid) {
-          logger.warn(`Quote validation failed for ${symbol}`, { errors: validation.errors });
+          // Validation errors are already logged by quoteValidator at debug level
           return null;
         }
         

@@ -56,8 +56,8 @@ export class StrategyEvaluator {
     }
 
     logger.info(`\n${'━'.repeat(60)}`);
-    logger.info(`📊 EVALUATING STRATEGIES: ${token.symbol} | Trade Size: ${token.tradeSize}`);
-    logger.info(`   Found ${strategies.length} enabled strategy(ies)`);
+    logger.info(`📊 Evaluating ${strategies.length} Strategy(ies) for ${token.symbol}`);
+    logger.info(`   Trade Size: ${token.tradeSize} ${token.symbol}`);
 
     // Evaluate all strategies in parallel
     const evaluationPromises = strategies.map(strategy =>
@@ -66,10 +66,36 @@ export class StrategyEvaluator {
 
     const results = await Promise.all(evaluationPromises);
 
-    // Log summary
+    // Log summary with better formatting
+    // "Successful" = evaluation completed without errors (quotes fetched, edge calculated)
     const successful = results.filter(r => r.success).length;
-    const profitable = results.filter(r => r.riskResult?.shouldProceed).length;
-    logger.info(`   Results: ${successful}/${strategies.length} successful, ${profitable} profitable`);
+    const failed = results.filter(r => !r.success);
+    
+    // "Profitable" = successful + passed all risk checks + edge is profitable + meets threshold
+    const profitable = results.filter(r => 
+      r.success && 
+      r.riskResult?.shouldProceed && 
+      r.edge?.isProfitable && 
+      r.edge?.meetsThreshold
+    ).length;
+    
+    logger.info(`\n   📈 Summary:`);
+    logger.info(`      ✅ Evaluated: ${successful}/${strategies.length} (quotes fetched, edge calculated)`);
+    if (failed.length > 0) {
+      const failureReasons = failed.map(f => {
+        if (f.error?.includes('Missing quote')) return 'quote fetch failed';
+        if (f.error?.includes('validation')) return 'quote validation failed';
+        if (f.error?.includes('convert')) return 'rate conversion failed';
+        return 'evaluation error';
+      });
+      const uniqueReasons = [...new Set(failureReasons)];
+      logger.debug(`      ⚠️  Failed: ${failed.length}/${strategies.length} (${uniqueReasons.join(', ')})`);
+    }
+    logger.info(`      💰 Profitable: ${profitable}/${strategies.length} (passed all checks & meets threshold)`);
+    
+    if (profitable === 0) {
+      logger.info(`      ⚠️  No profitable opportunities found`);
+    }
 
     return results;
   }
@@ -109,7 +135,9 @@ export class StrategyEvaluator {
     });
 
     const best = passingStrategies[0];
-    logger.info(`   ✅ Best strategy: ${best.strategy.name} (Edge: ${best.edge?.netEdgeBps.toFixed(2)} bps)`);
+    const edgeBps = best.edge?.netEdgeBps.toFixed(2) || '0.00';
+    logger.info(`\n   ⭐ Best Strategy: ${best.strategy.name}`);
+    logger.info(`      Edge: ${edgeBps} bps`);
     
     return best;
   }
@@ -124,7 +152,10 @@ export class StrategyEvaluator {
     const startTime = Date.now();
     
     try {
-      logger.debug(`   🔍 Evaluating strategy: ${strategy.name}`);
+      // Log strategy being evaluated in a more readable format
+      const gcAction = strategy.galaChainSide.operation === 'buy' ? 'BUY' : 'SELL';
+      const solAction = strategy.solanaSide.operation === 'buy' ? 'BUY' : 'SELL';
+      logger.debug(`   🔍 ${strategy.name}: ${gcAction} on GC (${strategy.galaChainSide.quoteCurrency}) → ${solAction} on SOL (${strategy.solanaSide.quoteCurrency})`);
 
       // Determine reverse flags based on operations
       const gcReverse = strategy.galaChainSide.operation === 'buy';
@@ -249,7 +280,14 @@ export class StrategyEvaluator {
         };
       }
 
-      logger.debug(`   ${riskResult.shouldProceed ? '✅' : '❌'} Strategy ${strategy.id}: ${riskResult.shouldProceed ? 'PASS' : 'FAIL'} (Edge: ${riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A'} bps)`);
+      const edgeDisplay = riskResult.edge?.netEdgeBps?.toFixed(2) || 'N/A';
+      const status = riskResult.shouldProceed ? '✅ PASS' : '❌ FAIL';
+      if (riskResult.shouldProceed) {
+        logger.info(`      ${status} - Edge: ${edgeDisplay} bps`);
+      } else {
+        const reasons = riskResult.reasons?.slice(0, 2).join(', ') || 'See details';
+        logger.debug(`      ${status} - Edge: ${edgeDisplay} bps (${reasons})`);
+      }
 
       return {
         strategy,
