@@ -1,3 +1,4 @@
+import BigNumber from 'bignumber.js';
 import logger from './utils/logger';
 import { createConfigService, IConfigService } from './config';
 import { GalaChainPriceProvider } from './core/priceProviders/galachain';
@@ -104,23 +105,55 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
   logger.info(`\n🔍 Running initial balance check before cycle...`);
   const initialBalanceCheck = await balanceChecker.checkBalances(true, true);
 
-  // Log balance check summary
+  // Log balance check summary (deduplicated by token, showing max required)
   logger.info(`\n📊 Balance Check Summary:`);
   
   if (initialBalanceCheck.checkedBalances) {
+    // Deduplicate GalaChain balances by token, keeping max required
     if (initialBalanceCheck.checkedBalances.galaChain.length > 0) {
-      logger.info(`   🔷 GalaChain:`);
+      const gcMap = new Map<string, { current: BigNumber; required: BigNumber; sufficient: boolean }>();
       initialBalanceCheck.checkedBalances.galaChain.forEach(check => {
+        const existing = gcMap.get(check.token);
+        if (!existing || check.required.isGreaterThan(existing.required)) {
+          gcMap.set(check.token, {
+            current: check.current,
+            required: check.required,
+            sufficient: check.sufficient
+          });
+        } else if (existing && !existing.sufficient && check.sufficient) {
+          // Update if new check is sufficient but existing wasn't
+          existing.sufficient = true;
+        }
+      });
+      
+      logger.info(`   🔷 GalaChain:`);
+      Array.from(gcMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([token, check]) => {
         const status = check.sufficient ? '✅' : '❌';
-        logger.info(`      ${status} ${check.token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)} (${check.purpose.toUpperCase()})`);
+        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}`);
       });
     }
     
+    // Deduplicate Solana balances by token, keeping max required
     if (initialBalanceCheck.checkedBalances.solana.length > 0) {
-      logger.info(`   🔸 Solana:`);
+      const solMap = new Map<string, { current: BigNumber; required: BigNumber; sufficient: boolean }>();
       initialBalanceCheck.checkedBalances.solana.forEach(check => {
+        const existing = solMap.get(check.token);
+        if (!existing || check.required.isGreaterThan(existing.required)) {
+          solMap.set(check.token, {
+            current: check.current,
+            required: check.required,
+            sufficient: check.sufficient
+          });
+        } else if (existing && !existing.sufficient && check.sufficient) {
+          // Update if new check is sufficient but existing wasn't
+          existing.sufficient = true;
+        }
+      });
+      
+      logger.info(`   🔸 Solana:`);
+      Array.from(solMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([token, check]) => {
         const status = check.sufficient ? '✅' : '❌';
-        logger.info(`      ${status} ${check.token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)} (${check.purpose.toUpperCase()})`);
+        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}`);
       });
     }
   }

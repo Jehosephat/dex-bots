@@ -34,7 +34,7 @@
           "balance": "1.002145203",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762438492904
+          "lastUpdated": 1762439234502
         },
         "GALA": {
           "symbol": "GALA",
@@ -43,7 +43,7 @@
           "balance": "40737.65478494",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762438492904
+          "lastUpdated": 1762439234502
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,33 +52,33 @@
           "balance": "25500",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762438492904
+          "lastUpdated": 1762439234502
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "0",
-          "balance": "0",
+          "rawBalance": "2000",
+          "balance": "2000",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762438492904
+          "lastUpdated": 1762439234502
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762438492904
+      "lastUpdated": 1762439234502
     },
     "solana": {
       "tokens": {},
-      "native": "0.547057563",
+      "native": "0.547013282",
       "totalValueUsd": "0",
-      "lastUpdated": 1762438493243
+      "lastUpdated": 1762439234312
     },
-    "lastUpdated": 1762438493243,
-    "version": 1041
+    "lastUpdated": 1762439234502,
+    "version": 1043
   },
-  "lastSaved": 1762438637967,
-  "version": 154,
+  "lastSaved": 1762439234504,
+  "version": 155,
   "tokenCooldowns": {
     "MEW": {
       "isInCooldown": true,
