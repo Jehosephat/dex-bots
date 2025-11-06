@@ -7,7 +7,7 @@ import { SolanaExecutor, SolanaExecutionResult } from './solanaExecutor';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { ArbitrageDirection } from '../types/direction';
 import logger from '../utils/logger';
-import { sendAlert } from '../utils/alerts';
+import { sendAlert, sendSolanaTradeAlert } from '../utils/alerts';
 import { getErrorHandler } from '../utils/errorHandler';
 import { ExecutionError, ValidationError } from '../utils/errors';
 
@@ -399,6 +399,42 @@ export class DualLegCoordinator {
       };
       
       sendAlert('Dual-leg trade executed', alertPayload, 'success').catch(() => {});
+      
+      // Send separate Solana-only formatted message
+      if (sol.success && sol.txSig) {
+        const solanaWalletAddress = process.env.SOLANA_WALLET_ADDRESS;
+        
+        // Determine token in/out and amounts for Solana side
+        let tokenIn: string;
+        let amountIn: string;
+        let tokenOut: string;
+        let amountOut: string;
+        
+        if (isReverse) {
+          // REVERSE: SELL token on Solana, receive quote currency
+          tokenIn = symbol;
+          amountIn = solAmount.toString();
+          tokenOut = solCurrency;
+          amountOut = formatQuote(sol.params.expectedCostInQuote, true); // Received quote (raw units)
+        } else {
+          // FORWARD: BUY token on Solana, spend quote currency
+          tokenIn = solCurrency;
+          amountIn = formatQuote(sol.params.expectedCostInQuote, false); // Spent quote (human-readable)
+          tokenOut = symbol;
+          amountOut = solAmount.toString();
+        }
+        
+        sendSolanaTradeAlert(
+          tokenIn,
+          amountIn,
+          tokenOut,
+          amountOut,
+          sol.txSig,
+          solanaWalletAddress
+        ).catch((err) => {
+          logger.warn('Failed to send Solana trade alert', { error: err instanceof Error ? err.message : String(err) });
+        });
+      }
     }
 
     return { gc, sol };
