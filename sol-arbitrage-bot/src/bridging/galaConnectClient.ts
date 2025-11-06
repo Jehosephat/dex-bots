@@ -110,12 +110,14 @@ export class GalaConnectClient {
 
   async requestBridgeOut(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
-    return this.postJson(ep.pathRequestBridgeOut, payload, ep.connectBaseUrl);
+    // Use dexApiBaseUrl for bridge operations instead of connectBaseUrl
+    return this.postJson(ep.pathRequestBridgeOut, payload, ep.dexApiBaseUrl);
   }
 
   async bridgeTokenOut(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
-    return this.postJson(ep.pathBridgeTokenOut, payload, ep.connectBaseUrl);
+    // Use dexApiBaseUrl for bridge operations instead of connectBaseUrl
+    return this.postJson(ep.pathBridgeTokenOut, payload, ep.dexApiBaseUrl);
   }
 
   async registerBridgeTransaction(payload: Record<string, unknown>): Promise<unknown> {
