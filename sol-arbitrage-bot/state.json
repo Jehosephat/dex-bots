@@ -34,61 +34,61 @@
           "balance": "1.002145203",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762386807038
+          "lastUpdated": 1762438492904
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "37282.22956911",
-          "balance": "37282.22956911",
+          "rawBalance": "40737.65478494",
+          "balance": "40737.65478494",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762386807038
+          "lastUpdated": 1762438492904
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "33000",
-          "balance": "33000",
+          "rawBalance": "25500",
+          "balance": "25500",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762386807038
+          "lastUpdated": 1762438492904
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "1350",
-          "balance": "1350",
+          "rawBalance": "0",
+          "balance": "0",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762386807038
+          "lastUpdated": 1762438492904
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762386807038
+      "lastUpdated": 1762438492904
     },
     "solana": {
       "tokens": {},
-      "native": "0.547183076",
+      "native": "0.547057563",
       "totalValueUsd": "0",
-      "lastUpdated": 1762386807059
+      "lastUpdated": 1762438493243
     },
-    "lastUpdated": 1762386807059,
-    "version": 977
+    "lastUpdated": 1762438493243,
+    "version": 1041
   },
-  "lastSaved": 1762386807060,
-  "version": 140,
+  "lastSaved": 1762438637967,
+  "version": 154,
   "tokenCooldowns": {
-    "USDUC": {
+    "MEW": {
       "isInCooldown": true,
-      "cooldownEndsAt": 1762380356937,
+      "cooldownEndsAt": 1762390321814,
       "remainingSeconds": 60,
       "reason": "Trade executed successfully"
     },
-    "MEW": {
+    "USDUC": {
       "isInCooldown": true,
-      "cooldownEndsAt": 1762380351079,
+      "cooldownEndsAt": 1762438684101,
       "remainingSeconds": 60,
       "reason": "Trade executed successfully"
     }

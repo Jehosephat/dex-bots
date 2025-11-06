@@ -174,11 +174,15 @@ export class StrategyEvaluator {
       logger.info(`      ${solAction} ${token.symbol} on Solana (quote: ${strategy.solanaSide.quoteCurrency})`);
 
       // Determine reverse flags based on operations
-      // reverse=false: BUY token (spend quote currency, get token)
-      // reverse=true: SELL token (spend token, get quote currency)
+      // 
+      // For Solana: reverse=false = BUY token, reverse=true = SELL token
       // So: operation='buy' → reverse=false, operation='sell' → reverse=true
-      const gcReverse = strategy.galaChainSide.operation === 'sell';
       const solReverse = strategy.solanaSide.operation === 'sell';
+      
+      // For GalaChain: reverse=false = SELL token → GET GALA, reverse=true = SELL GALA → BUY token
+      // So: operation='sell' → reverse=false (sell token, get GALA)
+      //     operation='buy' → reverse=true (sell GALA, buy token)
+      const gcReverse = strategy.galaChainSide.operation === 'buy';
 
       // Create temporary token config with strategy's quote currencies
       const tempTokenConfig: TokenConfig = {

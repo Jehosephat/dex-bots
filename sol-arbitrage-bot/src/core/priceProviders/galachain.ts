@@ -17,6 +17,7 @@ import {
   Pool, 
   TickData 
 } from '@gala-chain/dex';
+import { GSwap, PrivateKeySigner } from '@gala-chain/gswap-sdk';
 import { BasePriceProvider } from './base';
 import { PriceQuote, GalaChainQuote } from '../../types/core';
 import { TokenConfig } from '../../types/config';
@@ -37,6 +38,7 @@ export class GalaChainPriceProvider extends BasePriceProvider {
   private galaUsdPrice: number = 0;
   private galaUsdPriceLastUpdate: number = 0;
   private galaUsdPriceCacheDuration: number = 300000; // Cache for 5 minutes (300 seconds)
+  private gswap: GSwap | null = null;
 
   constructor(private configService: IConfigService) {
     super();
@@ -86,34 +88,44 @@ export class GalaChainPriceProvider extends BasePriceProvider {
 
       // Determine quote direction:
       // For REVERSE arbitrage (reverse=true): We want to BUY token with GALA (spend GALA, get token)
-      // For FORWARD arbitrage (reverse=false): 
-      //   - If gcQuoteVia is GALA: we're selling GALA to buy token (reverse quote)
-      //   - Otherwise: we're selling token to get quote currency (forward quote)
+      //   - shouldReverse=true (selling GALA to buy token)
+      // For FORWARD arbitrage (reverse=false): We want to SELL token to GET GALA
+      //   - shouldReverse=false (selling token to get GALA)
       // 
-      // When reverse=true, we always want to buy token with GALA, so shouldReverse=true
-      // When reverse=false, use the existing logic based on quoteVia
-      const shouldReverse = reverse ? true : (quoteVia === 'GALA');
+      // The reverse parameter indicates arbitrage direction, not quote direction
+      const shouldReverse = reverse; // Only reverse for reverse arbitrage (buying token with GALA)
 
-      logger.debug(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
-        tokenSymbol: symbol,
-        quoteVia,
-        token0: quoteVia === 'GALA' ? 'GALA' : symbol,
-        token1: quoteVia === 'GALA' ? symbol : quoteVia,
-        desiredTokens: reverse ? amount : (quoteVia === 'GALA' ? 'N/A' : amount),
-        estimatedGalaInput: reverse ? 'N/A' : (quoteVia === 'GALA' ? amount : 'N/A'),
-        reverseZeroForOne: shouldReverse,
-        sellingToken: shouldReverse ? 'token0 (GALA)' : (quoteVia === 'GALA' ? 'token1 (token)' : 'token0 (token)'),
-        receivingToken: shouldReverse ? 'token1 (token)' : (quoteVia === 'GALA' ? 'token0 (GALA)' : 'token1 (quote)')
-      });
+      // Try to use SDK for more accurate quotes (matches executor behavior)
+      // Only use SDK for forward quotes (selling token to get GALA) when quoteVia is GALA
+      let quote;
+      if (!shouldReverse && quoteVia === 'GALA') {
+        // Forward quote: selling token to get GALA - use SDK if available
+        quote = await this.getSDKQuote(symbol, amount);
+      }
+      
+      // Fall back to local API quote if SDK not available or for reverse quotes
+      if (!quote) {
+        logger.debug(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
+          tokenSymbol: symbol,
+          quoteVia,
+          token0: quoteVia === 'GALA' ? 'GALA' : symbol,
+          token1: quoteVia === 'GALA' ? symbol : quoteVia,
+          desiredTokens: reverse ? amount : (quoteVia === 'GALA' ? 'N/A' : amount),
+          estimatedGalaInput: reverse ? 'N/A' : (quoteVia === 'GALA' ? amount : 'N/A'),
+          reverseZeroForOne: shouldReverse,
+          sellingToken: shouldReverse ? 'token0 (GALA)' : (quoteVia === 'GALA' ? 'token1 (token)' : 'token0 (token)'),
+          receivingToken: shouldReverse ? 'token1 (token)' : (quoteVia === 'GALA' ? 'token0 (GALA)' : 'token1 (quote)')
+        });
 
-      // Get the quote - pass amount directly (e.g., 0.01 SOL or 1500 MEW)
-      const quote = await this.getLocalQuote(
-        symbol,
-        quoteVia,
-        new BigNumber(amount),
-        DexFeePercentageTypes.FEE_1_PERCENT,
-        shouldReverse // Reverse if we're selling GALA to buy token (or if reverse arbitrage)
-      );
+        // Get the quote - pass amount directly (e.g., 0.01 SOL or 1500 MEW)
+        quote = await this.getLocalQuote(
+          symbol,
+          quoteVia,
+          new BigNumber(amount),
+          DexFeePercentageTypes.FEE_1_PERCENT,
+          shouldReverse // Reverse if we're selling GALA to buy token (or if reverse arbitrage)
+        );
+      }
 
       if (!quote) {
         return null;
@@ -187,6 +199,54 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         symbol, 
         amount, 
         error: errorMessage 
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get quote using GSwap SDK (matches executor behavior for accuracy)
+   * Only works for forward quotes (selling token to get GALA)
+   */
+  private async getSDKQuote(symbol: string, amount: number): Promise<{
+    outputAmount: string;
+    poolAddress: string;
+    route?: string[];
+  } | null> {
+    try {
+      // Initialize SDK if not already initialized
+      if (!this.gswap) {
+        const priv = process.env.GALACHAIN_PRIVATE_KEY;
+        if (!priv) {
+          logger.debug('GALACHAIN_PRIVATE_KEY not set, skipping SDK quote');
+          return null;
+        }
+        const signer = new PrivateKeySigner(priv);
+        this.gswap = new GSwap({ signer });
+      }
+
+      const tokenConfig = this.configService.getTokenConfig(symbol);
+      if (!tokenConfig?.galaChainMint) {
+        return null;
+      }
+
+      const tokenIn = tokenConfig.galaChainMint;
+      const tokenOut = 'GALA|Unit|none|none';
+
+      // Use SDK quoting (matches executor)
+      const q = await this.gswap.quoting.quoteExactInput(tokenIn, tokenOut, amount);
+      const outputAmount = new BigNumber(q.outTokenAmount.toString());
+
+      logger.info(`📊 Using SDK quote for ${symbol}: ${outputAmount.toString()} GALA for ${amount} ${symbol} (matches executor)`);
+
+      return {
+        outputAmount: outputAmount.toString(),
+        poolAddress: 'unknown',
+        route: [symbol, 'GALA']
+      };
+    } catch (error) {
+      logger.debug('SDK quote failed, falling back to local API', {
+        error: error instanceof Error ? error.message : String(error)
       });
       return null;
     }
