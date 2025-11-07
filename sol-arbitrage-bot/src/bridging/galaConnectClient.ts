@@ -16,6 +16,18 @@ export interface BridgeConfigurationToken extends BridgeTokenDescriptor {
   channel?: string;
 }
 
+interface BridgeFeeResponse {
+  bridgeToken: BridgeTokenDescriptor;
+  bridgeTokenIsNonFungible: boolean;
+  estimatedPricePerTxFeeUnit: string;
+  estimatedTotalTxFeeInExternalToken: string;
+  estimatedTotalTxFeeInGala: string;
+  estimatedTxFeeUnitsTotal: string;
+  galaDecimals: number;
+  timestamp: number | string;
+  signingIdentity: string;
+  signature: string;
+}
 
 export class GalaConnectHttpError extends Error {
   constructor(
@@ -106,23 +118,29 @@ export class GalaConnectClient {
   }
 
   async getBridgeStatus(hash: string): Promise<unknown> {
-    const ep = resolveGalaEndpoints();
-    if (ep.urlBridgeStatus) {
-      const u = new URL(ep.urlBridgeStatus);
-      u.searchParams.set('hash', hash);
-      const res = await this.request(u.toString(), { method: 'GET' });
-      const text = await res.text();
-      const parsed = this.tryParse(text);
-      if (!res.ok) throw new GalaConnectHttpError(res.status, u.pathname + u.search, parsed ?? text, u.toString());
-      return parsed as unknown;
-    }
-    const url = new URL(ep.pathBridgeStatus, ep.dexApiBaseUrl);
-    url.searchParams.set('hash', hash);
-    const fullUrl = url.toString();
-    const res = await this.request(fullUrl, { method: 'GET' });
+    // Hard-coded: Use DEX API endpoint for bridge status
+    const fullUrl = 'https://dex-api-platform-dex-prod-gala.gala.com/v1/bridge/status';
+    const payload = { hash };
+    
+    // Log the URL and payload being used for debugging
+    console.log(`[getBridgeStatus] Checking bridge status at: ${fullUrl}`);
+    console.log(`[getBridgeStatus] Request body:`, JSON.stringify(payload));
+    
+    const res = await this.request(fullUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     const text = await res.text();
     const parsed = this.tryParse(text);
-    if (!res.ok) throw new GalaConnectHttpError(res.status, url.pathname + url.search, parsed ?? text, fullUrl);
+    
+    // Log the response for debugging
+    console.log(`[getBridgeStatus] Response status: ${res.status}`);
+    console.log(`[getBridgeStatus] Response body:`, text.substring(0, 500)); // First 500 chars
+    
+    if (!res.ok) {
+      throw new GalaConnectHttpError(res.status, '/v1/bridge/status', parsed ?? text, fullUrl);
+    }
     return parsed as unknown;
   }
 

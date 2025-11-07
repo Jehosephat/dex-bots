@@ -160,11 +160,16 @@ async function main() {
   console.log('Polling bridge status for hash:', hash);
   const start = Date.now();
   while (Date.now() - start < 30 * 60_000) {
-    const status = (await client.getBridgeStatus(hash)) as any;
-    const s = status?.data?.status ?? status?.status;
-    const desc = status?.data?.statusDescription;
-    console.log('Status:', s, desc);
-    if (s >= 5) break;
+    try {
+      const status = (await client.getBridgeStatus(hash)) as any;
+      console.log('Raw status response:', JSON.stringify(status, null, 2));
+      const s = status?.data?.status ?? status?.status;
+      const desc = status?.data?.statusDescription ?? status?.statusDescription;
+      console.log('Parsed Status:', s, desc);
+      if (s >= 5) break;
+    } catch (error) {
+      console.error('Error checking bridge status:', error instanceof Error ? error.message : String(error));
+    }
     await new Promise((r) => setTimeout(r, 15_000));
   }
 
