@@ -13,6 +13,7 @@ import {
   BridgingConfig,
   MonitoringConfig,
   NetworksConfig,
+  AutoBridgingConfig,
   ConfigValidationResult,
 } from '../types/config';
 
@@ -97,5 +98,10 @@ export interface IConfigService {
    * Get strategies configuration (if available)
    */
   getStrategiesConfig(): Record<string, any> | undefined;
+  
+  /**
+   * Get auto-bridging configuration (if available)
+   */
+  getAutoBridgingConfig(): AutoBridgingConfig | undefined;
 }
 

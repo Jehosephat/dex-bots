@@ -45,6 +45,13 @@ export class BalanceChecker {
   private lastBalanceCheckTime: number = 0;
   private lastBalanceCheckResult: BalanceCheckResult | null = null;
 
+  /**
+   * Get the last balance check result (cached)
+   */
+  getLastBalanceCheckResult(): BalanceCheckResult | null {
+    return this.lastBalanceCheckResult;
+  }
+
   constructor(stateManager?: StateManager, private configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
     // Use provided config service or create default one

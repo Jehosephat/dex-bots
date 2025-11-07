@@ -7,6 +7,9 @@ import { BalanceChecker } from './core/balanceChecker';
 import { TokenEvaluator } from './core/tokenEvaluator';
 import { TradeExecutor } from './core/tradeExecutor';
 import { getErrorHandler } from './utils/errorHandler';
+import { AutoBridgeService } from './bridging/autoBridgeService';
+import { BridgeManager } from './bridging/bridgeManager';
+import { BridgeStateTracker } from './bridging/bridgeStateTracker';
 
 export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', configService?: IConfigService): Promise<boolean> {
   // Use provided config service or create default one
@@ -32,6 +35,24 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
   const stateManager = (risk as any).stateManager;
   const balanceChecker = new BalanceChecker(stateManager, config);
   
+  // Initialize auto-bridging service (if enabled)
+  let autoBridgeService: AutoBridgeService | null = null;
+  const autoBridgingConfig = config.getAutoBridgingConfig();
+  if (autoBridgingConfig?.enabled) {
+    const bridgeManager = new BridgeManager(config as any); // BridgeManager expects ConfigManager, but IConfigService is compatible
+    await bridgeManager.initialize();
+    const bridgeStateTracker = new BridgeStateTracker();
+    autoBridgeService = new AutoBridgeService(
+      config,
+      balanceChecker,
+      bridgeManager,
+      bridgeStateTracker,
+      gcProvider,
+      solProvider
+    );
+    logger.info('🌉 Auto-bridging enabled');
+  }
+  
   // Initialize providers
   await gcProvider.initialize();
   await solProvider.initialize();
@@ -41,6 +62,14 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
     const balanceCheckResult = await checkInitialBalances(balanceChecker);
     if (!balanceCheckResult) {
       return false;
+    }
+    
+    // Check for auto-bridging opportunities after initial balance check
+    // Reuse the balance check result to avoid duplicate API calls
+    if (autoBridgeService) {
+      // Get the last balance check result from BalanceChecker (it caches the result)
+      const lastBalanceCheck = balanceChecker.getLastBalanceCheckResult();
+      await checkAutoBridging(autoBridgeService, lastBalanceCheck || undefined);
     }
   }
 
@@ -234,6 +263,39 @@ async function checkBalancesAfterTrade(balanceChecker: BalanceChecker): Promise<
       error: balanceError instanceof Error ? balanceError.message : String(balanceError)
     });
     return false;
+  }
+}
+
+/**
+ * Check for auto-bridging opportunities
+ */
+async function checkAutoBridging(
+  autoBridgeService: AutoBridgeService,
+  balanceCheckResult?: import('./core/balanceChecker').BalanceCheckResult
+): Promise<void> {
+  try {
+    logger.info(`\n🔍 Checking for auto-bridging opportunities...`);
+    const checkResult = await autoBridgeService.checkAllTokens(balanceCheckResult);
+    
+    if (checkResult.needsRebalancing && checkResult.recommendations.length > 0) {
+      logger.info(`🌉 Found ${checkResult.recommendations.length} token(s) needing rebalancing`);
+      
+      for (const imbalance of checkResult.recommendations) {
+        try {
+          await autoBridgeService.rebalance(imbalance);
+        } catch (error) {
+          logger.error(`❌ Failed to rebalance ${imbalance.token}`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } else {
+      logger.debug(`✅ No auto-bridging needed - balances are balanced`);
+    }
+  } catch (error) {
+    logger.warn(`⚠️ Auto-bridging check failed, continuing`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

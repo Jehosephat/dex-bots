@@ -105,6 +105,31 @@ export const monitoringConfigSchema = z.object({
 });
 
 /**
+ * Auto-bridging configuration schema
+ */
+export const autoBridgingConfigSchema = z.object({
+  enabled: z.boolean(),
+  imbalanceThresholdPercent: z.number().int().min(50).max(100).default(80),
+  targetSplitPercent: z.number().int().min(0).max(100).default(50),
+  minRebalanceAmount: nonNegativeNumberSchema.default(100),
+  checkIntervalMinutes: z.number().int().min(1).default(60),
+  cooldownMinutes: z.number().int().min(0).default(30),
+  maxBridgesPerDay: z.number().int().min(1).default(10),
+  enabledTokens: z.array(z.string()).default([]), // Empty = all enabled tokens
+  skipTokens: z.array(z.string()).default([]),
+}).transform((data) => ({
+  ...data,
+  imbalanceThresholdPercent: data.imbalanceThresholdPercent ?? 80,
+  targetSplitPercent: data.targetSplitPercent ?? 50,
+  minRebalanceAmount: data.minRebalanceAmount ?? 100,
+  checkIntervalMinutes: data.checkIntervalMinutes ?? 60,
+  cooldownMinutes: data.cooldownMinutes ?? 30,
+  maxBridgesPerDay: data.maxBridgesPerDay ?? 10,
+  enabledTokens: data.enabledTokens ?? [],
+  skipTokens: data.skipTokens ?? [],
+}));
+
+/**
  * Arbitrage strategy configuration schema
  */
 export const arbitrageStrategySchema = z.object({
@@ -149,6 +174,7 @@ export const botConfigSchema = z.object({
   trading: tradingConfigSchema,
   bridging: bridgingConfigSchema,
   monitoring: monitoringConfigSchema,
+  autoBridging: autoBridgingConfigSchema.optional(),
   networks: networksConfigSchema,
   strategies: z.record(z.string(), arbitrageStrategySchema).optional(),
 });

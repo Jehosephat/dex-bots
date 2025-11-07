@@ -30,63 +30,56 @@
         "SOL": {
           "symbol": "SOL",
           "mint": "GSOL|Unit|none|none",
-          "rawBalance": "1.002145203",
-          "balance": "1.002145203",
+          "rawBalance": "1.011145203",
+          "balance": "1.011145203",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762448272454
+          "lastUpdated": 1762540788493
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "23828.06167884",
-          "balance": "23828.06167884",
+          "rawBalance": "23691.31426061",
+          "balance": "23691.31426061",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762448272454
+          "lastUpdated": 1762540788493
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "25500",
-          "balance": "25500",
+          "rawBalance": "25800",
+          "balance": "25800",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762448272454
+          "lastUpdated": 1762540788493
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "2050",
-          "balance": "2050",
+          "rawBalance": "1600",
+          "balance": "1600",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762448272454
+          "lastUpdated": 1762540788493
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762448272454
+      "lastUpdated": 1762540788493
     },
     "solana": {
       "tokens": {},
-      "native": "0.546817018",
+      "native": "0.536600063",
       "totalValueUsd": "0",
-      "lastUpdated": 1762448272161
+      "lastUpdated": 1762540788881
     },
-    "lastUpdated": 1762448272454,
-    "version": 1069
+    "lastUpdated": 1762540788881,
+    "version": 1085
   },
-  "lastSaved": 1762448272455,
-  "version": 169,
-  "tokenCooldowns": {
-    "USDUC": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1762445986032,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    }
-  },
+  "lastSaved": 1762540846544,
+  "version": 172,
+  "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],

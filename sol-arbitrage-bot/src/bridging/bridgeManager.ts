@@ -262,6 +262,50 @@ export class BridgeManager {
   }
 
 
+  /**
+   * Poll bridge status until completion
+   */
+  async waitForBridgeCompletion(
+    hash: string,
+    timeoutMinutes: number = 30
+  ): Promise<{ status: number; statusDescription: string } | null> {
+    if (!this.client) throw new Error('BridgeManager not initialized');
+
+    const start = Date.now();
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+    let lastStatus: number | undefined;
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const statusResponse = await this.client.getBridgeStatus(hash);
+        const status = (statusResponse as any)?.data?.status ?? (statusResponse as any)?.status;
+        const desc = (statusResponse as any)?.data?.statusDescription ?? (statusResponse as any)?.statusDescription;
+
+        if (status !== lastStatus) {
+          logger.info('Bridge status update', { hash, status, description: desc });
+          lastStatus = status;
+        }
+
+        if (status >= 5) {
+          // Status 5 = completed, >5 = failed
+          return { status, statusDescription: desc || 'Unknown' };
+        }
+      } catch (error: any) {
+        // Handle 404 as "not yet available"
+        if (error?.status === 404) {
+          logger.debug('Bridge status not yet available (404), waiting...', { hash });
+        } else {
+          logger.warn('Error checking bridge status', { hash, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 15_000)); // Poll every 15 seconds
+    }
+
+    logger.warn('Bridge status polling timed out', { hash, timeoutMinutes });
+    return null;
+  }
+
   private async resolveBridgeTokenDescriptor(symbol: string): Promise<BridgeTokenDescriptor> {
     // 1) Prefer local config tokens.json descriptor (e.g., GSOL|Unit|none|none)
     const tokenCfg = this.configManager.getTokenConfig(symbol);

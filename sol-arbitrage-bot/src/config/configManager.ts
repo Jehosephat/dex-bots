@@ -19,6 +19,7 @@ import {
   BridgingConfig,
   MonitoringConfig,
   NetworksConfig,
+  AutoBridgingConfig,
   EnvironmentConfig,
   ConfigValidationResult,
 } from '../types/config';
@@ -382,6 +383,13 @@ export class ConfigManager implements IConfigService {
    */
   getStrategiesConfig(): Record<string, any> | undefined {
     return this.config.strategies;
+  }
+
+  /**
+   * Get auto-bridging configuration (if available)
+   */
+  getAutoBridgingConfig(): AutoBridgingConfig | undefined {
+    return this.config.autoBridging;
   }
 
   /**

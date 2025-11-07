@@ -50,6 +50,18 @@ export interface MonitoringConfig {
   bridgeTimeoutMinutes: number;
 }
 
+export interface AutoBridgingConfig {
+  enabled: boolean;
+  imbalanceThresholdPercent: number;
+  targetSplitPercent: number;
+  minRebalanceAmount: number;
+  checkIntervalMinutes: number;
+  cooldownMinutes: number;
+  maxBridgesPerDay: number;
+  enabledTokens: string[]; // Empty = all enabled tokens
+  skipTokens: string[];
+}
+
 export interface NetworkConfig {
   rpcUrl: string;
   chainId: string;
@@ -68,6 +80,7 @@ export interface BotConfig {
   monitoring: MonitoringConfig;
   networks: NetworksConfig;
   strategies?: Record<string, any>; // Optional strategies configuration
+  autoBridging?: AutoBridgingConfig; // Optional auto-bridging configuration
 }
 
 export interface EnvironmentConfig {
