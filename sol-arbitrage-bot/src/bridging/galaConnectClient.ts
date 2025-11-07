@@ -1,4 +1,6 @@
 import { resolveGalaEndpoints } from './galaEndpoints';
+import { OracleBridgeFeeAssertionDto } from '@gala-chain/api';
+import { plainToInstance } from 'class-transformer';
 
 export interface BridgeTokenDescriptor {
   collection: string;
@@ -14,18 +16,6 @@ export interface BridgeConfigurationToken extends BridgeTokenDescriptor {
   channel?: string;
 }
 
-interface BridgeFeeResponse {
-  bridgeToken: BridgeTokenDescriptor;
-  bridgeTokenIsNonFungible: boolean;
-  estimatedPricePerTxFeeUnit: string;
-  estimatedTotalTxFeeInExternalToken: string;
-  estimatedTotalTxFeeInGala: string;
-  estimatedTxFeeUnitsTotal: string;
-  galaDecimals: number;
-  timestamp: number | string;
-  signingIdentity: string;
-  signature: string;
-}
 
 export class GalaConnectHttpError extends Error {
   constructor(
@@ -42,7 +32,40 @@ export class GalaConnectHttpError extends Error {
   }
 }
 
+interface RequestBridgeTokenResponse {
+  Data?: string;
+  data?: { Data?: string } | string;
+  Hash?: string;
+  hash?: string;
+  Status?: number;
+  status?: number;
+  message?: string;
+}
+
+interface BridgeTokenResponse {
+  Data?: {
+    chainId: number;
+    emitter: string;
+    nonce: string;
+    sequence: string;
+    payload: string;
+  };
+  Hash?: string;
+  hash?: string;
+  Status?: number;
+  status?: number;
+  message?: string;
+}
+
+interface GetPublicKeyResponse {
+  Data?: string;
+  data?: string;
+  publicKey?: string;
+}
+
 export class GalaConnectClient {
+  private cachedPublicKey?: string;
+
   constructor(
     private readonly baseUrl: string,
     private readonly galachainBaseUrl: string,
@@ -65,13 +88,21 @@ export class GalaConnectClient {
     return tokens;
   }
 
-  async fetchBridgeFee(payload: { chainId: string; bridgeToken: BridgeTokenDescriptor }): Promise<BridgeFeeResponse> {
+  async fetchBridgeFee(payload: { chainId: string; bridgeToken: BridgeTokenDescriptor }): Promise<OracleBridgeFeeAssertionDto> {
     const ep = resolveGalaEndpoints();
+    let rawResponse: any;
     if (ep.urlBridgeFee) {
       const u = new URL(ep.urlBridgeFee);
-      return this.postJson(u.pathname + u.search, payload, `${u.protocol}//${u.host}`);
+      rawResponse = await this.postJson(u.pathname + u.search, payload, `${u.protocol}//${u.host}`);
+    } else {
+      rawResponse = await this.postJson(ep.pathBridgeFee, payload, ep.dexApiBaseUrl);
     }
-    return this.postJson(ep.pathBridgeFee, payload, ep.dexApiBaseUrl);
+    
+    // Deserialize the API response into OracleBridgeFeeAssertionDto
+    // The API may return the DTO directly or wrapped in a response object
+    const feeData = rawResponse?.data || rawResponse;
+    const dto = plainToInstance(OracleBridgeFeeAssertionDto, feeData);
+    return dto;
   }
 
   async getBridgeStatus(hash: string): Promise<unknown> {
@@ -108,15 +139,85 @@ export class GalaConnectClient {
     return this.postJson(path, body, baseForBalances);
   }
 
+  /**
+   * Get public key for the wallet address from GalaChain
+   * Caches the result to avoid repeated API calls
+   */
+  async getPublicKey(walletAddress?: string): Promise<string> {
+    if (this.cachedPublicKey) {
+      return this.cachedPublicKey;
+    }
+
+    const ep = resolveGalaEndpoints();
+    const address = walletAddress || this.walletAddress;
+    
+    // Use direct request instead of postJson to handle 500 status that still contains valid data
+    const url = new URL(ep.pathGetPublicKey, ep.galaConnectBaseUrl);
+    const fullUrl = url.toString();
+    const res = await this.request(fullUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: address }),
+    });
+    
+    const text = await res.text();
+    const parsed = text ? this.tryParse(text) : undefined;
+    
+    // Extract public key from response (handle nested structure: Data.publicKey)
+    let publicKey: string | undefined;
+    if (parsed && typeof parsed === 'object') {
+      const response = parsed as any;
+      // Try nested structure first: Data.publicKey
+      if (response.Data && typeof response.Data === 'object' && response.Data.publicKey) {
+        publicKey = response.Data.publicKey;
+      } else if (response.data && typeof response.data === 'object' && response.data.publicKey) {
+        publicKey = response.data.publicKey;
+      } else if (typeof response.Data === 'string') {
+        publicKey = response.Data;
+      } else if (typeof response.data === 'string') {
+        publicKey = response.data;
+      } else if (typeof response.publicKey === 'string') {
+        publicKey = response.publicKey;
+      }
+    }
+    
+    if (!publicKey || typeof publicKey !== 'string') {
+      throw new GalaConnectHttpError(
+        res.status,
+        ep.pathGetPublicKey,
+        parsed ?? text,
+        fullUrl
+      );
+    }
+
+    this.cachedPublicKey = publicKey;
+    return publicKey;
+  }
+
+  /**
+   * Request to bridge a token (GalaConnect API)
+   */
+  async requestBridgeToken(payload: Record<string, unknown>): Promise<RequestBridgeTokenResponse> {
+    const ep = resolveGalaEndpoints();
+    return this.postJson<RequestBridgeTokenResponse>(ep.pathRequestBridgeToken, payload, ep.galaConnectBaseUrl);
+  }
+
+  /**
+   * Bridge a token (GalaConnect API)
+   */
+  async bridgeToken(payload: Record<string, unknown>): Promise<BridgeTokenResponse> {
+    const ep = resolveGalaEndpoints();
+    return this.postJson<BridgeTokenResponse>(ep.pathBridgeToken, payload, ep.galaConnectBaseUrl);
+  }
+
+  // Legacy methods (deprecated - kept for backward compatibility)
   async requestBridgeOut(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
-    // Use dexApiBaseUrl for bridge operations instead of connectBaseUrl
     return this.postJson(ep.pathRequestBridgeOut, payload, ep.dexApiBaseUrl);
   }
 
   async bridgeTokenOut(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
-    // Use dexApiBaseUrl for bridge operations instead of connectBaseUrl
     return this.postJson(ep.pathBridgeTokenOut, payload, ep.dexApiBaseUrl);
   }
 

@@ -1,8 +1,9 @@
 import 'dotenv/config';
-import { Wallet } from 'ethers';
+import BigNumber from 'bignumber.js';
 import { resolveGalaEndpoints } from './bridging/galaEndpoints';
 import { GalaConnectClient } from './bridging/galaConnectClient';
-import { signBridgePayload } from './bridging/galaSign';
+import { RequestTokenBridgeOutDto, TokenInstanceKey, TokenClassKey } from '@gala-chain/api';
+import { instanceToPlain } from 'class-transformer';
 
 async function main() {
   const ep = resolveGalaEndpoints();
@@ -21,7 +22,7 @@ async function main() {
     return;
   }
 
-  // Validate private key format (should be hex string, 66 chars with 0x prefix or 64 without)
+  // Validate private key format (should be hex string, 64 chars with or without 0x prefix)
   const isValidKey = /^(0x)?[0-9a-fA-F]{64}$/.test(bridgePriv.trim());
   if (!isValidKey || bridgePriv.includes('your_') || bridgePriv.includes('placeholder')) {
     console.error('❌ Invalid BRIDGE_PRIVATE_KEY format');
@@ -33,82 +34,129 @@ async function main() {
     return;
   }
 
-  const client = new GalaConnectClient(ep.dexApiBaseUrl, ep.dexApiBaseUrl, walletIdentity);
+  // Initialize client with DEX API base URL
+  const client = new GalaConnectClient(ep.connectBaseUrl, ep.dexApiBaseUrl, walletIdentity);
 
   // Prepare descriptor for GALA
   const galaDescriptor = { collection: 'GALA', category: 'Unit', type: 'none', additionalKey: 'none' };
   
   console.log('📊 Fetching bridge fee...');
-  // Fetch fee for Solana
-  const fee = (await client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: galaDescriptor })) as any;
-  console.log(`💰 Bridge fee: ${fee.estimatedTotalTxFeeInGala} GALA`);
+  // Fetch fee for Solana (returns OracleBridgeFeeAssertionDto)
+  const fee = await client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: galaDescriptor });
+  console.log(`💰 Bridge fee: ${fee.estimatedTotalTxFeeInGala?.toString() || '0'} GALA`);
 
-  const amount = '10';
+  const amount = new BigNumber('10');
   const destinationChainId = 1002; // Solana chain id used by Gala services
-  const tokenInstance = { ...galaDescriptor, instance: '0' };
-  // uniqueKey must start with "galaswap-operation-" per API validation
-  const uniqueKey = `galaswap-operation-${Date.now()}`;
+  
+  // Create TokenInstanceKey using fungibleKey helper
+  const tokenClass = new TokenClassKey();
+  tokenClass.collection = galaDescriptor.collection;
+  tokenClass.category = galaDescriptor.category;
+  tokenClass.type = galaDescriptor.type;
+  tokenClass.additionalKey = galaDescriptor.additionalKey;
+  const tokenInstance = TokenInstanceKey.fungibleKey(tokenClass);
+  
+  // uniqueKey must start with "galaswap-operation-" for DEX API
+  const uniqueKey = `galaswap-operation-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
-  const message = {
-    destinationChainId,
-    destinationChainTxFee: fee,
-    quantity: amount,
-    recipient: solRecipient,
-    tokenInstance,
-    uniqueKey,
-  };
+  // Create RequestTokenBridgeOutDto using @gala-chain/api
+  const dto = new RequestTokenBridgeOutDto();
+  dto.destinationChainId = destinationChainId;
+  dto.tokenInstance = tokenInstance;
+  dto.quantity = amount;
+  dto.recipient = solRecipient;
+  dto.destinationChainTxFee = fee; // OracleBridgeFeeAssertionDto
+  dto.uniqueKey = uniqueKey;
 
-  const hasCrossRate = Boolean(fee?.galaExchangeCrossRate);
+  console.log('📋 Building bridge DTO:', { destinationChainId, uniqueKey });
   
-  // Normalize fee object: remove the field that's not being used for typed data
-  // If hasCrossRate is true, remove galaExchangeRate; if false, remove galaExchangeCrossRate
-  // Also sanitize by removing undefined fields (ethers.js doesn't handle undefined well)
-  const normalizedFee = hasCrossRate
-    ? Object.fromEntries(Object.entries({ ...fee, galaExchangeRate: undefined }).filter(([_, v]) => v !== undefined))
-    : Object.fromEntries(Object.entries({ ...fee, galaExchangeCrossRate: undefined }).filter(([_, v]) => v !== undefined));
+  // Prepare private key (ensure 0x prefix)
+  const privateKey = bridgePriv.trim().startsWith('0x') ? bridgePriv.trim() : `0x${bridgePriv.trim()}`;
   
-  // Update message with normalized fee
-  const normalizedMessage = {
-    ...message,
-    destinationChainTxFee: normalizedFee,
+  console.log('🔐 Signing bridge DTO with built-in .sign() method...');
+  // Sign the DTO using built-in .sign() method
+  dto.sign(privateKey);
+  console.log('✅ DTO signed');
+  
+  // Serialize DTO to plain object for API call
+  const dtoPayload = instanceToPlain(dto, {
+    enableImplicitConversion: true,
+    exposeDefaultValues: true,
+  }) as any;
+  
+  // Ensure BigNumber values are serialized as fixed notation strings (not exponential)
+  const fixBigNumberSerialization = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (obj instanceof BigNumber) {
+      return obj.toFixed().replace(/\.?0+$/, '');
+    }
+    if (typeof obj === 'string' && /^[\d.]+[eE][+-]?\d+$/.test(obj)) {
+      // String is in exponential notation (e.g., "1e-9"), convert to fixed notation
+      const bn = new BigNumber(obj);
+      return bn.toFixed().replace(/\.?0+$/, '');
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(fixBigNumberSerialization);
+    }
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      const result: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = fixBigNumberSerialization(value);
+      }
+      return result;
+    }
+    return obj;
   };
   
-  console.log('📋 Fee normalization:', { hasCrossRate, hasGalaExchangeRate: !!normalizedFee.galaExchangeRate, hasGalaExchangeCrossRate: !!normalizedFee.galaExchangeCrossRate });
-  
-  console.log('🔐 Creating signer from private key...');
-  let signer: Wallet;
-  try {
-    signer = new Wallet(bridgePriv.trim());
-  } catch (error) {
-    console.error('❌ Failed to create wallet from BRIDGE_PRIVATE_KEY');
-    console.error('   Error:', error instanceof Error ? error.message : String(error));
-    console.error('\n💡 Ensure BRIDGE_PRIVATE_KEY is a valid Ethereum private key');
+  const fixedPayload = fixBigNumberSerialization(dtoPayload);
+  console.log('📤 Request payload:', JSON.stringify(fixedPayload, null, 2));
+
+  console.log('🌉 Submitting RequestTokenBridgeOut...', { uniqueKey, amount: amount.toString() });
+  const req = await client.requestBridgeOut(fixedPayload);
+  console.log('RequestTokenBridgeOut response:', req);
+
+  // Extract bridge request ID
+  let bridgeRequestId: string | undefined;
+  if (typeof req === 'object' && req !== null) {
+    const request = req as any;
+    if (typeof request.Data === 'string') {
+      bridgeRequestId = request.Data;
+    } else if (request.data != null) {
+      if (typeof request.data === 'string') {
+        bridgeRequestId = request.data;
+      } else if (typeof request.data === 'object') {
+        const dataObj = request.data as { Data?: unknown };
+        if (typeof dataObj.Data === 'string') {
+          bridgeRequestId = dataObj.Data;
+        }
+      }
+    }
+  }
+
+  if (!bridgeRequestId) {
+    console.error('❌ Bridge request ID missing from response');
+    console.error('Response:', req);
     process.exit(1);
     return;
   }
-  
-  console.log(`📝 Signing bridge payload (hasCrossRate: ${hasCrossRate})...`);
-  const { signature } = await signBridgePayload(signer, normalizedMessage, hasCrossRate);
-  const payload = { ...normalizedMessage, signature };
 
-  console.log('🌉 Submitting RequestTokenBridgeOut...', { uniqueKey, amount });
-  console.log('📤 Request payload:', JSON.stringify(payload, null, 2));
-  const req = await client.requestBridgeOut(payload);
-  console.log('RequestBridgeOut response:', req);
+  console.log('✅ RequestTokenBridgeOut accepted, bridgeRequestId:', bridgeRequestId);
 
   console.log('Submitting BridgeTokenOut...');
-  const bridgeTokenOutPayload = { bridgeFromChannel: 'asset', bridgeRequestId: (req as any).Data || (req as any).data?.Data || (req as any).data };
+  const bridgeTokenOutPayload = { bridgeFromChannel: 'asset', bridgeRequestId };
   console.log('📤 BridgeTokenOut payload:', JSON.stringify(bridgeTokenOutPayload, null, 2));
   const out = await client.bridgeTokenOut(bridgeTokenOutPayload);
   console.log('BridgeTokenOut response:', out);
 
-  const hash: string = (out as any).Hash || (out as any).hash;
-  if (!hash) {
-    console.error('No bridge hash found in response; cannot poll status.');
+  const hash = (out as any)?.Hash || (out as any)?.hash;
+  if (!hash || typeof hash !== 'string') {
+    console.error('❌ No bridge hash found in response; cannot poll status.');
+    console.error('Response:', out);
     process.exit(1);
     return;
   }
 
+  console.log('✅ BridgeTokenOut submitted, transaction hash:', hash);
   console.log('Polling bridge status for hash:', hash);
   const start = Date.now();
   while (Date.now() - start < 30 * 60_000) {
@@ -127,5 +175,3 @@ main().catch((err) => {
   console.error('❌ Bridge roundtrip test failed', err);
   process.exitCode = 1;
 });
-
-
