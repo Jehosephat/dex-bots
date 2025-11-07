@@ -110,21 +110,14 @@ export class GalaConnectClient {
       rawResponse = await this.postJson(ep.pathBridgeFee, payload, ep.dexApiBaseUrl);
     }
     
-    // Deserialize the API response into OracleBridgeFeeAssertionDto
-    // The API may return the DTO directly or wrapped in a response object
     const feeData = rawResponse?.data || rawResponse;
     const dto = plainToInstance(OracleBridgeFeeAssertionDto, feeData);
     return dto;
   }
 
   async getBridgeStatus(hash: string): Promise<unknown> {
-    // Hard-coded: Use DEX API endpoint for bridge status
     const fullUrl = 'https://dex-api-platform-dex-prod-gala.gala.com/v1/bridge/status';
     const payload = { hash };
-    
-    // Log the URL and payload being used for debugging
-    console.log(`[getBridgeStatus] Checking bridge status at: ${fullUrl}`);
-    console.log(`[getBridgeStatus] Request body:`, JSON.stringify(payload));
     
     const res = await this.request(fullUrl, {
       method: 'POST',
@@ -133,10 +126,6 @@ export class GalaConnectClient {
     });
     const text = await res.text();
     const parsed = this.tryParse(text);
-    
-    // Log the response for debugging
-    console.log(`[getBridgeStatus] Response status: ${res.status}`);
-    console.log(`[getBridgeStatus] Response body:`, text.substring(0, 500)); // First 500 chars
     
     if (!res.ok) {
       throw new GalaConnectHttpError(res.status, '/v1/bridge/status', parsed ?? text, fullUrl);
@@ -157,10 +146,6 @@ export class GalaConnectClient {
     return this.postJson(path, body, baseForBalances);
   }
 
-  /**
-   * Get public key for the wallet address from GalaChain
-   * Caches the result to avoid repeated API calls
-   */
   async getPublicKey(walletAddress?: string): Promise<string> {
     if (this.cachedPublicKey) {
       return this.cachedPublicKey;
@@ -168,8 +153,6 @@ export class GalaConnectClient {
 
     const ep = resolveGalaEndpoints();
     const address = walletAddress || this.walletAddress;
-    
-    // Use direct request instead of postJson to handle 500 status that still contains valid data
     const url = new URL(ep.pathGetPublicKey, ep.galaConnectBaseUrl);
     const fullUrl = url.toString();
     const res = await this.request(fullUrl, {
@@ -181,11 +164,9 @@ export class GalaConnectClient {
     const text = await res.text();
     const parsed = text ? this.tryParse(text) : undefined;
     
-    // Extract public key from response (handle nested structure: Data.publicKey)
     let publicKey: string | undefined;
     if (parsed && typeof parsed === 'object') {
       const response = parsed as any;
-      // Try nested structure first: Data.publicKey
       if (response.Data && typeof response.Data === 'object' && response.Data.publicKey) {
         publicKey = response.Data.publicKey;
       } else if (response.data && typeof response.data === 'object' && response.data.publicKey) {
@@ -212,23 +193,15 @@ export class GalaConnectClient {
     return publicKey;
   }
 
-  /**
-   * Request to bridge a token (GalaConnect API)
-   */
   async requestBridgeToken(payload: Record<string, unknown>): Promise<RequestBridgeTokenResponse> {
     const ep = resolveGalaEndpoints();
     return this.postJson<RequestBridgeTokenResponse>(ep.pathRequestBridgeToken, payload, ep.galaConnectBaseUrl);
   }
 
-  /**
-   * Bridge a token (GalaConnect API)
-   */
   async bridgeToken(payload: Record<string, unknown>): Promise<BridgeTokenResponse> {
     const ep = resolveGalaEndpoints();
     return this.postJson<BridgeTokenResponse>(ep.pathBridgeToken, payload, ep.galaConnectBaseUrl);
   }
-
-  // Legacy methods (deprecated - kept for backward compatibility)
   async requestBridgeOut(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
     return this.postJson(ep.pathRequestBridgeOut, payload, ep.dexApiBaseUrl);
@@ -241,7 +214,6 @@ export class GalaConnectClient {
 
   async registerBridgeTransaction(payload: Record<string, unknown>): Promise<unknown> {
     const ep = resolveGalaEndpoints();
-    // Some deployments expose registration on connect base
     const path = '/v1/bridge/transaction';
     return this.postJson(path, payload, ep.connectBaseUrl);
   }

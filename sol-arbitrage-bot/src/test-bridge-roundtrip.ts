@@ -40,15 +40,12 @@ async function main() {
   // Prepare descriptor for GALA
   const galaDescriptor = { collection: 'GALA', category: 'Unit', type: 'none', additionalKey: 'none' };
   
-  console.log('📊 Fetching bridge fee...');
-  // Fetch fee for Solana (returns OracleBridgeFeeAssertionDto)
   const fee = await client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: galaDescriptor });
-  console.log(`💰 Bridge fee: ${fee.estimatedTotalTxFeeInGala?.toString() || '0'} GALA`);
+  console.log(`Bridge fee: ${fee.estimatedTotalTxFeeInGala?.toString() || '0'} GALA`);
 
   const amount = new BigNumber('10');
-  const destinationChainId = 1002; // Solana chain id used by Gala services
+  const destinationChainId = 1002;
   
-  // Create TokenInstanceKey using fungibleKey helper
   const tokenClass = new TokenClassKey();
   tokenClass.collection = galaDescriptor.collection;
   tokenClass.category = galaDescriptor.category;
@@ -56,42 +53,30 @@ async function main() {
   tokenClass.additionalKey = galaDescriptor.additionalKey;
   const tokenInstance = TokenInstanceKey.fungibleKey(tokenClass);
   
-  // uniqueKey must start with "galaswap-operation-" for DEX API
   const uniqueKey = `galaswap-operation-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
-  // Create RequestTokenBridgeOutDto using @gala-chain/api
   const dto = new RequestTokenBridgeOutDto();
   dto.destinationChainId = destinationChainId;
   dto.tokenInstance = tokenInstance;
   dto.quantity = amount;
   dto.recipient = solRecipient;
-  dto.destinationChainTxFee = fee; // OracleBridgeFeeAssertionDto
+  dto.destinationChainTxFee = fee;
   dto.uniqueKey = uniqueKey;
 
-  console.log('📋 Building bridge DTO:', { destinationChainId, uniqueKey });
-  
-  // Prepare private key (ensure 0x prefix)
   const privateKey = bridgePriv.trim().startsWith('0x') ? bridgePriv.trim() : `0x${bridgePriv.trim()}`;
-  
-  console.log('🔐 Signing bridge DTO with built-in .sign() method...');
-  // Sign the DTO using built-in .sign() method
   dto.sign(privateKey);
-  console.log('✅ DTO signed');
   
-  // Serialize DTO to plain object for API call
   const dtoPayload = instanceToPlain(dto, {
     enableImplicitConversion: true,
     exposeDefaultValues: true,
   }) as any;
   
-  // Ensure BigNumber values are serialized as fixed notation strings (not exponential)
   const fixBigNumberSerialization = (obj: any): any => {
     if (obj === null || obj === undefined) return obj;
     if (obj instanceof BigNumber) {
       return obj.toFixed().replace(/\.?0+$/, '');
     }
     if (typeof obj === 'string' && /^[\d.]+[eE][+-]?\d+$/.test(obj)) {
-      // String is in exponential notation (e.g., "1e-9"), convert to fixed notation
       const bn = new BigNumber(obj);
       return bn.toFixed().replace(/\.?0+$/, '');
     }
@@ -109,11 +94,8 @@ async function main() {
   };
   
   const fixedPayload = fixBigNumberSerialization(dtoPayload);
-  console.log('📤 Request payload:', JSON.stringify(fixedPayload, null, 2));
 
-  console.log('🌉 Submitting RequestTokenBridgeOut...', { uniqueKey, amount: amount.toString() });
   const req = await client.requestBridgeOut(fixedPayload);
-  console.log('RequestTokenBridgeOut response:', req);
 
   // Extract bridge request ID
   let bridgeRequestId: string | undefined;
@@ -140,13 +122,10 @@ async function main() {
     return;
   }
 
-  console.log('✅ RequestTokenBridgeOut accepted, bridgeRequestId:', bridgeRequestId);
+  console.log('RequestTokenBridgeOut accepted, bridgeRequestId:', bridgeRequestId);
 
-  console.log('Submitting BridgeTokenOut...');
   const bridgeTokenOutPayload = { bridgeFromChannel: 'asset', bridgeRequestId };
-  console.log('📤 BridgeTokenOut payload:', JSON.stringify(bridgeTokenOutPayload, null, 2));
   const out = await client.bridgeTokenOut(bridgeTokenOutPayload);
-  console.log('BridgeTokenOut response:', out);
 
   const hash = (out as any)?.Hash || (out as any)?.hash;
   if (!hash || typeof hash !== 'string') {
@@ -156,16 +135,14 @@ async function main() {
     return;
   }
 
-  console.log('✅ BridgeTokenOut submitted, transaction hash:', hash);
-  console.log('Polling bridge status for hash:', hash);
+  console.log('BridgeTokenOut submitted, transaction hash:', hash);
   const start = Date.now();
   while (Date.now() - start < 30 * 60_000) {
     try {
       const status = (await client.getBridgeStatus(hash)) as any;
-      console.log('Raw status response:', JSON.stringify(status, null, 2));
       const s = status?.data?.status ?? status?.status;
       const desc = status?.data?.statusDescription ?? status?.statusDescription;
-      console.log('Parsed Status:', s, desc);
+      console.log('Status:', s, desc);
       if (s >= 5) break;
     } catch (error) {
       console.error('Error checking bridge status:', error instanceof Error ? error.message : String(error));
@@ -173,7 +150,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 15_000));
   }
 
-  console.log('✅ Outbound GC->Solana step complete (or timed out if not reached). For roundtrip back, initiate Solana->GC bridge using your Solana wallet.');
+  console.log('Outbound GC->Solana step complete.');
 }
 
 main().catch((err) => {

@@ -149,10 +149,8 @@ export class BridgeManager {
       logger.info('Fetching bridge fee', { symbol, amount: amount.toString() });
       const bridgeFee = await this.client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: descriptor });
       
-      // 3. Build DTO using @gala-chain/api RequestTokenBridgeOutDto
       const uniqueKey = `galaswap-operation-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       
-      // Create TokenInstanceKey from descriptor (use fungibleKey helper for fungible tokens)
       const tokenClass = new TokenClassKey();
       tokenClass.collection = descriptor.collection;
       tokenClass.category = descriptor.category;
@@ -160,36 +158,28 @@ export class BridgeManager {
       tokenClass.additionalKey = descriptor.additionalKey;
       const tokenInstance = TokenInstanceKey.fungibleKey(tokenClass);
       
-      // Create RequestTokenBridgeOutDto
       const dto = new RequestTokenBridgeOutDto();
-      dto.destinationChainId = 1002; // SOLANA_CHAIN_ID
+      dto.destinationChainId = 1002;
       dto.tokenInstance = tokenInstance;
-      dto.quantity = amount; // BigNumber is accepted
+      dto.quantity = amount;
       dto.recipient = recipient;
-      dto.destinationChainTxFee = bridgeFee; // OracleBridgeFeeAssertionDto from API
+      dto.destinationChainTxFee = bridgeFee;
       dto.uniqueKey = uniqueKey;
 
-      // 4. Sign the DTO using built-in .sign() method
       logger.debug('Signing bridge DTO', { symbol, uniqueKey });
       dto.sign(this.privateKey);
       
-      // 5. Serialize DTO to plain object for API call
-      // Use instanceToPlain to properly serialize BigNumber values to fixed notation strings
       const dtoPayload = instanceToPlain(dto, {
         enableImplicitConversion: true,
         exposeDefaultValues: true,
       }) as any;
       
-      // Ensure BigNumber values are serialized as fixed notation strings (not exponential)
-      // instanceToPlain may convert BigNumbers to strings, but they might be in exponential notation
       const fixBigNumberSerialization = (obj: any): any => {
         if (obj === null || obj === undefined) return obj;
         if (obj instanceof BigNumber) {
-          // Convert BigNumber instance to fixed notation string, removing trailing zeros
           return obj.toFixed().replace(/\.?0+$/, '');
         }
         if (typeof obj === 'string' && /^[\d.]+[eE][+-]?\d+$/.test(obj)) {
-          // String is in exponential notation (e.g., "1e-9"), convert to fixed notation
           const bn = new BigNumber(obj);
           return bn.toFixed().replace(/\.?0+$/, '');
         }
@@ -208,11 +198,9 @@ export class BridgeManager {
       
       const fixedPayload = fixBigNumberSerialization(dtoPayload);
       
-      // 6. Submit RequestTokenBridgeOut (DEX API)
       logger.info('Submitting RequestTokenBridgeOut', { symbol, uniqueKey });
       const requestResponse = await this.client.requestBridgeOut(fixedPayload);
       
-      // 7. Extract bridge request ID
       let bridgeRequestId: string | undefined;
       if (typeof requestResponse === 'object' && requestResponse !== null) {
         const req = requestResponse as any;
@@ -240,7 +228,6 @@ export class BridgeManager {
       
       logger.info('RequestTokenBridgeOut accepted', { symbol, bridgeRequestId });
       
-      // 8. Submit BridgeTokenOut (DEX API)
       logger.info('Submitting BridgeTokenOut', { symbol, bridgeRequestId });
       const bridgeResponse = await this.client.bridgeTokenOut({
         bridgeFromChannel: 'asset',
