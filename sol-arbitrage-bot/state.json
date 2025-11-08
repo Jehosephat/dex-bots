@@ -30,20 +30,20 @@
         "SOL": {
           "symbol": "SOL",
           "mint": "GSOL|Unit|none|none",
-          "rawBalance": "1.011145203",
-          "balance": "1.011145203",
+          "rawBalance": "1.030783047",
+          "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762540788493
+          "lastUpdated": 1762566672309
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "23691.31426061",
-          "balance": "23691.31426061",
+          "rawBalance": "27578.17561236",
+          "balance": "27578.17561236",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762540788493
+          "lastUpdated": 1762566672309
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,34 +52,41 @@
           "balance": "25800",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762540788493
+          "lastUpdated": 1762566672309
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "1600",
-          "balance": "1600",
+          "rawBalance": "386.783166",
+          "balance": "386.783166",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762540788493
+          "lastUpdated": 1762566672309
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762540788493
+      "lastUpdated": 1762566672309
     },
     "solana": {
       "tokens": {},
-      "native": "0.536600063",
+      "native": "0.516298469",
       "totalValueUsd": "0",
-      "lastUpdated": 1762540788881
+      "lastUpdated": 1762566672614
     },
-    "lastUpdated": 1762540788881,
-    "version": 1085
+    "lastUpdated": 1762566672614,
+    "version": 1245
   },
-  "lastSaved": 1762540846544,
-  "version": 172,
-  "tokenCooldowns": {},
+  "lastSaved": 1762566672615,
+  "version": 176,
+  "tokenCooldowns": {
+    "SOL": {
+      "isInCooldown": true,
+      "cooldownEndsAt": 1762564988359,
+      "remainingSeconds": 60,
+      "reason": "Trade executed successfully"
+    }
+  },
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],

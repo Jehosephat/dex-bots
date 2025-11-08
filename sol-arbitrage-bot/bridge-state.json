@@ -1,0 +1,19 @@
+{
+  "bridges": [
+    {
+      "token": "USDUC",
+      "amount": "3136.783166",
+      "direction": "solana->galaChain",
+      "hash": "2WRpBRvhfE99NLSRo6JC2osy6gD5K4sH13LkBz4fVYJ2gt3hhD9hoU5uc8BCR3qaCZNZLJ6BuDjsrMNZ4rt6FdHx",
+      "timestamp": 1762564924630,
+      "status": "pending"
+    }
+  ],
+  "lastBridgeTime": {
+    "USDUC": 1762564924630
+  },
+  "dailyBridgeCount": {
+    "USDUC": 1
+  },
+  "lastResetDate": "2025-11-08"
+}

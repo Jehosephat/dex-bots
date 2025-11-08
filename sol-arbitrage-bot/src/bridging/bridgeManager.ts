@@ -5,6 +5,7 @@ import { GalaConnectClient, BridgeTokenDescriptor } from './galaConnectClient';
 import { resolveGalaEndpoints } from './galaEndpoints';
 import { RequestTokenBridgeOutDto, TokenInstanceKey, TokenClassKey } from '@gala-chain/api';
 import { instanceToPlain } from 'class-transformer';
+import { bridgeOutNativeSol, bridgeOutSplToken } from './solanaBridge';
 
 export interface BridgeFeeEstimate {
   chain: 'Solana';
@@ -342,5 +343,113 @@ export class BridgeManager {
     if (!this.client) throw new Error('BridgeManager not initialized');
     const status = await this.client.getBridgeStatus(hash);
     return status;
+  }
+
+  /**
+   * Execute a bridge from Solana to GalaChain
+   */
+  async executeBridgeIn(params: {
+    symbol: string;
+    amount: number | string | BigNumber;
+    recipient?: string;
+  }): Promise<BridgeExecutionResult> {
+    const { symbol, amount: amountParam } = params;
+    const amount = new BigNumber(amountParam);
+    const recipient = params.recipient ?? process.env.GALACHAIN_WALLET_ADDRESS ?? '';
+
+    if (!recipient) {
+      return {
+        success: false,
+        error: 'GALACHAIN_WALLET_ADDRESS not set - cannot bridge to GalaChain',
+      };
+    }
+
+    const solanaPrivateKey = process.env.SOLANA_PRIVATE_KEY;
+    if (!solanaPrivateKey) {
+      return {
+        success: false,
+        error: 'SOLANA_PRIVATE_KEY not set - cannot sign Solana transaction',
+      };
+    }
+
+    const galaBridgeProgramId = process.env.GC_SOL_BRIDGE_PROGRAM;
+    if (!galaBridgeProgramId) {
+      return {
+        success: false,
+        error: 'GC_SOL_BRIDGE_PROGRAM not set - cannot bridge from Solana',
+      };
+    }
+
+    const networks = this.configManager.getNetworksConfig();
+    const rpcUrl = networks.solana.rpcUrl;
+
+    try {
+      const tokenConfig = this.configManager.getTokenConfig(symbol);
+      if (!tokenConfig) {
+        return {
+          success: false,
+          error: `Token ${symbol} not found in configuration`,
+        };
+      }
+
+      // Handle native SOL
+      if (symbol === 'SOL' || symbol === 'GSOL') {
+        logger.info(`🌉 Initiating bridge: ${amount.toFixed(8)} ${symbol} from Solana → GalaChain`);
+
+        const result = await bridgeOutNativeSol({
+          rpcUrl,
+          solanaPrivateKeyBase58: solanaPrivateKey,
+          galaBridgeProgramId,
+          galaWalletIdentity: recipient,
+          amountSol: amount.toNumber(),
+        });
+
+        // Transaction confirmed - logging handled by caller
+        return {
+          success: true,
+          transactionHash: result.signature,
+        };
+      }
+
+      // Handle SPL tokens
+      if (!tokenConfig.solanaMint) {
+        return {
+          success: false,
+          error: `Token ${symbol} does not have a Solana mint address configured`,
+        };
+      }
+
+      // Resolve token descriptor for GalaChain
+      const descriptor = await this.resolveBridgeTokenDescriptor(symbol);
+      
+      // Convert amount to base units (using token decimals)
+      const decimals = tokenConfig.decimals || 9;
+      const amountBaseUnits = BigInt(amount.multipliedBy(10 ** decimals).toFixed(0));
+
+      logger.info(`🌉 Initiating bridge: ${amount.toFixed(8)} ${symbol} from Solana → GalaChain`);
+
+      const result = await bridgeOutSplToken({
+        rpcUrl,
+        solanaPrivateKeyBase58: solanaPrivateKey,
+        galaBridgeProgramId,
+        galaWalletIdentity: recipient,
+        tokenMintAddress: tokenConfig.solanaMint,
+        amountBaseUnits,
+        tokenDescriptor: descriptor,
+      });
+
+      // Transaction confirmed - logging handled by caller
+      return {
+        success: true,
+        transactionHash: result.signature,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Solana → GalaChain bridge execution failed', { symbol, error: errorMessage });
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
   }
 }

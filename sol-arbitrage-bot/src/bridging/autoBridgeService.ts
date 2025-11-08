@@ -226,8 +226,6 @@ export class AutoBridgeService {
   ): Promise<BridgeResult> {
     try {
       if (direction === 'galaChain->solana') {
-        logger.info(`🌉 Initiating bridge: ${amount.toFixed(8)} ${token.symbol} from GalaChain → Solana`);
-        
         const result = await this.bridgeManager.executeBridgeOut({
           symbol: token.symbol,
           amount: amount,
@@ -244,7 +242,7 @@ export class AutoBridgeService {
             result.transactionHash
           );
 
-          logger.info(`✅ Bridge initiated successfully: ${result.transactionHash}`);
+          logger.info(`✅ Bridge completed: ${amount.toFixed(8)} ${token.symbol} from GalaChain → Solana (tx: ${result.transactionHash})`);
           return {
             success: true,
             token: token.symbol,
@@ -263,15 +261,40 @@ export class AutoBridgeService {
           };
         }
       } else {
-        // SOL → GC bridging (currently only supports SOL, not SPL tokens)
-        logger.warn(`⚠️ Solana → GalaChain bridging not yet implemented for ${token.symbol}`);
-        return {
-          success: false,
-          token: token.symbol,
-          amount,
-          direction,
-          error: 'Solana → GalaChain bridging not yet implemented',
-        };
+        // Solana → GalaChain bridging
+        const result = await this.bridgeManager.executeBridgeIn({
+          symbol: token.symbol,
+          amount: amount,
+          recipient: process.env.GALACHAIN_WALLET_ADDRESS,
+        });
+
+        if (result.success && result.transactionHash) {
+          // Record bridge in state tracker
+          this.bridgeStateTracker.recordBridge(
+            token.symbol,
+            amount,
+            direction,
+            result.transactionHash
+          );
+
+          logger.info(`✅ Bridge completed: ${amount.toFixed(8)} ${token.symbol} from Solana → GalaChain (tx: ${result.transactionHash})`);
+          return {
+            success: true,
+            token: token.symbol,
+            amount,
+            direction,
+            hash: result.transactionHash,
+          };
+        } else {
+          logger.error(`❌ Bridge failed: ${result.error || 'Unknown error'}`);
+          return {
+            success: false,
+            token: token.symbol,
+            amount,
+            direction,
+            error: result.error || 'Unknown error',
+          };
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -534,16 +557,10 @@ export class AutoBridgeService {
     }
 
     logger.info(`🔍 Imbalance detected: ${imbalance.token} - GC: ${imbalance.gcPercent.toFixed(2)}%, SOL: ${imbalance.solPercent.toFixed(2)}%`);
-    logger.info(`🌉 Initiating bridge: ${imbalance.bridgeAmount.toFixed(8)} ${imbalance.token} from ${imbalance.direction === 'galaChain->solana' ? 'GalaChain → Solana' : 'Solana → GalaChain'}`);
 
     const result = await this.executeBridge(token, imbalance.bridgeAmount, imbalance.direction);
 
-    if (result.success) {
-      logger.info(`✅ Bridge initiated successfully for ${imbalance.token}: ${result.hash}`);
-    } else {
-      logger.error(`❌ Bridge failed for ${imbalance.token}: ${result.error}`);
-    }
-
+    // executeBridge() already logs success/failure, so we don't need to log again here
     return result;
   }
 }
