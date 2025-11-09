@@ -34,16 +34,16 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762709874200
+          "lastUpdated": 1762710903013
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "30784.32359333",
-          "balance": "30784.32359333",
+          "rawBalance": "31998.8003673",
+          "balance": "31998.8003673",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762709874200
+          "lastUpdated": 1762710903013
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,34 +52,41 @@
           "balance": "35804.74688",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762709874200
+          "lastUpdated": 1762710903013
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "633.089892",
-          "balance": "633.089892",
+          "rawBalance": "97.684089",
+          "balance": "97.684089",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762709874200
+          "lastUpdated": 1762710903013
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762709874200
+      "lastUpdated": 1762710903013
     },
     "solana": {
       "tokens": {},
-      "native": "0.513259723",
+      "native": "0.512566273",
       "totalValueUsd": "0",
-      "lastUpdated": 1762709874847
+      "lastUpdated": 1762710903295
     },
-    "lastUpdated": 1762709874847,
-    "version": 1541
+    "lastUpdated": 1762710903295,
+    "version": 1547
   },
-  "lastSaved": 1762709950580,
-  "version": 198,
-  "tokenCooldowns": {},
+  "lastSaved": 1762710965038,
+  "version": 200,
+  "tokenCooldowns": {
+    "USDUC": {
+      "isInCooldown": true,
+      "cooldownEndsAt": 1762710980012,
+      "remainingSeconds": 60,
+      "reason": "Trade executed successfully"
+    }
+  },
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],

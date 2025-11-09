@@ -123,8 +123,10 @@ export class SolanaExecutor {
       const quoteCfg = getQuoteTokenConfig(quoteCurrency);
       if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${quoteCurrency}`);
 
-      const inputMint = quote.jupiterRoute?.inputMint || quoteCfg.solanaMint; // quote currency
-      const outputMint = quote.jupiterRoute?.outputMint || tokenCfg.solanaMint; // target token
+      // For BUY operations (forward trades): always spend quote currency to get token
+      // DO NOT use quote.jupiterRoute for mints - it may be from a reverse quote!
+      const inputMint = quoteCfg.solanaMint; // quote currency (what we're spending)
+      const outputMint = tokenCfg.solanaMint; // target token (what we're buying)
 
       // Use ExactOut: request to buy "tradeSize" output tokens
       const outAmountRaw = new BigNumber(tradeSize).multipliedBy(new BigNumber(10).pow(tokenCfg.decimals)).integerValue(BigNumber.ROUND_DOWN).toString();
@@ -230,9 +232,10 @@ export class SolanaExecutor {
       const quoteCfg = getQuoteTokenConfig(quoteCurrency);
       if (!quoteCfg?.solanaMint) throw new Error(`No Solana mint for quote token ${quoteCurrency}`);
 
-      // REVERSE: inputMint = token, outputMint = quote currency
-      const inputMint = tokenCfg.solanaMint; // token
-      const outputMint = quoteCfg.solanaMint; // USDC/SOL
+      // For SELL operations (reverse trades): always sell token to get quote currency
+      // DO NOT use quote.jupiterRoute for mints - it may be from a forward quote!
+      const inputMint = tokenCfg.solanaMint; // token (what we're selling)
+      const outputMint = quoteCfg.solanaMint; // quote currency (what we're receiving)
 
       // Use ExactIn: sell exact amount of token
       const inAmountRaw = new BigNumber(tradeSize)

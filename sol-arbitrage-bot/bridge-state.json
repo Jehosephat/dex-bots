@@ -127,14 +127,22 @@
       "hash": "5c84e4392b4657964fa7ed3257d13796e7ee7e4332412f684bffd55dec7488cb",
       "timestamp": 1762708519587,
       "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "364.594197",
+      "direction": "solana->galaChain",
+      "hash": "6FX7DvFxQXXeD1cKyKgdzuEcV28y6vZVudGpFV6yMxwMpuTkhEaB1Emvj1ym5jiRb2h8S8ztTMGxvpRLTVyDLGK",
+      "timestamp": 1762710324230,
+      "status": "pending"
     }
   ],
   "lastBridgeTime": {
-    "USDUC": 1762708414036,
+    "USDUC": 1762710324230,
     "MEW": 1762708519587
   },
   "dailyBridgeCount": {
-    "USDUC": 9,
+    "USDUC": 10,
     "MEW": 3
   },
   "lastResetDate": "2025-11-09"
