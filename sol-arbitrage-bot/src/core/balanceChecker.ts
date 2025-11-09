@@ -22,8 +22,13 @@ export interface BalanceCheckResult {
   insufficientFunds: InsufficientFund[];
   recommendations: string[];
   checkedBalances?: {
-    galaChain: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>;
-    solana: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>;
+    galaChain: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+    solana: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+  };
+  totalUsdValue?: {
+    galaChain: number;
+    solana: number;
+    total: number;
   };
 }
 
@@ -195,11 +200,19 @@ export class BalanceChecker {
         }
       }
 
+      // Calculate USD values for all balances
+      let totalUsdValue: { galaChain: number; solana: number; total: number } | undefined;
+      if (checkedBalances && (gcProvider || solProvider)) {
+        await this.calculateUsdValues(checkedBalances, enabledTokens, gcProvider, solProvider);
+        totalUsdValue = this.calculateTotalUsdValue(checkedBalances);
+      }
+
       const result: BalanceCheckResult = {
         canTrade,
         insufficientFunds,
         recommendations,
-        checkedBalances
+        checkedBalances,
+        totalUsdValue
       };
       
       // Cache the result for cooldown period
@@ -519,7 +532,7 @@ export class BalanceChecker {
     insufficientFunds: InsufficientFund[],
     recommendations: string[],
     priceProvider?: SolanaPriceProvider | null,
-    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean }>,
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>,
     direction: ArbitrageDirection = 'forward'
   ): Promise<void> {
     const config = this.configService!.getConfig();
@@ -920,6 +933,169 @@ export class BalanceChecker {
     this.isPaused = false;
     this.pauseReason = '';
     logger.info(`✅ Trading manually resumed`);
+  }
+
+  /**
+   * Calculate USD values for all checked balances
+   */
+  private async calculateUsdValues(
+    checkedBalances: {
+      galaChain: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+      solana: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+    },
+    enabledTokens: any[],
+    gcProvider?: GalaChainPriceProvider | null,
+    solProvider?: SolanaPriceProvider | null
+  ): Promise<void> {
+    try {
+      // Get base USD prices
+      let galaUsdPrice = 0;
+      let solUsdPrice = 0;
+
+      if (gcProvider) {
+        try {
+          galaUsdPrice = gcProvider.getGALAUSDPrice();
+        } catch (error) {
+          logger.debug('Failed to get GALA/USD price for USD value calculation', { error });
+        }
+      }
+
+      if (solProvider) {
+        try {
+          solUsdPrice = solProvider.getSOLUSDPrice();
+        } catch (error) {
+          logger.debug('Failed to get SOL/USD price for USD value calculation', { error });
+        }
+      }
+
+      // Create token config map for quick lookup
+      const tokenConfigMap = new Map<string, any>();
+      enabledTokens.forEach(token => {
+        tokenConfigMap.set(token.symbol, token);
+      });
+
+      // Calculate USD values for GalaChain balances
+      for (const balance of checkedBalances.galaChain) {
+        let usdValue = 0;
+
+        // Handle known quote currencies (GALA, SOL) even if not in enabled tokens
+        if (balance.token === 'GALA') {
+          // Direct GALA to USD
+          if (galaUsdPrice > 0) {
+            usdValue = balance.current.multipliedBy(galaUsdPrice).toNumber();
+          }
+        } else if (balance.token === 'SOL' || balance.token === 'GSOL') {
+          // SOL to USD
+          if (solUsdPrice > 0) {
+            usdValue = balance.current.multipliedBy(solUsdPrice).toNumber();
+          }
+        } else {
+          // For other tokens, need token config to get quote
+          const tokenConfig = tokenConfigMap.get(balance.token);
+          if (tokenConfig && gcProvider && galaUsdPrice > 0) {
+            // Try to get token price in GALA, then convert to USD
+            try {
+              // Get a small quote to determine price (1 token)
+              const quote = await gcProvider.getQuote(balance.token, 1, false);
+              if (quote && quote.price) {
+                // Price is in GALA per token
+                const priceInGala = quote.price;
+                const usdValuePerToken = priceInGala.multipliedBy(galaUsdPrice);
+                usdValue = balance.current.multipliedBy(usdValuePerToken).toNumber();
+              }
+            } catch (error) {
+              logger.debug(`Failed to get price for ${balance.token} on GalaChain`, { error });
+            }
+          }
+        }
+
+        balance.usdValue = usdValue;
+      }
+
+      // Calculate USD values for Solana balances
+      for (const balance of checkedBalances.solana) {
+        let usdValue = 0;
+
+        // Handle known quote currencies (SOL, GALA) even if not in enabled tokens
+        if (balance.token === 'SOL' || balance.token === 'GSOL') {
+          // Direct SOL to USD
+          if (solUsdPrice > 0) {
+            usdValue = balance.current.multipliedBy(solUsdPrice).toNumber();
+          }
+        } else if (balance.token === 'GALA') {
+          // GALA to USD
+          if (galaUsdPrice > 0) {
+            usdValue = balance.current.multipliedBy(galaUsdPrice).toNumber();
+          }
+        } else {
+          // For other tokens, need token config to get quote
+          const tokenConfig = tokenConfigMap.get(balance.token);
+          if (tokenConfig && solProvider && (galaUsdPrice > 0 || solUsdPrice > 0)) {
+            // Try to get token price in quote currency, then convert to USD
+            try {
+              const quoteCurrency = tokenConfig.solQuoteVia || 'USDC';
+              // Get a small quote to determine price (1 token)
+              const quote = await solProvider.getQuote(balance.token, 1, false, quoteCurrency);
+              if (quote && quote.price) {
+                if (quoteCurrency === 'USDC') {
+                  // USDC is 1:1 with USD
+                  usdValue = balance.current.multipliedBy(quote.price).toNumber();
+                } else if (quoteCurrency === 'SOL') {
+                  // SOL price, convert to USD
+                  const priceInSol = quote.price;
+                  usdValue = balance.current.multipliedBy(priceInSol).multipliedBy(solUsdPrice).toNumber();
+                } else if (quoteCurrency === 'GALA') {
+                  // GALA price, convert to USD
+                  const priceInGala = quote.price;
+                  usdValue = balance.current.multipliedBy(priceInGala).multipliedBy(galaUsdPrice).toNumber();
+                }
+              }
+            } catch (error) {
+              logger.debug(`Failed to get price for ${balance.token} on Solana`, { error });
+            }
+          }
+        }
+
+        balance.usdValue = usdValue;
+      }
+    } catch (error) {
+      logger.warn('Failed to calculate USD values for balances', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Calculate total USD value across all balances
+   */
+  private calculateTotalUsdValue(
+    checkedBalances: {
+      galaChain: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+      solana: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>;
+    }
+  ): { galaChain: number; solana: number; total: number } {
+    // Deduplicate by token (keep highest USD value if duplicates exist)
+    const gcMap = new Map<string, number>();
+    const solMap = new Map<string, number>();
+
+    for (const balance of checkedBalances.galaChain) {
+      const existing = gcMap.get(balance.token) || 0;
+      gcMap.set(balance.token, Math.max(existing, balance.usdValue || 0));
+    }
+
+    for (const balance of checkedBalances.solana) {
+      const existing = solMap.get(balance.token) || 0;
+      solMap.set(balance.token, Math.max(existing, balance.usdValue || 0));
+    }
+
+    const galaChainTotal = Array.from(gcMap.values()).reduce((sum, val) => sum + val, 0);
+    const solanaTotal = Array.from(solMap.values()).reduce((sum, val) => sum + val, 0);
+
+    return {
+      galaChain: galaChainTotal,
+      solana: solanaTotal,
+      total: galaChainTotal + solanaTotal
+    };
   }
 
   /**

@@ -135,6 +135,14 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
   // Log balance check summary (deduplicated by token, showing max required)
   logger.info(`\n📊 Balance Check Summary:`);
   
+  // Log total USD value if available
+  if (initialBalanceCheck.totalUsdValue) {
+    const total = initialBalanceCheck.totalUsdValue;
+    logger.info(`\n💰 Total Inventory Value: $${total.total.toFixed(2)} USD`);
+    logger.info(`   🔷 GalaChain: $${total.galaChain.toFixed(2)} USD`);
+    logger.info(`   🔸 Solana: $${total.solana.toFixed(2)} USD`);
+  }
+
   if (initialBalanceCheck.checkedBalances) {
     // Deduplicate GalaChain balances by token, keeping max required
     if (initialBalanceCheck.checkedBalances.galaChain.length > 0) {
@@ -156,7 +164,11 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
       logger.info(`   🔷 GalaChain:`);
       Array.from(gcMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([token, check]) => {
         const status = check.sufficient ? '✅' : '❌';
-        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}`);
+        // Find USD value from original balance check
+        const originalCheck = initialBalanceCheck.checkedBalances!.galaChain.find(b => b.token === token);
+        const usdValue = originalCheck?.usdValue;
+        const usdStr = usdValue !== undefined && usdValue > 0 ? ` (≈$${usdValue.toFixed(2)})` : '';
+        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}${usdStr}`);
       });
     }
     
@@ -180,7 +192,11 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
       logger.info(`   🔸 Solana:`);
       Array.from(solMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([token, check]) => {
         const status = check.sufficient ? '✅' : '❌';
-        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}`);
+        // Find USD value from original balance check
+        const originalCheck = initialBalanceCheck.checkedBalances!.solana.find(b => b.token === token);
+        const usdValue = originalCheck?.usdValue;
+        const usdStr = usdValue !== undefined && usdValue > 0 ? ` (≈$${usdValue.toFixed(2)})` : '';
+        logger.info(`      ${status} ${token}: ${check.current.toFixed(8)} ${check.sufficient ? '>=' : '<'} ${check.required.toFixed(8)}${usdStr}`);
       });
     }
   }

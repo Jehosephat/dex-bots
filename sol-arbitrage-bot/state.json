@@ -34,65 +34,52 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762707087535
+          "lastUpdated": 1762709874200
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "30800.53934802",
-          "balance": "30800.53934802",
+          "rawBalance": "30784.32359333",
+          "balance": "30784.32359333",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762707087535
+          "lastUpdated": 1762709874200
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "42554.74475",
-          "balance": "42554.74475",
+          "rawBalance": "35804.74688",
+          "balance": "35804.74688",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762707087535
+          "lastUpdated": 1762709874200
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "475.27043",
-          "balance": "475.27043",
+          "rawBalance": "633.089892",
+          "balance": "633.089892",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762707087535
+          "lastUpdated": 1762709874200
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762707087535
+      "lastUpdated": 1762709874200
     },
     "solana": {
       "tokens": {},
-      "native": "0.513725944",
+      "native": "0.513259723",
       "totalValueUsd": "0",
-      "lastUpdated": 1762707087386
+      "lastUpdated": 1762709874847
     },
-    "lastUpdated": 1762707087535,
-    "version": 1525
+    "lastUpdated": 1762709874847,
+    "version": 1541
   },
-  "lastSaved": 1762707139693,
-  "version": 194,
-  "tokenCooldowns": {
-    "USDUC": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1762707185133,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    },
-    "MEW": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1762707179252,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    }
-  },
+  "lastSaved": 1762709950580,
+  "version": 198,
+  "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],
