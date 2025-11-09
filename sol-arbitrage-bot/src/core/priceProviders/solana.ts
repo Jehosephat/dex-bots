@@ -43,13 +43,15 @@ export class SolanaPriceProvider extends BasePriceProvider {
     super();
     this.quoteValidator = new QuoteValidator();
     
-    // Initialize strategy manager with bound methods
-    this.strategyManager = StrategyManager.createSolanaStrategyManager(
-      this.jupiterApiUrl,
-      (tokenSymbol: string, amount: number, reverse: boolean) => this.getJupiterQuote(tokenSymbol, amount, reverse),
-      (tokenSymbol: string) => this.getSpotPrice(tokenSymbol),
-      this.configService
-    );
+      // Initialize strategy manager with bound methods
+      // Note: getJupiterQuote will be called with quoteCurrency from the strategy
+      this.strategyManager = StrategyManager.createSolanaStrategyManager(
+        this.jupiterApiUrl,
+        (tokenSymbol: string, amount: number, reverse: boolean, quoteCurrency?: string) => 
+          this.getJupiterQuote(tokenSymbol, amount, reverse, quoteCurrency),
+        (tokenSymbol: string) => this.getSpotPrice(tokenSymbol),
+        this.configService
+      );
   }
 
   async initialize(): Promise<void> {
@@ -111,12 +113,14 @@ export class SolanaPriceProvider extends BasePriceProvider {
       }
 
       // Get quote using strategy
+      // Use tempTokenConfig (with quoteCurrency override) instead of original tokenConfig
+      const configToUse = quoteCurrency ? tempTokenConfig : tokenConfig;
       let quote: PriceQuote | null;
       if (strategy instanceof SolanaStandardQuoteStrategy) {
         // Standard strategy needs reverse parameter
-        quote = await (strategy as any).getQuoteWithReverse(symbol, amount, tokenConfig, reverse);
+        quote = await (strategy as any).getQuoteWithReverse(symbol, amount, configToUse, reverse);
       } else {
-        quote = await strategy.getQuote(symbol, amount, tokenConfig);
+        quote = await strategy.getQuote(symbol, amount, configToUse);
       }
 
       // Validate quote
@@ -148,7 +152,8 @@ export class SolanaPriceProvider extends BasePriceProvider {
   private async getJupiterQuote(
     tokenSymbol: string, 
     amount: number,
-    reverse: boolean = false
+    reverse: boolean = false,
+    quoteCurrency?: string
   ): Promise<{
     inputAmount: string;
     outputAmount: string;
@@ -161,18 +166,21 @@ export class SolanaPriceProvider extends BasePriceProvider {
         throw new Error(`No Solana mint for token ${tokenSymbol}`);
       }
 
+      // Use provided quoteCurrency override, or fall back to token config
+      const effectiveQuoteCurrency = quoteCurrency || tokenConfig.solQuoteVia;
+
       // Get the quote token configuration
-      const quoteTokenConfig = this.configService.getQuoteTokenConfig(tokenConfig.solQuoteVia);
+      const quoteTokenConfig = this.configService.getQuoteTokenConfig(effectiveQuoteCurrency);
       if (!quoteTokenConfig) {
-        throw new Error(`Quote token config not found for ${tokenConfig.solQuoteVia}`);
+        throw new Error(`Quote token config not found for ${effectiveQuoteCurrency}`);
       }
       if (!quoteTokenConfig.solanaMint) {
-        throw new Error(`No Solana mint for quote token ${tokenConfig.solQuoteVia}`);
+        throw new Error(`No Solana mint for quote token ${effectiveQuoteCurrency}`);
       }
 
       // Special case: Can't quote SOL/SOL on Jupiter (trying to swap SOL for itself)
       if (tokenConfig.solanaMint === quoteTokenConfig.solanaMint) {
-        logger.debug(`Skipping Jupiter quote for ${tokenSymbol}/${tokenConfig.solQuoteVia} - same mint, returning 1:1 price`);
+        logger.debug(`Skipping Jupiter quote for ${tokenSymbol}/${effectiveQuoteCurrency} - same mint, returning 1:1 price`);
         // Return a 1:1 quote with no price impact
         const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
         return {

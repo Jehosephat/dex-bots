@@ -39,7 +39,7 @@ export class StrategyManager {
    */
   static createSolanaStrategyManager(
     jupiterApiUrl: string,
-    getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean) => Promise<{
+    getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean, quoteCurrency?: string) => Promise<{
       inputAmount: string;
       outputAmount: string;
       priceImpact: number;

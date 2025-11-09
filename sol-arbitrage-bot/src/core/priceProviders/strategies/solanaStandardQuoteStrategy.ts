@@ -19,7 +19,7 @@ import logger from '../../../utils/logger';
  */
 export class SolanaStandardQuoteStrategy implements IQuoteStrategy {
   private readonly jupiterApiUrl: string;
-  private readonly getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean) => Promise<{
+  private readonly getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean, quoteCurrency?: string) => Promise<{
     inputAmount: string;
     outputAmount: string;
     priceImpact: number;
@@ -31,7 +31,7 @@ export class SolanaStandardQuoteStrategy implements IQuoteStrategy {
 
   constructor(
     jupiterApiUrl: string,
-    getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean) => Promise<{
+    getJupiterQuote: (tokenSymbol: string, amount: number, reverse: boolean, quoteCurrency?: string) => Promise<{
       inputAmount: string;
       outputAmount: string;
       priceImpact: number;
@@ -61,8 +61,9 @@ export class SolanaStandardQuoteStrategy implements IQuoteStrategy {
       // Get quote based on direction with error handling
       // reverse=false: SOL → Token (buying token with SOL/USDC)
       // reverse=true: Token → SOL (selling token for SOL/USDC)
+      // Pass the quote currency from tokenConfig so getJupiterQuote uses the correct quote token
       const quote = await this.errorHandler.executeWithProtection(
-        () => this.getJupiterQuote(symbol, amount, reverse),
+        () => this.getJupiterQuote(symbol, amount, reverse, tokenConfig.solQuoteVia),
         'jupiter-api',
         `Jupiter quote for ${symbol}`
       );

@@ -34,16 +34,16 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762566672309
+          "lastUpdated": 1762696994072
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "27578.17561236",
-          "balance": "27578.17561236",
+          "rawBalance": "32476.60590418",
+          "balance": "32476.60590418",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762566672309
+          "lastUpdated": 1762696994072
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,37 +52,43 @@
           "balance": "25800",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762566672309
+          "lastUpdated": 1762696994072
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "386.783166",
-          "balance": "386.783166",
+          "rawBalance": "2254.883722",
+          "balance": "2254.883722",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762566672309
+          "lastUpdated": 1762696994072
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762566672309
+      "lastUpdated": 1762696994072
     },
     "solana": {
       "tokens": {},
-      "native": "0.516298469",
+      "native": "0.515126809",
       "totalValueUsd": "0",
-      "lastUpdated": 1762566672614
+      "lastUpdated": 1762696994360
     },
-    "lastUpdated": 1762566672614,
-    "version": 1245
+    "lastUpdated": 1762696994360,
+    "version": 1473
   },
-  "lastSaved": 1762566672615,
-  "version": 176,
+  "lastSaved": 1762696994361,
+  "version": 184,
   "tokenCooldowns": {
     "SOL": {
       "isInCooldown": true,
       "cooldownEndsAt": 1762564988359,
+      "remainingSeconds": 60,
+      "reason": "Trade executed successfully"
+    },
+    "USDUC": {
+      "isInCooldown": true,
+      "cooldownEndsAt": 1762695495615,
       "remainingSeconds": 60,
       "reason": "Trade executed successfully"
     }
