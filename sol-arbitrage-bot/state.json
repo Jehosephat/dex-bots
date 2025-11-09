@@ -34,16 +34,16 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762696994072
+          "lastUpdated": 1762705287158
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "32476.60590418",
-          "balance": "32476.60590418",
+          "rawBalance": "37576.52244943",
+          "balance": "37576.52244943",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762696994072
+          "lastUpdated": 1762705287158
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,47 +52,34 @@
           "balance": "25800",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762696994072
+          "lastUpdated": 1762705287158
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "2254.883722",
-          "balance": "2254.883722",
+          "rawBalance": "1308.758704",
+          "balance": "1308.758704",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762696994072
+          "lastUpdated": 1762705287158
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762696994072
+      "lastUpdated": 1762705287158
     },
     "solana": {
       "tokens": {},
-      "native": "0.515126809",
+      "native": "0.514320953",
       "totalValueUsd": "0",
-      "lastUpdated": 1762696994360
+      "lastUpdated": 1762705287248
     },
-    "lastUpdated": 1762696994360,
-    "version": 1473
+    "lastUpdated": 1762705287248,
+    "version": 1513
   },
-  "lastSaved": 1762696994361,
-  "version": 184,
-  "tokenCooldowns": {
-    "SOL": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1762564988359,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    },
-    "USDUC": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1762695495615,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    }
-  },
+  "lastSaved": 1762705332802,
+  "version": 194,
+  "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],

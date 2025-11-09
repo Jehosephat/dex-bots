@@ -39,13 +39,37 @@
       "hash": "2FsaShjk99fxPHqm2tUuTvtPuvhRiQUGvqYVV3xz51uZKSzsNp8GafJoREGri4f9iwtXy9RUjdoyVBm5caBF3icZ",
       "timestamp": 1762696791687,
       "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1186.733421",
+      "direction": "solana->galaChain",
+      "hash": "V3X8TKyyMrhpoVbHg9dWoUDHzZitrDYMReSDDFXnHCJzb2LnPTS7jT6Wqg7RZJf2HpD1u23vbqM88PvKFgMKc1j",
+      "timestamp": 1762698622128,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "518.057649",
+      "direction": "solana->galaChain",
+      "hash": "NGGZ6jznK97g2KKyHT2U95KBw1D8zextfScUE3GQSrtsG3LTWb7aRLyuK2Qn9xCedAG1PzZLYE2Wb1PbCG5puEB",
+      "timestamp": 1762701380955,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1099.0839115",
+      "direction": "solana->galaChain",
+      "hash": "3HDQcf2tdRqj34ahZSW2bT8pvVBWAPUuerbLFYiSXJ7RmVa5UeDW2JYg6TPfQjAKFjz1PPNDSq3KnpaJ4dDNCgx8",
+      "timestamp": 1762702606833,
+      "status": "pending"
     }
   ],
   "lastBridgeTime": {
-    "USDUC": 1762696791687
+    "USDUC": 1762702606833
   },
   "dailyBridgeCount": {
-    "USDUC": 1
+    "USDUC": 4
   },
   "lastResetDate": "2025-11-09"
 }

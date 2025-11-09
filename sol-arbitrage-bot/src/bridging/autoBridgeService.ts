@@ -310,7 +310,9 @@ export class AutoBridgeService {
   }
 
   /**
-   * Check if bridging is allowed (rate limits, cooldowns)
+   * Check if bridging is allowed (rate limits only, no cooldowns)
+   * Note: Cooldowns are for trading, not bridging. Bridging should happen to rebalance
+   * before more trades make the imbalance worse.
    */
   canBridge(token: string): boolean {
     const autoBridgingConfig = this.configService.getAutoBridgingConfig();
@@ -318,16 +320,9 @@ export class AutoBridgeService {
       return false;
     }
 
-    // Check cooldown
-    if (this.bridgeStateTracker.isInCooldown(token, autoBridgingConfig.cooldownMinutes)) {
-      const remaining = this.bridgeStateTracker.getRemainingCooldown(token, autoBridgingConfig.cooldownMinutes);
-      logger.debug(`Token ${token} is in cooldown, ${remaining} minutes remaining`);
-      return false;
-    }
-
-    // Check daily limit
+    // Check daily limit only (cooldowns don't apply to bridging)
     if (this.bridgeStateTracker.hasExceededDailyLimit(token, autoBridgingConfig.maxBridgesPerDay)) {
-      logger.debug(`Token ${token} has exceeded daily bridge limit (${autoBridgingConfig.maxBridgesPerDay})`);
+      logger.info(`Token ${token} has exceeded daily bridge limit (${autoBridgingConfig.maxBridgesPerDay})`);
       return false;
     }
 
@@ -513,14 +508,26 @@ export class AutoBridgeService {
 
       // Use pre-fetched balances if available, otherwise fetch
       const preFetchedBalances = balanceMap.get(token.symbol);
+      
+      if (!preFetchedBalances && balanceCheckResult?.checkedBalances) {
+        logger.debug(`Token ${token.symbol} not found in balance check results, will fetch directly`);
+      }
+      
       const imbalance = await this.checkImbalance(token, preFetchedBalances);
       
+      // Log imbalance check result for debugging
       if (imbalance.needsRebalancing) {
-        // Check if bridging is allowed (cooldown, rate limits)
+        logger.info(`🔍 Imbalance detected for ${token.symbol}: GC ${imbalance.gcPercent.toFixed(2)}%, SOL ${imbalance.solPercent.toFixed(2)}%`);
+      } else if (imbalance.reason && imbalance.reason !== 'No imbalance detected') {
+        logger.debug(`Token ${token.symbol} imbalance check: ${imbalance.reason}`);
+      }
+      
+      if (imbalance.needsRebalancing) {
+        // Check if bridging is allowed (rate limits only, no cooldowns)
         if (this.canBridge(token.symbol)) {
           recommendations.push(imbalance);
         } else {
-          logger.debug(`Token ${token.symbol} needs rebalancing but is in cooldown or rate limited`);
+          logger.info(`Token ${token.symbol} needs rebalancing but has exceeded daily bridge limit`);
         }
       }
     }

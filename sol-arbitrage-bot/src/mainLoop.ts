@@ -58,19 +58,17 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
   await solProvider.initialize();
 
   // Check balances before starting (especially for live mode)
-  if (runMode === 'live') {
-    const balanceCheckResult = await checkInitialBalances(balanceChecker);
-    if (!balanceCheckResult) {
-      return false;
-    }
-    
-    // Check for auto-bridging opportunities after initial balance check
-    // Reuse the balance check result to avoid duplicate API calls
-    if (autoBridgeService) {
-      // Get the last balance check result from BalanceChecker (it caches the result)
-      const lastBalanceCheck = balanceChecker.getLastBalanceCheckResult();
-      await checkAutoBridging(autoBridgeService, lastBalanceCheck || undefined);
-    }
+  const balanceCheckResult = await checkInitialBalances(balanceChecker);
+  if (runMode === 'live' && !balanceCheckResult) {
+    return false;
+  }
+  
+  // Check for auto-bridging opportunities after initial balance check (works in both live and dry_run)
+  // Reuse the balance check result to avoid duplicate API calls
+  if (autoBridgeService) {
+    // Get the last balance check result from BalanceChecker (it caches the result)
+    const lastBalanceCheck = balanceChecker.getLastBalanceCheckResult();
+    await checkAutoBridging(autoBridgeService, lastBalanceCheck || undefined);
   }
 
   let anyExecuted = false;
