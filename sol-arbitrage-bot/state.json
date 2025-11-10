@@ -77,8 +77,8 @@
     "lastUpdated": 1762710903295,
     "version": 1547
   },
-  "lastSaved": 1762710965038,
-  "version": 200,
+  "lastSaved": 1762784456325,
+  "version": 201,
   "tokenCooldowns": {
     "USDUC": {
       "isInCooldown": true,
@@ -90,5 +90,7 @@
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "pendingBridges": [],
-  "recentTrades": []
+  "recentTrades": [],
+  "status": "running",
+  "lastHeartbeat": 1762784426310
 }
