@@ -16,6 +16,7 @@ dotenv.config();
 
 // Import routes
 import botRoutes from './routes/bot';
+import configRoutes from './routes/config';
 
 const app = express();
 const httpServer = createServer(app);
@@ -42,6 +43,7 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 app.use('/api/bot', botRoutes(io));
+app.use('/api/config', configRoutes);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
