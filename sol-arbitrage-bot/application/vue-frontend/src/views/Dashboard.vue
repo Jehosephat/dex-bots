@@ -3,6 +3,10 @@
     <header class="dashboard-header">
       <h1>Sol Arbitrage Bot</h1>
       <p class="subtitle">Control Panel</p>
+      <nav class="header-nav">
+        <router-link to="/" class="nav-link">Dashboard</router-link>
+        <router-link to="/config" class="nav-link">Configuration</router-link>
+      </nav>
     </header>
     
     <main class="dashboard-content">
@@ -37,6 +41,30 @@ import BotControl from '../components/dashboard/BotControl.vue'
   margin: 0.5rem 0 0 0;
   color: #7f8c8d;
   font-size: 1rem;
+}
+
+.header-nav {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-link {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: #7f8c8d;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.nav-link:hover {
+  background: #f8f9fa;
+  color: #2c3e50;
+}
+
+.nav-link.router-link-active {
+  background: #3498db;
+  color: white;
 }
 
 .dashboard-content {
