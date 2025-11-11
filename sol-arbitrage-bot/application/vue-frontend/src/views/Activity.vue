@@ -1,6 +1,6 @@
 <template>
-  <div class="trades-view">
-    <header class="trades-header">
+  <div class="activity-view">
+    <header class="activity-header">
       <h1>Sol Arbitrage Bot</h1>
       <p class="subtitle">Control Panel</p>
       <nav class="header-nav">
@@ -11,29 +11,29 @@
       </nav>
     </header>
 
-    <main class="trades-content">
-      <TradeHistory />
+    <main class="activity-content">
+      <ActivityFeed />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import TradeHistory from '../components/trades/TradeHistory.vue'
+import ActivityFeed from '../components/activity/ActivityFeed.vue'
 </script>
 
 <style scoped>
-.trades-view {
+.activity-view {
   min-height: 100vh;
   background: #f5f5f5;
 }
 
-.trades-header {
+.activity-header {
   background: white;
   padding: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.trades-header h1 {
+.activity-header h1 {
   margin: 0;
   font-size: 2rem;
   color: #2c3e50;
@@ -69,7 +69,7 @@ import TradeHistory from '../components/trades/TradeHistory.vue'
   color: white;
 }
 
-.trades-content {
+.activity-content {
   max-width: 1400px;
   margin: 2rem auto;
   padding: 0 2rem;
