@@ -5,6 +5,7 @@
  */
 
 import { TradeService, TradeLogEntry } from './tradeService';
+import { ConfigService } from './configService';
 import fs from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
@@ -20,6 +21,10 @@ export interface PnLSummary {
   winRate: number;
   totalVolume: number; // Total trade volume
   averageEdgeBps: number;
+  totalBridgingFees: number; // In GALA (estimated)
+  totalBridgingFeesUsd: number; // In USD
+  netExpectedEdge: number; // totalExpectedEdge - totalBridgingFees
+  netActualEdge?: number; // totalActualEdge - totalBridgingFees (if available)
   period: {
     start: string;
     end: string;
@@ -53,10 +58,13 @@ export interface PnLBreakdown {
 
 export class PnLService {
   private tradeService: TradeService;
+  private configService: ConfigService;
   private stateFilePath: string;
+  private bridgeStatePath: string;
 
   constructor() {
     this.tradeService = new TradeService();
+    this.configService = new ConfigService();
     
     // Determine bot root directory
     const currentDir = __dirname;
@@ -64,6 +72,76 @@ export class PnLService {
       ? path.resolve(currentDir, '../../..')
       : path.resolve(currentDir, '../../../..');
     this.stateFilePath = path.join(botRoot, 'state.json');
+    this.bridgeStatePath = path.join(botRoot, 'bridge-state.json');
+  }
+
+  /**
+   * Calculate total bridging fees for a given time period
+   */
+  private async calculateBridgingFees(filters?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ totalFeesGala: number; totalFeesUsd: number }> {
+    try {
+      // Get bridging config to get bridge cost
+      const bridgingConfig = await this.configService.getBridgingConfig();
+      const bridgeCostUsd = bridgingConfig.bridgeCostUsd || 1.25; // Default $1.25 USD
+      
+      // Read bridge state
+      if (!existsSync(this.bridgeStatePath)) {
+        return { totalFeesGala: 0, totalFeesUsd: 0 };
+      }
+      
+      const bridgeStateContent = await fs.readFile(this.bridgeStatePath, 'utf-8');
+      const bridgeState = JSON.parse(bridgeStateContent);
+      
+      if (!bridgeState.bridges || !Array.isArray(bridgeState.bridges)) {
+        return { totalFeesGala: 0, totalFeesUsd: 0 };
+      }
+      
+      // Filter bridges by date if specified
+      let bridges = bridgeState.bridges;
+      
+      if (filters?.startDate) {
+        const start = new Date(filters.startDate).getTime();
+        bridges = bridges.filter((b: any) => (b.timestamp || 0) >= start);
+      }
+      
+      if (filters?.endDate) {
+        const end = new Date(filters.endDate).getTime();
+        bridges = bridges.filter((b: any) => (b.timestamp || 0) <= end);
+      }
+      
+      // Count completed bridges (or all if status is not available)
+      const completedBridges = bridges.filter((b: any) => 
+        !b.status || b.status === 'completed' || b.status === 'pending'
+      );
+      
+      const totalBridges = completedBridges.length;
+      const totalFeesUsd = totalBridges * bridgeCostUsd;
+      
+      // Estimate GALA price from state.json if available, otherwise use default
+      let galaUsdPrice = 0.01; // Default fallback
+      try {
+        if (existsSync(this.stateFilePath)) {
+          const stateContent = await fs.readFile(this.stateFilePath, 'utf-8');
+          const state = JSON.parse(stateContent);
+          // Try to get GALA price from state if available
+          if (state.galaUsdPrice) {
+            galaUsdPrice = parseFloat(state.galaUsdPrice) || 0.01;
+          }
+        }
+      } catch (e) {
+        // Use default if we can't read state
+      }
+      
+      const totalFeesGala = totalFeesUsd / galaUsdPrice;
+      
+      return { totalFeesGala, totalFeesUsd };
+    } catch (error) {
+      console.error('Failed to calculate bridging fees:', error);
+      return { totalFeesGala: 0, totalFeesUsd: 0 };
+    }
   }
 
   /**
@@ -131,6 +209,18 @@ export class PnLService {
     const averageEdgeBps = totalTrades > 0 ? totalExpectedEdgeBps / totalTrades : 0;
     const winRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
     
+    // Calculate bridging fees for the same period
+    const bridgingFees = await this.calculateBridgingFees({
+      startDate: filters?.startDate,
+      endDate: filters?.endDate
+    });
+    
+    // Calculate net edge (edge minus bridging fees)
+    const netExpectedEdge = totalExpectedEdge - bridgingFees.totalFeesGala;
+    const netActualEdge = totalActualEdge !== 0 
+      ? totalActualEdge - bridgingFees.totalFeesGala 
+      : undefined;
+    
     const timestamps = filteredTrades.map(t => new Date(t.timestamp).getTime());
     const start = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : new Date().toISOString();
     const end = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : new Date().toISOString();
@@ -146,6 +236,10 @@ export class PnLService {
       winRate,
       totalVolume,
       averageEdgeBps,
+      totalBridgingFees: bridgingFees.totalFeesGala,
+      totalBridgingFeesUsd: bridgingFees.totalFeesUsd,
+      netExpectedEdge,
+      netActualEdge,
       period: { start, end }
     };
   }

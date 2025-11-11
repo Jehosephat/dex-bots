@@ -69,6 +69,34 @@
             {{ breakdown.summary.totalActualEdgeBps?.toFixed(2) }} BPS total
           </div>
         </div>
+
+        <div class="summary-card" :class="{ 'fee-card': breakdown.summary.totalBridgingFees > 0 }">
+          <div class="card-label">Bridging Fees</div>
+          <div class="card-value">{{ formatGala(breakdown.summary.totalBridgingFees) }}</div>
+          <div class="card-detail">
+            ${{ breakdown.summary.totalBridgingFeesUsd.toFixed(2) }} USD
+          </div>
+        </div>
+
+        <div class="summary-card net-card">
+          <div class="card-label">Net Expected Edge</div>
+          <div class="card-value" :class="{ negative: breakdown.summary.netExpectedEdge < 0 }">
+            {{ formatGala(breakdown.summary.netExpectedEdge) }}
+          </div>
+          <div class="card-detail">
+            After bridging fees
+          </div>
+        </div>
+
+        <div v-if="breakdown.summary.netActualEdge !== undefined" class="summary-card net-card">
+          <div class="card-label">Net Actual Edge</div>
+          <div class="card-value" :class="{ negative: breakdown.summary.netActualEdge < 0 }">
+            {{ formatGala(breakdown.summary.netActualEdge) }}
+          </div>
+          <div class="card-detail">
+            After bridging fees
+          </div>
+        </div>
       </div>
 
       <!-- Time Period Breakdown -->
@@ -286,6 +314,18 @@ onMounted(async () => {
 }
 
 .card-detail .error {
+  color: #e74c3c;
+}
+
+.fee-card {
+  border-left-color: #f39c12;
+}
+
+.net-card {
+  border-left-color: #27ae60;
+}
+
+.net-card .card-value.negative {
   color: #e74c3c;
 }
 

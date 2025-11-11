@@ -34,6 +34,8 @@ export interface BridgingConfig {
   maxBridgesPerDay: number;
   enabledTokens: string[];
   skipTokens: string[];
+  bridgeCostUsd?: number; // Bridge cost in USD (default $1.25)
+  tradesPerBridge?: number; // Number of trades per bridge (for amortization)
 }
 
 export interface InventoryConfig {

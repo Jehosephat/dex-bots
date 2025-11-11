@@ -13,6 +13,10 @@ export interface PnLSummary {
   winRate: number
   totalVolume: number
   averageEdgeBps: number
+  totalBridgingFees: number
+  totalBridgingFeesUsd: number
+  netExpectedEdge: number
+  netActualEdge?: number
   period: {
     start: string
     end: string
