@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import Configuration from '../views/Configuration.vue'
+import Trades from '../views/Trades.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,6 +15,11 @@ const router = createRouter({
       path: '/config',
       name: 'configuration',
       component: Configuration
+    },
+    {
+      path: '/trades',
+      name: 'trades',
+      component: Trades
     }
   ]
 })

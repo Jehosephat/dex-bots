@@ -6,6 +6,7 @@
       <nav class="header-nav">
         <router-link to="/" class="nav-link">Dashboard</router-link>
         <router-link to="/config" class="nav-link">Configuration</router-link>
+        <router-link to="/trades" class="nav-link">Trades</router-link>
       </nav>
     </header>
 

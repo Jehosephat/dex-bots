@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard">
-    <header class="dashboard-header">
+  <div class="trades-view">
+    <header class="trades-header">
       <h1>Sol Arbitrage Bot</h1>
       <p class="subtitle">Control Panel</p>
       <nav class="header-nav">
@@ -9,30 +9,30 @@
         <router-link to="/trades" class="nav-link">Trades</router-link>
       </nav>
     </header>
-    
-    <main class="dashboard-content">
-      <BotControl />
+
+    <main class="trades-content">
+      <TradeHistory />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import BotControl from '../components/dashboard/BotControl.vue'
+import TradeHistory from '../components/trades/TradeHistory.vue'
 </script>
 
 <style scoped>
-.dashboard {
+.trades-view {
   min-height: 100vh;
   background: #f5f5f5;
 }
 
-.dashboard-header {
+.trades-header {
   background: white;
   padding: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.dashboard-header h1 {
+.trades-header h1 {
   margin: 0;
   font-size: 2rem;
   color: #2c3e50;
@@ -68,8 +68,8 @@ import BotControl from '../components/dashboard/BotControl.vue'
   color: white;
 }
 
-.dashboard-content {
-  max-width: 1200px;
+.trades-content {
+  max-width: 1400px;
   margin: 2rem auto;
   padding: 0 2rem;
 }
