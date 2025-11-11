@@ -21,7 +21,6 @@
           <option :value="undefined">All</option>
           <option value="trade">Trades</option>
           <option value="bridge">Bridges</option>
-          <option value="balance">Balances</option>
           <option value="error">Errors</option>
           <option value="info">Info</option>
         </select>
@@ -114,7 +113,7 @@ const activityStore = useActivityStore()
 const { events, loading, error, filters, autoRefresh } = storeToRefs(activityStore)
 
 const localFilters = ref({
-  type: undefined as 'trade' | 'bridge' | 'balance' | 'error' | 'info' | undefined,
+  type: undefined as 'trade' | 'bridge' | 'error' | 'info' | undefined,
   level: undefined as 'info' | 'warn' | 'error' | 'success' | undefined,
   token: ''
 })
