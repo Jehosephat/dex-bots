@@ -104,5 +104,28 @@ router.get('/inventory', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/pnl/daily
+ * Get daily P&L data for charting
+ */
+router.get('/daily', async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate, mode } = req.query;
+    
+    const dailyData = await pnlService.getDailyPnL({
+      startDate: startDate as string,
+      endDate: endDate as string,
+      mode: mode as 'live' | 'dry_run'
+    });
+    
+    res.json(dailyData);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get daily P&L data',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router;
 

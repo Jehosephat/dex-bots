@@ -167,6 +167,14 @@
         </div>
       </div>
 
+      <!-- Daily P&L Chart -->
+      <div class="section">
+        <h3>Daily P&L Trend</h3>
+        <div class="chart-wrapper">
+          <DailyPnLChart :mode="selectedMode" />
+        </div>
+      </div>
+
       <!-- Token Breakdown -->
       <div class="section">
         <h3>Performance by Token</h3>
@@ -206,6 +214,7 @@
 import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePnLStore } from '../../stores/pnl'
+import DailyPnLChart from './DailyPnLChart.vue'
 
 const pnlStore = usePnLStore()
 const { breakdown, loading, error } = storeToRefs(pnlStore)
@@ -331,6 +340,13 @@ onMounted(async () => {
 
 .section {
   margin-bottom: 2rem;
+}
+
+.chart-wrapper {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e9ecef;
 }
 
 .section h3 {

@@ -384,5 +384,72 @@ export class PnLService {
       return null;
     }
   }
-}
 
+  /**
+   * Get daily P&L data for charting
+   */
+  async getDailyPnL(filters?: {
+    startDate?: string;
+    endDate?: string;
+    mode?: 'live' | 'dry_run';
+  }): Promise<Array<{ date: string; edge: number; volume: number; trades: number; fees: number }>> {
+    const trades = await this.tradeService.readTrades();
+    
+    // Filter trades
+    let filteredTrades = trades;
+    
+    if (filters?.startDate) {
+      const start = new Date(filters.startDate).getTime();
+      filteredTrades = filteredTrades.filter(t => new Date(t.timestamp).getTime() >= start);
+    }
+    
+    if (filters?.endDate) {
+      const end = new Date(filters.endDate).getTime();
+      filteredTrades = filteredTrades.filter(t => new Date(t.timestamp).getTime() <= end);
+    }
+    
+    if (filters?.mode) {
+      filteredTrades = filteredTrades.filter(t => t.mode === filters.mode);
+    }
+    
+    // Group by date
+    const dailyMap = new Map<string, {
+      edge: number;
+      volume: number;
+      trades: number;
+    }>();
+    
+    filteredTrades.forEach(trade => {
+      const date = new Date(trade.timestamp);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      const existing = dailyMap.get(dateKey) || { edge: 0, volume: 0, trades: 0 };
+      existing.edge += trade.expectedNetEdge || 0;
+      existing.volume += trade.tradeSize || 0;
+      existing.trades += 1;
+      dailyMap.set(dateKey, existing);
+    });
+    
+    // Get bridging fees for the period
+    const bridgingFees = await this.calculateBridgingFees({
+      startDate: filters?.startDate,
+      endDate: filters?.endDate
+    });
+    
+    // Calculate daily fees (distribute evenly across days)
+    const dates = Array.from(dailyMap.keys()).sort();
+    const dailyFee = dates.length > 0 ? bridgingFees.totalFeesGala / dates.length : 0;
+    
+    // Convert to array and add fees
+    return dates.map(date => {
+      const data = dailyMap.get(date)!;
+      return {
+        date,
+        edge: data.edge,
+        volume: data.volume,
+        trades: data.trades,
+        fees: dailyFee
+      };
+    });
+  }
+}
