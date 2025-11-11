@@ -81,25 +81,37 @@ export class ActivityService {
           const bridgeStateContent = await fs.readFile(this.bridgeStatePath, 'utf-8');
           const bridgeState = JSON.parse(bridgeStateContent);
           
-          if (bridgeState.history && Array.isArray(bridgeState.history)) {
-            const recentBridges = bridgeState.history
+          // bridge-state.json uses 'bridges' array, not 'history'
+          if (bridgeState.bridges && Array.isArray(bridgeState.bridges)) {
+            const recentBridges = bridgeState.bridges
               .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0))
               .slice(0, limit / 4); // Use quarter for bridges
 
             for (const bridge of recentBridges) {
               const status = bridge.status || 'pending';
+              // Convert amount from BigNumber string to number if needed
+              const amount = typeof bridge.amount === 'string' 
+                ? parseFloat(bridge.amount) 
+                : bridge.amount;
+              
+              // Format direction for display
+              const directionDisplay = bridge.direction === 'galaChain->solana' 
+                ? 'GalaChain → Solana'
+                : bridge.direction === 'solana->galaChain'
+                ? 'Solana → GalaChain'
+                : bridge.direction || '';
+              
               events.push({
                 id: `bridge-${bridge.hash || bridge.timestamp || Date.now()}`,
                 timestamp: new Date(bridge.timestamp || Date.now()).toISOString(),
                 type: 'bridge',
                 level: status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'info',
-                message: `Bridge ${status}: ${bridge.amount || '?'} ${bridge.token || '?'} ${bridge.direction || ''}`,
+                message: `Bridge ${status}: ${amount?.toFixed(4) || '?'} ${bridge.token || '?'} (${directionDisplay})`,
                 metadata: {
                   token: bridge.token,
                   direction: bridge.direction,
-                  txHash: bridge.gcTxHash,
-                  txSig: bridge.solTxSig,
-                  amount: bridge.amount,
+                  hash: bridge.hash, // Store hash (could be GC tx hash or Solana sig)
+                  amount: amount,
                   status: bridge.status
                 }
               });
@@ -107,6 +119,7 @@ export class ActivityService {
           }
         } catch (e) {
           // Ignore bridge state read errors
+          console.error('Failed to read bridge state:', e);
         }
       }
     } catch (error) {
