@@ -4,6 +4,7 @@ import Configuration from '../views/Configuration.vue'
 import Trades from '../views/Trades.vue'
 import Activity from '../views/Activity.vue'
 import PnL from '../views/PnL.vue'
+import Balances from '../views/Balances.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -32,6 +33,11 @@ const router = createRouter({
       path: '/pnl',
       name: 'pnl',
       component: PnL
+    },
+    {
+      path: '/balances',
+      name: 'balances',
+      component: Balances
     }
   ]
 })

@@ -20,6 +20,7 @@ import configRoutes from './routes/config';
 import tradeRoutes from './routes/trades';
 import activityRoutes from './routes/activity';
 import pnlRoutes from './routes/pnl';
+import balanceRoutes from './routes/balances';
 import { FileWatcherService } from './services/fileWatcher';
 
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/pnl', pnlRoutes);
+app.use('/api/balances', balanceRoutes);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {

@@ -9,6 +9,7 @@
         <router-link to="/trades" class="nav-link">Trades</router-link>
         <router-link to="/activity" class="nav-link">Activity</router-link>
         <router-link to="/pnl" class="nav-link">P&L</router-link>
+        <router-link to="/balances" class="nav-link">Balances</router-link>
       </nav>
     </header>
 
