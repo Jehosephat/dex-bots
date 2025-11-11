@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue'
 import Configuration from '../views/Configuration.vue'
 import Trades from '../views/Trades.vue'
 import Activity from '../views/Activity.vue'
+import PnL from '../views/PnL.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -26,6 +27,11 @@ const router = createRouter({
       path: '/activity',
       name: 'activity',
       component: Activity
+    },
+    {
+      path: '/pnl',
+      name: 'pnl',
+      component: PnL
     }
   ]
 })
