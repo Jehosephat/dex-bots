@@ -171,6 +171,9 @@ watch(autoRefresh, (newVal) => {
 
 onMounted(async () => {
   await activityStore.fetchActivity()
+  // Set up WebSocket for real-time updates
+  activityStore.setupWebSocket()
+  // Fallback to polling if WebSocket is not available
   if (autoRefresh.value) {
     activityStore.startAutoRefresh(5000)
   }
@@ -178,6 +181,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   activityStore.stopAutoRefresh()
+  activityStore.disconnectWebSocket()
 })
 </script>
 

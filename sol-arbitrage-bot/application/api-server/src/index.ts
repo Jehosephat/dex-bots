@@ -19,12 +19,13 @@ import botRoutes from './routes/bot';
 import configRoutes from './routes/config';
 import tradeRoutes from './routes/trades';
 import activityRoutes from './routes/activity';
+import { FileWatcherService } from './services/fileWatcher';
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.VUE_APP_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || process.env.VUE_APP_URL || 'http://localhost:5173',
     methods: ['GET', 'POST']
   }
 });
@@ -57,6 +58,10 @@ io.on('connection', (socket) => {
     console.log('Client disconnected:', socket.id);
   });
 });
+
+// Start file watcher for real-time updates
+const fileWatcher = new FileWatcherService(io);
+fileWatcher.startWatching();
 
 // Export io for use in routes/services
 export { io };
