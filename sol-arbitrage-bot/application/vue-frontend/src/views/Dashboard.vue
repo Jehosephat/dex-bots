@@ -15,12 +15,14 @@
     
     <main class="dashboard-content">
       <BotControl />
+      <ConsolePane />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import BotControl from '../components/dashboard/BotControl.vue'
+import ConsolePane from '../components/dashboard/ConsolePane.vue'
 </script>
 
 <style scoped>
@@ -75,6 +77,9 @@ import BotControl from '../components/dashboard/BotControl.vue'
   max-width: 1200px;
   margin: 2rem auto;
   padding: 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 </style>
 

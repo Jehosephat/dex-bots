@@ -9,6 +9,7 @@ import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
+import { Server } from 'socket.io';
 
 interface BotStatus {
   status: 'running' | 'stopped' | 'paused' | 'error';
@@ -23,10 +24,15 @@ export class BotManager {
   private botProcess: ChildProcess | null = null;
   private botPid: number | null = null;
   private startTime: Date | null = null;
+  private botMode: 'live' | 'dry_run' | null = null; // Track the mode the bot was started with
   private stateFilePath: string;
   private botRoot: string;
+  private io: Server | null = null;
+  private consoleLogs: Array<{ timestamp: number; type: 'stdout' | 'stderr'; message: string }> = [];
+  private readonly MAX_LOGS = 1000; // Keep last 1000 log lines
 
-  constructor() {
+  constructor(io?: Server) {
+    this.io = io || null;
     // Path to bot root (two levels up from api-server/dist)
     // In development, __dirname points to src, in production to dist
     const currentDir = __dirname;
@@ -52,15 +58,11 @@ export class BotManager {
 
         // Try to read state file for additional info
         let lastCycle: string | undefined;
-        let mode: 'live' | 'dry_run' | undefined;
         try {
           if (existsSync(this.stateFilePath)) {
             const stateContent = await fs.readFile(this.stateFilePath, 'utf-8');
             const state = JSON.parse(stateContent);
             lastCycle = state.lastCycleTime;
-            // Check if we can infer mode from state (if available)
-            // For now, default to dry_run
-            mode = 'dry_run';
           }
         } catch (e) {
           // Ignore state file read errors
@@ -68,7 +70,7 @@ export class BotManager {
 
         return {
           status: 'running',
-          mode: mode || 'dry_run',
+          mode: this.botMode || 'dry_run', // Use tracked mode
           pid: this.botPid || undefined,
           uptime,
           lastCycle
@@ -91,7 +93,7 @@ export class BotManager {
             if (heartbeatAge < 120000) {
               return {
                 status: 'running',
-                mode: 'dry_run', // TODO: Read from actual process/env
+                mode: this.botMode || 'dry_run', // Use tracked mode if available
                 lastCycle: state.lastCycleTime
               };
             }
@@ -124,28 +126,38 @@ export class BotManager {
         return currentStatus;
       }
 
-      // Path to bot entry point
-      const botEntryPoint = path.join(this.botRoot, 'dist', 'index.js');
+      // Path to bot entry point - use run-bot.ts (the actual entry point)
+      const botEntryPointSrc = path.join(this.botRoot, 'src', 'run-bot.ts');
+      const botEntryPointDist = path.join(this.botRoot, 'dist', 'run-bot.js');
 
-      // Check if bot is built
-      if (!existsSync(botEntryPoint)) {
-        throw new Error('Bot not built. Run "npm run build" first.');
-      }
+      // Determine if we should use compiled version or source
+      const useCompiled = existsSync(botEntryPointDist);
+      const entryPoint = useCompiled ? botEntryPointDist : botEntryPointSrc;
 
       // Start bot process
       const env = {
         ...process.env,
-        MODE: mode
+        RUN_MODE: mode  // Bot expects RUN_MODE, not MODE
       };
 
-      this.botProcess = spawn('node', [botEntryPoint], {
+      // Use node for compiled, tsx for source
+      const command = useCompiled ? 'node' : 'npx';
+      const args = useCompiled ? [entryPoint] : ['tsx', entryPoint];
+
+      this.botProcess = spawn(command, args, {
         cwd: this.botRoot,
         env,
-        stdio: 'pipe'
+        stdio: ['ignore', 'pipe', 'pipe'], // stdin: ignore, stdout: pipe, stderr: pipe
+        shell: false
       });
+      
+      // Log process start
+      console.log(`[BotManager] Starting bot process: ${command} ${args.join(' ')}`);
+      console.log(`[BotManager] Mode: ${mode}, PID: ${this.botProcess.pid}`);
 
       this.botPid = this.botProcess.pid || null;
       this.startTime = new Date();
+      this.botMode = mode; // Track the mode we started with
 
       // Handle process events
       this.botProcess.on('exit', (code) => {
@@ -153,6 +165,7 @@ export class BotManager {
         this.botProcess = null;
         this.botPid = null;
         this.startTime = null;
+        this.botMode = null; // Clear mode when process exits
       });
 
       this.botProcess.on('error', (error) => {
@@ -160,20 +173,48 @@ export class BotManager {
         this.botProcess = null;
         this.botPid = null;
         this.startTime = null;
+        this.botMode = null; // Clear mode on error
       });
 
-      // Log output
+      // Capture and emit console output
       if (this.botProcess.stdout) {
+        this.botProcess.stdout.setEncoding('utf8');
         this.botProcess.stdout.on('data', (data) => {
-          console.log(`[Bot] ${data.toString()}`);
+          const message = data.toString();
+          console.log(`[Bot stdout] ${message}`);
+          // Split by newlines and add each line as a separate log entry
+          const lines = message.split('\n').filter((line: string) => line.trim().length > 0);
+          lines.forEach((line: string) => this.addLog('stdout', line));
         });
+        
+        this.botProcess.stdout.on('error', (error) => {
+          console.error('[Bot stdout error]', error);
+          this.addLog('stderr', `stdout error: ${error.message}`);
+        });
+      } else {
+        console.warn('[BotManager] stdout is null');
       }
 
       if (this.botProcess.stderr) {
+        this.botProcess.stderr.setEncoding('utf8');
         this.botProcess.stderr.on('data', (data) => {
-          console.error(`[Bot Error] ${data.toString()}`);
+          const message = data.toString();
+          console.error(`[Bot stderr] ${message}`);
+          // Split by newlines and add each line as a separate log entry
+          const lines = message.split('\n').filter((line: string) => line.trim().length > 0);
+          lines.forEach((line: string) => this.addLog('stderr', line));
         });
+        
+        this.botProcess.stderr.on('error', (error) => {
+          console.error('[Bot stderr error]', error);
+          this.addLog('stderr', `stderr error: ${error.message}`);
+        });
+      } else {
+        console.warn('[BotManager] stderr is null');
       }
+      
+      // Add a startup message
+      this.addLog('stdout', `Bot process started (PID: ${this.botPid}, Mode: ${mode})`);
 
       // Wait a moment to ensure process started
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -214,6 +255,8 @@ export class BotManager {
       this.botProcess = null;
       this.botPid = null;
       this.startTime = null;
+      this.botMode = null; // Clear mode when stopped
+      // Don't clear console logs - keep them for reference
 
       return {
         status: 'stopped'
@@ -224,6 +267,50 @@ export class BotManager {
         error: error instanceof Error ? error.message : String(error)
       };
     }
+  }
+
+  /**
+   * Add a log entry and emit via WebSocket
+   */
+  private addLog(type: 'stdout' | 'stderr', message: string): void {
+    if (!message || message.trim().length === 0) {
+      return; // Skip empty messages
+    }
+    
+    const logEntry = {
+      timestamp: Date.now(),
+      type,
+      message: message.trim()
+    };
+
+    // Add to logs array
+    this.consoleLogs.push(logEntry);
+
+    // Keep only last MAX_LOGS entries
+    if (this.consoleLogs.length > this.MAX_LOGS) {
+      this.consoleLogs.shift();
+    }
+
+    // Emit via WebSocket if available
+    if (this.io) {
+      this.io.emit('bot:console:output', logEntry);
+    } else {
+      console.warn('[BotManager] Socket.io not available, cannot emit console output');
+    }
+  }
+
+  /**
+   * Get recent console logs
+   */
+  getConsoleLogs(limit: number = 100): Array<{ timestamp: number; type: 'stdout' | 'stderr'; message: string }> {
+    return this.consoleLogs.slice(-limit);
+  }
+
+  /**
+   * Clear console logs
+   */
+  clearConsoleLogs(): void {
+    this.consoleLogs = [];
   }
 
   /**

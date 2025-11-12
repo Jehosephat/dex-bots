@@ -4,7 +4,7 @@
       <h2>Token Balances</h2>
       <div class="header-actions">
         <button @click="refreshBalances" class="btn btn-secondary" :disabled="loading">
-          {{ loading ? 'Refreshing...' : 'Refresh from Networks' }}
+          {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </div>
     </div>

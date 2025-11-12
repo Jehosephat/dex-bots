@@ -34,55 +34,55 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762710903013
+          "lastUpdated": 1762906597084
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "31998.8003673",
-          "balance": "31998.8003673",
+          "rawBalance": "32759.78824101",
+          "balance": "32759.78824101",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762710903013
+          "lastUpdated": 1762906597084
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "35804.74688",
-          "balance": "35804.74688",
+          "rawBalance": "36434.41106",
+          "balance": "36434.41106",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762710903013
+          "lastUpdated": 1762906597084
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "97.684089",
-          "balance": "97.684089",
+          "rawBalance": "1675.667494",
+          "balance": "1675.667494",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762710903013
+          "lastUpdated": 1762906597084
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762710903013
+      "lastUpdated": 1762906597085
     },
     "solana": {
       "tokens": {},
-      "native": "0.512566273",
+      "native": "0.512352076",
       "totalValueUsd": "0",
-      "lastUpdated": 1762710903295
+      "lastUpdated": 1762906597536
     },
-    "lastUpdated": 1762710903295,
-    "version": 1547
+    "lastUpdated": 1762906597536,
+    "version": 1555
   },
-  "lastSaved": 1762784456325,
-  "version": 201,
+  "lastSaved": 1762906998252,
+  "version": 212,
   "tokenCooldowns": {
     "USDUC": {
       "isInCooldown": true,
-      "cooldownEndsAt": 1762710980012,
+      "cooldownEndsAt": 1762907055905,
       "remainingSeconds": 60,
       "reason": "Trade executed successfully"
     }
@@ -92,5 +92,5 @@
   "pendingBridges": [],
   "recentTrades": [],
   "status": "running",
-  "lastHeartbeat": 1762784426310
+  "lastHeartbeat": 1762905266726
 }

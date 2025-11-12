@@ -20,6 +20,26 @@
     </div>
 
     <div class="controls">
+      <div v-if="!isRunning" class="mode-selector">
+        <label>
+          <input 
+            type="radio" 
+            v-model="selectedMode" 
+            value="dry_run"
+            :disabled="isLoading"
+          />
+          Dry Run
+        </label>
+        <label>
+          <input 
+            type="radio" 
+            v-model="selectedMode" 
+            value="live"
+            :disabled="isLoading"
+          />
+          Live
+        </label>
+      </div>
       <button 
         @click="handleStart" 
         :disabled="isRunning || isLoading"
@@ -91,11 +111,15 @@ const formatUptime = (seconds: number): string => {
   return `${hours}h ${minutes}m ${secs}s`
 }
 
+const selectedMode = ref<'live' | 'dry_run'>('dry_run')
+
 const handleStart = async () => {
   isLoading.value = true
   error.value = null
   try {
-    await botStore.start('dry_run')
+    await botStore.start(selectedMode.value)
+    // Refresh status after starting to get updated mode
+    await refreshStatus()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to start bot'
   } finally {
@@ -217,6 +241,32 @@ onMounted(() => {
 .controls {
   display: flex;
   gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mode-selector {
+  display: flex;
+  gap: 1rem;
+  margin-right: 1rem;
+}
+
+.mode-selector label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #2c3e50;
+}
+
+.mode-selector input[type="radio"] {
+  cursor: pointer;
+}
+
+.mode-selector input[type="radio"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .btn {

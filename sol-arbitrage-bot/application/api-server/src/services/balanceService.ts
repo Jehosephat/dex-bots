@@ -65,21 +65,58 @@ export class BalanceService {
         return null;
       }
       
+      // Convert BigNumber strings and ensure proper types
+      const convertTokenBalance = (token: any): TokenBalance => {
+        return {
+          symbol: token.symbol || '',
+          mint: token.mint || '',
+          rawBalance: typeof token.rawBalance === 'string' ? token.rawBalance : String(token.rawBalance || '0'),
+          balance: typeof token.balance === 'string' ? token.balance : String(token.balance || '0'),
+          decimals: typeof token.decimals === 'number' ? token.decimals : parseInt(String(token.decimals || 0), 10),
+          valueUsd: typeof token.valueUsd === 'number' ? token.valueUsd : parseFloat(String(token.valueUsd || '0')),
+          lastUpdated: typeof token.lastUpdated === 'number' ? token.lastUpdated : parseInt(String(token.lastUpdated || Date.now()), 10)
+        };
+      };
+
+      const convertChainBalances = (chainData: any): ChainBalances => {
+        const tokens: Record<string, TokenBalance> = {};
+        if (chainData.tokens && typeof chainData.tokens === 'object') {
+          Object.keys(chainData.tokens).forEach(symbol => {
+            tokens[symbol] = convertTokenBalance(chainData.tokens[symbol]);
+          });
+        }
+
+        return {
+          tokens,
+          native: typeof chainData.native === 'string' ? chainData.native : String(chainData.native || '0'),
+          totalValueUsd: typeof chainData.totalValueUsd === 'number' 
+            ? chainData.totalValueUsd 
+            : parseFloat(String(chainData.totalValueUsd || '0')),
+          lastUpdated: typeof chainData.lastUpdated === 'number' 
+            ? chainData.lastUpdated 
+            : parseInt(String(chainData.lastUpdated || Date.now()), 10)
+        };
+      };
+
       return {
-        galaChain: state.inventory.galaChain || {
+        galaChain: convertChainBalances(state.inventory.galaChain || {
           tokens: {},
           native: '0',
           totalValueUsd: 0,
           lastUpdated: Date.now()
-        },
-        solana: state.inventory.solana || {
+        }),
+        solana: convertChainBalances(state.inventory.solana || {
           tokens: {},
           native: '0',
           totalValueUsd: 0,
           lastUpdated: Date.now()
-        },
-        lastUpdated: state.inventory.lastUpdated || Date.now(),
-        version: state.inventory.version
+        }),
+        lastUpdated: typeof state.inventory.lastUpdated === 'number' 
+          ? state.inventory.lastUpdated 
+          : parseInt(String(state.inventory.lastUpdated || Date.now()), 10),
+        version: typeof state.inventory.version === 'number' 
+          ? state.inventory.version 
+          : parseInt(String(state.inventory.version || 0), 10)
       };
     } catch (error) {
       console.error('Failed to read balances from state:', error);

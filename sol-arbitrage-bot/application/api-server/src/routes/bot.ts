@@ -10,10 +10,14 @@ import { BotManager } from '../services/botManager';
 
 const router = Router();
 
-// Initialize bot manager
-const botManager = new BotManager();
+// Initialize bot manager (will be set with io in botRoutes)
+let botManager: BotManager;
 
 export default function botRoutes(io: Server): Router {
+  // Initialize bot manager with Socket.io instance
+  if (!botManager) {
+    botManager = new BotManager(io);
+  }
   /**
    * GET /api/bot/status
    * Get current bot status
@@ -106,6 +110,39 @@ export default function botRoutes(io: Server): Router {
     } catch (error) {
       res.status(500).json({ 
         error: 'Failed to resume bot',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  /**
+   * GET /api/bot/console
+   * Get recent console logs
+   */
+  router.get('/console', async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = botManager.getConsoleLogs(limit);
+      res.json({ logs });
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Failed to get console logs',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/bot/console
+   * Clear console logs
+   */
+  router.delete('/console', async (req: Request, res: Response) => {
+    try {
+      botManager.clearConsoleLogs();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Failed to clear console logs',
         message: error instanceof Error ? error.message : String(error)
       });
     }

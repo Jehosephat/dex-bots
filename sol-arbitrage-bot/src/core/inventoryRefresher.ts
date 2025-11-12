@@ -143,26 +143,42 @@ export class InventoryRefresher {
       try {
         for (const token of enabled) {
           if (!token.solanaMint) continue;
-          const mint = new PublicKey(token.solanaMint);
-          const accounts = await conn.getTokenAccountsByOwner(owner, { mint });
-          let raw = new BigNumber(0);
-          for (const acc of accounts.value) {
-            const data = acc.account.data as Buffer;
-            const decoded: any = AccountLayout.decode(data);
-            const amountU64: Buffer = decoded.amount as Buffer;
-            const amountBig = amountU64.readBigUInt64LE(0);
-            raw = raw.plus(new BigNumber(amountBig.toString()));
+          try {
+            const mint = new PublicKey(token.solanaMint);
+            const accounts = await conn.getTokenAccountsByOwner(owner, { mint });
+            let raw = new BigNumber(0);
+            for (const acc of accounts.value) {
+              const data = acc.account.data as Buffer;
+              const decoded: any = AccountLayout.decode(data);
+              const amountU64: Buffer = decoded.amount as Buffer;
+              const amountBig = amountU64.readBigUInt64LE(0);
+              raw = raw.plus(new BigNumber(amountBig.toString()));
+            }
+            const balance = raw.dividedBy(new BigNumber(10).pow(token.decimals));
+            // Always store the token, even if balance is 0
+            tokens[token.symbol] = {
+              symbol: token.symbol,
+              mint: token.solanaMint,
+              rawBalance: raw,
+              balance,
+              decimals: token.decimals,
+              valueUsd: new BigNumber(0),
+              lastUpdated: Date.now()
+            };
+            logger.debug(`Stored Solana balance for ${token.symbol}: ${balance.toString()}`);
+          } catch (tokenErr) {
+            logger.debug(`Failed to fetch balance for ${token.symbol} on Solana: ${tokenErr instanceof Error ? tokenErr.message : String(tokenErr)}`);
+            // Store 0 balance if fetch fails
+            tokens[token.symbol] = {
+              symbol: token.symbol,
+              mint: token.solanaMint,
+              rawBalance: new BigNumber(0),
+              balance: new BigNumber(0),
+              decimals: token.decimals,
+              valueUsd: new BigNumber(0),
+              lastUpdated: Date.now()
+            };
           }
-          const balance = raw.dividedBy(new BigNumber(10).pow(token.decimals));
-          tokens[token.symbol] = {
-            symbol: token.symbol,
-            mint: token.solanaMint,
-            rawBalance: raw,
-            balance,
-            decimals: token.decimals,
-            valueUsd: new BigNumber(0),
-            lastUpdated: Date.now()
-          };
         }
       } catch (scanErr) {
         rpcScanWorked = false;

@@ -46,17 +46,8 @@ export const useBalanceStore = defineStore('balances', () => {
   }
 
   const refreshBalances = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await api.post<AllBalances>('/balances/refresh')
-      balances.value = response.data
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to refresh balances'
-      throw e
-    } finally {
-      loading.value = false
-    }
+    // Just re-fetch from state.json, don't call network refresh
+    await fetchBalances()
   }
 
   return {
