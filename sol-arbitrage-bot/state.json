@@ -34,16 +34,16 @@
           "balance": "1.030783047",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1762906597084
+          "lastUpdated": 1762907496952
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "32759.78824101",
-          "balance": "32759.78824101",
+          "rawBalance": "35359.62078262",
+          "balance": "35359.62078262",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1762906597084
+          "lastUpdated": 1762907496952
         },
         "MEW": {
           "symbol": "MEW",
@@ -52,37 +52,37 @@
           "balance": "36434.41106",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1762906597084
+          "lastUpdated": 1762907496952
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "1675.667494",
-          "balance": "1675.667494",
+          "rawBalance": "824.673026",
+          "balance": "824.673026",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1762906597084
+          "lastUpdated": 1762907496952
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1762906597085
+      "lastUpdated": 1762907496952
     },
     "solana": {
       "tokens": {},
-      "native": "0.512352076",
+      "native": "0.512143943",
       "totalValueUsd": "0",
-      "lastUpdated": 1762906597536
+      "lastUpdated": 1762907498553
     },
-    "lastUpdated": 1762906597536,
-    "version": 1555
+    "lastUpdated": 1762907498553,
+    "version": 1561
   },
-  "lastSaved": 1762906998252,
-  "version": 212,
+  "lastSaved": 1762908054889,
+  "version": 214,
   "tokenCooldowns": {
     "USDUC": {
       "isInCooldown": true,
-      "cooldownEndsAt": 1762907055905,
+      "cooldownEndsAt": 1762908111887,
       "remainingSeconds": 60,
       "reason": "Trade executed successfully"
     }

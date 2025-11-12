@@ -21,6 +21,7 @@
     <div v-else-if="breakdown" class="dashboard-content">
       <!-- Summary Cards -->
       <div class="summary-cards">
+        <!-- First Row -->
         <div class="summary-card">
           <div class="card-label">Total Trades</div>
           <div class="card-value">{{ breakdown.summary.totalTrades }}</div>
@@ -35,14 +36,6 @@
           <div class="card-value">{{ breakdown.summary.winRate.toFixed(1) }}%</div>
           <div class="card-detail">
             {{ breakdown.summary.successfulTrades }} / {{ breakdown.summary.totalTrades }} trades
-          </div>
-        </div>
-
-        <div class="summary-card">
-          <div class="card-label">Total Expected Edge</div>
-          <div class="card-value">{{ formatGala(breakdown.summary.totalExpectedEdge) }}</div>
-          <div class="card-detail">
-            {{ breakdown.summary.totalExpectedEdgeBps.toFixed(2) }} BPS total
           </div>
         </div>
 
@@ -69,6 +62,17 @@
             {{ breakdown.summary.totalActualEdgeBps?.toFixed(2) }} BPS total
           </div>
         </div>
+      </div>
+
+      <!-- Second Row -->
+      <div class="summary-cards">
+        <div class="summary-card">
+          <div class="card-label">Gross Proceeds</div>
+          <div class="card-value">{{ formatGala(breakdown.summary.totalExpectedEdge) }}</div>
+          <div class="card-detail">
+            {{ breakdown.summary.totalExpectedEdgeBps.toFixed(2) }} BPS total
+          </div>
+        </div>
 
         <div class="summary-card" :class="{ 'fee-card': breakdown.summary.totalBridgingFees > 0 }">
           <div class="card-label">Bridging Fees</div>
@@ -79,7 +83,7 @@
         </div>
 
         <div class="summary-card net-card">
-          <div class="card-label">Net Expected Edge</div>
+          <div class="card-label">Net Proceeds</div>
           <div class="card-value" :class="{ negative: breakdown.summary.netExpectedEdge < 0 }">
             {{ formatGala(breakdown.summary.netExpectedEdge) }}
           </div>
@@ -289,6 +293,7 @@ onMounted(async () => {
   gap: 1rem;
   margin-bottom: 2rem;
 }
+
 
 .summary-card {
   background: #f8f9fa;

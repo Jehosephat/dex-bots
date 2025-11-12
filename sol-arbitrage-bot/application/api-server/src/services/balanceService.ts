@@ -137,28 +137,12 @@ export class BalanceService {
   }
 
   /**
-   * Refresh balances by running InventoryRefresher
-   * This will fetch fresh balances from the networks and update state.json
+   * Refresh balances by re-reading from state.json
+   * This simply reloads the current balances from the state file
    */
   async refreshBalances(): Promise<AllBalances | null> {
-    try {
-      // Import InventoryRefresher dynamically to avoid circular dependencies
-      const { InventoryRefresher } = require('../../../src/core/inventoryRefresher');
-      const { StateManager } = require('../../../src/core/stateManager');
-      
-      const stateManager = new StateManager();
-      const refresher = new InventoryRefresher(stateManager);
-      
-      // Refresh all balances
-      await refresher.refreshAll();
-      
-      // Read the updated balances
-      return await this.getAllBalances();
-    } catch (error) {
-      console.error('Failed to refresh balances:', error);
-      // Return current balances even if refresh failed
-      return await this.getAllBalances();
-    }
+    // Just re-fetch from state.json, don't call network refresh
+    return await this.getAllBalances();
   }
 }
 
