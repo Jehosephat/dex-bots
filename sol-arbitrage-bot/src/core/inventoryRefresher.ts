@@ -13,7 +13,8 @@ export class InventoryRefresher {
   private gcClient: GalaConnectClient | null = null;
 
   constructor(stateManager?: StateManager) {
-    this.state = stateManager || new StateManager();
+    // Use provided stateManager or the singleton instance
+    this.state = stateManager || StateManager.getInstance();
     // Defer client init until refresh to access env comfortably
     this.gcClient = null;
   }
@@ -139,9 +140,41 @@ export class InventoryRefresher {
 
       const tokens: Record<string, any> = { ...current.tokens };
       const enabled = getEnabledTokens();
+      const quoteTokens = ['GALA', 'SOL', 'USDC'];
+      
+      // Create a list of all tokens to check (enabled + quote tokens)
+      const tokensToCheck: Array<{ symbol: string; solanaMint: string; decimals: number }> = [];
+      
+      // Add enabled tokens
+      enabled.forEach(token => {
+        if (token.solanaMint) {
+          tokensToCheck.push({
+            symbol: token.symbol,
+            solanaMint: token.solanaMint,
+            decimals: token.decimals
+          });
+        }
+      });
+      
+      // Add quote tokens (skip SOL since it's native)
+      quoteTokens.forEach(symbol => {
+        if (symbol === 'SOL') return; // Skip SOL - it's already shown as native
+        const qt = getQuoteTokenBySymbol(symbol);
+        if (qt && qt.solanaMint) {
+          // Only add if not already in enabled tokens
+          if (!tokensToCheck.find(t => t.symbol === symbol)) {
+            tokensToCheck.push({
+              symbol,
+              solanaMint: qt.solanaMint,
+              decimals: qt.decimals
+            });
+          }
+        }
+      });
+      
       let rpcScanWorked = true;
       try {
-        for (const token of enabled) {
+        for (const token of tokensToCheck) {
           if (!token.solanaMint) continue;
           try {
             const mint = new PublicKey(token.solanaMint);
@@ -191,7 +224,7 @@ export class InventoryRefresher {
             const heliusUrl = `https://api.helius.xyz/v0/addresses/${owner.toBase58()}/balances?api-key=${heliusKey}`;
             const { data } = await axios.get(heliusUrl, { timeout: 15000, headers: { accept: 'application/json' } });
             const items: any[] = Array.isArray(data?.tokens) ? data.tokens : [];
-            for (const token of enabled) {
+            for (const token of tokensToCheck) {
               if (!token.solanaMint) continue;
               const entry = items.find((t: any) => t?.mint === token.solanaMint);
               if (!entry) continue;
@@ -234,7 +267,7 @@ export class InventoryRefresher {
               }
             }
             if (Array.isArray(data)) {
-              for (const token of enabled) {
+              for (const token of tokensToCheck) {
                 if (!token.solanaMint) continue;
                 const entry = data.find((t: any) => t.tokenAddress === token.solanaMint || t.mintAddress === token.solanaMint);
                 if (!entry) continue;

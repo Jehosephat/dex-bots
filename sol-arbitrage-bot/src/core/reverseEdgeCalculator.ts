@@ -133,8 +133,16 @@ export class ReverseEdgeCalculator {
         bridgeCost,
         riskBuffer,
         totalCost,
-        galaChainProceeds: solanaProceedsGala, // Proceeds are from Solana in reverse
-        solanaCostGala: galaChainCost, // Cost is on GalaChain in reverse
+
+        // Universal fields (REVERSE direction: BUY on GalaChain, SELL on Solana)
+        income: solanaProceedsGala,       // GALA received from selling on Solana
+        expense: galaChainCost,           // GALA spent buying on GalaChain
+        sellSide: 'solana',               // We're selling on Solana
+        buySide: 'galachain',             // We're buying on GalaChain
+
+        // Deprecated fields (kept for backward compatibility - confusing names!)
+        galaChainProceeds: solanaProceedsGala, // ⚠️ Actually Solana proceeds, not GalaChain!
+        solanaCostGala: galaChainCost,         // ⚠️ Actually GalaChain cost, not Solana!
         solToGalaRate: quoteToGalaRate,
         priceImpactAcceptable,
         invalidationReasons
@@ -193,6 +201,14 @@ export class ReverseEdgeCalculator {
       bridgeCost: new BigNumber(0),
       riskBuffer: new BigNumber(0),
       totalCost: new BigNumber(0),
+
+      // Universal fields (reverse direction by default for this calculator)
+      income: new BigNumber(0),
+      expense: new BigNumber(0),
+      sellSide: 'solana',      // Reverse direction: sell on Solana
+      buySide: 'galachain',    // Reverse direction: buy on GalaChain
+
+      // Deprecated fields
       galaChainProceeds: new BigNumber(0),
       solanaCostGala: new BigNumber(0),
       solToGalaRate: new BigNumber(0),

@@ -1,27 +1,33 @@
 /**
- * Edge Calculator for SOL Arbitrage Bot
- * 
- * Calculates net edge for arbitrage opportunities by comparing
- * GalaChain sell prices with Solana buy prices.
+ * Unified Edge Calculator for SOL Arbitrage Bot
+ *
+ * Calculates net edge for arbitrage opportunities in BOTH directions:
+ * - Forward: SELL on GalaChain → BUY on Solana
+ * - Reverse: BUY on GalaChain → SELL on Solana
+ *
+ * This replaces EdgeCalculator + ReverseEdgeCalculator, eliminating 50% code duplication.
  */
 
 import BigNumber from 'bignumber.js';
-import { 
-  ArbitrageOpportunity, 
-  PriceQuote, 
-  GalaChainQuote, 
+import {
+  ArbitrageOpportunity,
+  GalaChainQuote,
   SolanaQuote
 } from '../types/core';
 import { TokenConfig } from '../types/config';
 import { IConfigService } from '../config';
 import logger from '../utils/logger';
-import { 
-  calculateNetEdge, 
+import {
+  calculateNetEdge,
   calculateNetEdgeBps,
   isNetEdgeSufficient,
-  calculatePriceImpactBps,
-  isValidPrice 
+  isValidPrice
 } from '../utils/calculations';
+
+/**
+ * Trade direction for edge calculation
+ */
+export type TradeDirection = 'forward' | 'reverse';
 
 export interface EdgeCalculationResult {
   /** Whether the opportunity is profitable */
@@ -95,20 +101,18 @@ export interface EdgeCalculationResult {
   invalidationReasons: string[];
 }
 
-export class EdgeCalculator {
+export class UnifiedEdgeCalculator {
   private tradingConfig: any;
   private bridgingConfig: any;
-  
+
   constructor(private configService: IConfigService) {
     try {
-      logger.debug(`🔍 DEBUG: EdgeCalculator constructor - getting trading config...`);
+      logger.debug(`🔍 DEBUG: UnifiedEdgeCalculator constructor - getting configs...`);
       this.tradingConfig = configService.getTradingConfig();
-      logger.debug(`🔍 DEBUG: EdgeCalculator constructor - trading config obtained`);
-      logger.debug(`🔍 DEBUG: EdgeCalculator constructor - getting bridging config...`);
       this.bridgingConfig = configService.getBridgingConfig();
-      logger.debug(`🔍 DEBUG: EdgeCalculator constructor - bridging config obtained`);
+      logger.debug(`🔍 DEBUG: UnifiedEdgeCalculator constructor - configs obtained`);
     } catch (configError) {
-      logger.error(`❌ ERROR getting config in EdgeCalculator constructor`, {
+      logger.error(`❌ ERROR getting config in UnifiedEdgeCalculator constructor`, {
         error: configError instanceof Error ? configError.message : String(configError),
         stack: configError instanceof Error ? configError.stack : undefined
       });
@@ -117,23 +121,27 @@ export class EdgeCalculator {
   }
 
   /**
-   * Calculate edge for an arbitrage opportunity
+   * Calculate edge for an arbitrage opportunity (works for BOTH directions)
+   *
+   * @param direction - 'forward' (SELL GC → BUY SOL) or 'reverse' (BUY GC → SELL SOL)
    */
   calculateEdge(
+    direction: TradeDirection,
     tokenConfig: TokenConfig,
     galaChainQuote: GalaChainQuote,
     solanaQuote: SolanaQuote,
-    solToGalaRate: BigNumber,
+    quoteToGalaRate: BigNumber,
     galaUsdPrice?: number
   ): EdgeCalculationResult {
     const invalidationReasons: string[] = [];
-    
+
     try {
-      logger.debug(`🔍 DEBUG: EdgeCalculator.calculateEdge() started`, {
+      logger.debug(`🔍 DEBUG: UnifiedEdgeCalculator.calculateEdge() started`, {
+        direction,
         token: tokenConfig.symbol,
         solQuoteVia: tokenConfig.solQuoteVia,
         solQuoteCurrency: solanaQuote.currency,
-        solToGalaRate: solToGalaRate.toString()
+        quoteToGalaRate: quoteToGalaRate.toString()
       });
 
       // Validate inputs
@@ -141,82 +149,107 @@ export class EdgeCalculator {
       if (!isValidPrice(galaChainQuote.price)) {
         invalidationReasons.push('Invalid GalaChain price');
       }
-      
+
       if (!isValidPrice(solanaQuote.price)) {
         invalidationReasons.push('Invalid Solana price');
       }
-      
-      if (!isValidPrice(solToGalaRate)) {
-        invalidationReasons.push('Invalid SOL to GALA rate');
+
+      if (!isValidPrice(quoteToGalaRate)) {
+        invalidationReasons.push('Invalid quote to GALA rate');
       }
 
       if (invalidationReasons.length > 0) {
         logger.debug(`🔍 DEBUG: Validation failed, returning invalid result`);
-        return this.createInvalidResult(invalidationReasons);
+        return this.createInvalidResult(direction, invalidationReasons);
       }
 
-      logger.debug(`🔍 DEBUG: Calculating proceeds and costs...`);
-      // Calculate GALA proceeds from GalaChain sell
-      const galaChainProceeds = galaChainQuote.price.multipliedBy(tokenConfig.tradeSize);
-      logger.debug(`🔍 DEBUG: GalaChain proceeds calculated: ${galaChainProceeds.toString()}`);
-      
-      // Calculate quote currency cost for Solana buy
-      // Note: solanaQuote.price is in quote currency (SOL or USDC) per token
-      const solanaCostInQuoteCurrency = solanaQuote.price.multipliedBy(tokenConfig.tradeSize);
-      logger.debug(`🔍 DEBUG: Solana cost in quote currency (${solanaQuote.currency}): ${solanaCostInQuoteCurrency.toString()}`);
-      
-      // Convert quote currency cost to GALA
-      // Note: solToGalaRate is actually quoteToGalaRate (handles both SOL and USDC)
-      const solanaCostGala = solanaCostInQuoteCurrency.multipliedBy(solToGalaRate);
-      logger.debug(`🔍 DEBUG: Solana cost converted to GALA: ${solanaCostGala.toString()}`);
-      
-      // Calculate bridge cost in GALA (amortized per trade)
+      // Calculate income and expense based on direction
+      let income: BigNumber;
+      let expense: BigNumber;
+      let sellSide: 'galachain' | 'solana';
+      let buySide: 'galachain' | 'solana';
+
+      if (direction === 'forward') {
+        // FORWARD: SELL token on GalaChain for GALA → BUY token on Solana with quote currency
+        logger.debug(`🔍 DEBUG: Calculating FORWARD edge...`);
+
+        // Income: GALA proceeds from selling on GalaChain
+        income = galaChainQuote.price.multipliedBy(tokenConfig.tradeSize);
+        logger.debug(`🔍 DEBUG: Income (GalaChain proceeds): ${income.toString()}`);
+
+        // Expense: Quote currency cost converted to GALA for buying on Solana
+        const solanaCostInQuoteCurrency = solanaQuote.price.multipliedBy(tokenConfig.tradeSize);
+        expense = solanaCostInQuoteCurrency.multipliedBy(quoteToGalaRate);
+        logger.debug(`🔍 DEBUG: Expense (Solana cost in GALA): ${expense.toString()}`);
+
+        sellSide = 'galachain';
+        buySide = 'solana';
+
+      } else {
+        // REVERSE: BUY token on GalaChain with GALA → SELL token on Solana for quote currency
+        logger.debug(`🔍 DEBUG: Calculating REVERSE edge...`);
+
+        // Expense: GALA cost for buying on GalaChain
+        expense = galaChainQuote.price.multipliedBy(tokenConfig.tradeSize);
+        logger.debug(`🔍 DEBUG: Expense (GalaChain cost): ${expense.toString()}`);
+
+        // Income: Quote currency proceeds converted to GALA from selling on Solana
+        const solanaProceedsInQuoteCurrency = solanaQuote.price.multipliedBy(tokenConfig.tradeSize);
+        income = solanaProceedsInQuoteCurrency.multipliedBy(quoteToGalaRate);
+        logger.debug(`🔍 DEBUG: Income (Solana proceeds in GALA): ${income.toString()}`);
+
+        sellSide = 'solana';
+        buySide = 'galachain';
+      }
+
+      // Calculate bridge cost in GALA (amortized)
       const bridgeCost = this.calculateBridgeCost(galaUsdPrice);
-      
-      // Calculate risk buffer
-      const riskBuffer = this.calculateRiskBuffer(galaChainProceeds);
-      
-      // Calculate net edge
-      const netEdge = calculateNetEdge(
-        galaChainProceeds,
-        solanaCostGala,
-        bridgeCost,
-        riskBuffer
-      );
-      
-      // Calculate net edge in basis points
-      const totalCost = solanaCostGala.plus(bridgeCost).plus(riskBuffer);
+
+      // Calculate risk buffer (based on income)
+      const riskBuffer = this.calculateRiskBuffer(income);
+
+      // Calculate net edge using universal formula: income - expense - costs
+      const netEdge = calculateNetEdge(income, expense, bridgeCost, riskBuffer);
+
+      // Calculate total cost and net edge in basis points
+      const totalCost = expense.plus(bridgeCost).plus(riskBuffer);
       const netEdgeBps = calculateNetEdgeBps(netEdge, totalCost);
-      
+
+      // Get minimum edge threshold (reverse may have different threshold)
+      const minEdgeBps = direction === 'reverse'
+        ? (this.tradingConfig.reverseArbitrageMinEdgeBps || this.tradingConfig.minEdgeBps)
+        : this.tradingConfig.minEdgeBps;
+
       // Check if edge meets minimum threshold
-      const meetsThreshold = isNetEdgeSufficient(netEdgeBps, this.tradingConfig.minEdgeBps);
-      
+      const meetsThreshold = isNetEdgeSufficient(netEdgeBps, minEdgeBps);
+
       // Calculate price impacts
       const galaChainPriceImpactBps = galaChainQuote.priceImpactBps;
       const solanaPriceImpactBps = solanaQuote.priceImpactBps;
-      
+
       // Check if price impacts are acceptable
       const priceImpactAcceptable = this.isPriceImpactAcceptable(
         galaChainPriceImpactBps,
         solanaPriceImpactBps
       );
-      
+
       // Check if opportunity is profitable
       const isProfitable = netEdge.isPositive() && meetsThreshold && priceImpactAcceptable;
-      
+
       // Add invalidation reasons if not profitable
       if (!isProfitable) {
         if (!netEdge.isPositive()) {
           invalidationReasons.push('Negative net edge');
         }
         if (!meetsThreshold) {
-          invalidationReasons.push(`Edge ${netEdgeBps}bps below threshold ${this.tradingConfig.minEdgeBps}bps`);
+          invalidationReasons.push(`Edge ${netEdgeBps}bps below threshold ${minEdgeBps}bps`);
         }
         if (!priceImpactAcceptable) {
           invalidationReasons.push(`Price impact too high: GC ${galaChainPriceImpactBps}bps, SOL ${solanaPriceImpactBps}bps`);
         }
       }
 
+      // Build result with universal fields
       const result: EdgeCalculationResult = {
         isProfitable,
         netEdge,
@@ -228,57 +261,60 @@ export class EdgeCalculator {
         riskBuffer,
         totalCost,
 
-        // Universal fields (FORWARD direction: SELL on GalaChain, BUY on Solana)
-        income: galaChainProceeds,        // GALA received from selling on GalaChain
-        expense: solanaCostGala,          // GALA spent buying on Solana
-        sellSide: 'galachain',            // We're selling on GalaChain
-        buySide: 'solana',                // We're buying on Solana
+        // Universal fields (semantically correct for ALL directions)
+        income,
+        expense,
+        sellSide,
+        buySide,
 
-        // Deprecated fields (kept for backward compatibility)
-        galaChainProceeds,
-        solanaCostGala,
-        solToGalaRate,
+        // Deprecated fields (kept for backward compatibility - confusing in reverse!)
+        galaChainProceeds: income,  // Misleading name but maintains compatibility
+        solanaCostGala: expense,     // Misleading name but maintains compatibility
+        solToGalaRate: quoteToGalaRate,
         priceImpactAcceptable,
         invalidationReasons
       };
 
-      // Detailed logging moved to mainLoop.ts for better visibility
-      // This debug log kept for backwards compatibility
-      logger.debug(`🧮 Edge calculation completed for ${tokenConfig.symbol}`, {
+      logger.debug(`🧮 Edge calculation completed for ${tokenConfig.symbol} (${direction})`, {
+        income: income.toString(),
+        expense: expense.toString(),
         netEdge: netEdge.toString(),
         netEdgeBps,
         isProfitable,
-        meetsThreshold
+        meetsThreshold,
+        sellSide,
+        buySide
       });
 
       return result;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('❌ Edge calculation failed', { 
+      logger.error('❌ Edge calculation failed', {
+        direction,
         tokenSymbol: tokenConfig.symbol,
-        error: errorMessage 
+        error: errorMessage
       });
-      return this.createInvalidResult([`Calculation error: ${errorMessage}`]);
+      return this.createInvalidResult(direction, [`Calculation error: ${errorMessage}`]);
     }
   }
 
   /**
    * Calculate SOL to GALA conversion rate
    */
-  async calculateSolToGalaRate(
+  async calculateQuoteToGalaRate(
     galaUsdPrice: number,
-    solUsdPrice: number
+    quoteUsdPrice: number
   ): Promise<BigNumber> {
-    if (galaUsdPrice <= 0 || solUsdPrice <= 0) {
+    if (galaUsdPrice <= 0 || quoteUsdPrice <= 0) {
       throw new Error('Invalid USD prices for rate calculation');
     }
 
-    // SOL to GALA rate = SOL_USD / GALA_USD
-    const rate = new BigNumber(solUsdPrice).div(galaUsdPrice);
-    
-    logger.debug(`💱 SOL to GALA rate: 1 SOL = ${rate.toString()} GALA`, {
-      solUsdPrice,
+    // Quote to GALA rate = QUOTE_USD / GALA_USD
+    const rate = new BigNumber(quoteUsdPrice).div(galaUsdPrice);
+
+    logger.debug(`💱 Quote to GALA rate: 1 QUOTE = ${rate.toString()} GALA`, {
+      quoteUsdPrice,
       galaUsdPrice
     });
 
@@ -292,17 +328,17 @@ export class EdgeCalculator {
   private calculateBridgeCost(galaUsdPrice?: number): BigNumber {
     // Get bridge cost from config (default $1.25 USD)
     const bridgeCostUsd = this.bridgingConfig.bridgeCostUsd || 1.25;
-    
+
     // Get GALA USD price (use provided value or fallback)
     const galaPrice = galaUsdPrice || 0.01;
-    
+
     // Calculate full bridge cost in GALA
     const fullBridgeCostGala = new BigNumber(bridgeCostUsd).div(galaPrice);
-    
+
     // Amortize across trades (default: 100 trades per bridge)
     const tradesPerBridge = this.bridgingConfig.tradesPerBridge || 100;
     const amortizedBridgeCost = fullBridgeCostGala.div(tradesPerBridge);
-    
+
     logger.debug(`🔍 Bridge cost calculation:`, {
       bridgeCostUsd,
       galaUsdPrice: galaPrice,
@@ -310,16 +346,16 @@ export class EdgeCalculator {
       tradesPerBridge,
       amortizedBridgeCost: amortizedBridgeCost.toString()
     });
-    
+
     return amortizedBridgeCost;
   }
 
   /**
-   * Calculate risk buffer in GALA
+   * Calculate risk buffer in GALA (based on income)
    */
-  private calculateRiskBuffer(galaChainProceeds: BigNumber): BigNumber {
+  private calculateRiskBuffer(income: BigNumber): BigNumber {
     const riskBufferBps = this.tradingConfig.riskBufferBps;
-    return galaChainProceeds.multipliedBy(riskBufferBps).div(10000);
+    return income.multipliedBy(riskBufferBps).div(10000);
   }
 
   /**
@@ -330,15 +366,22 @@ export class EdgeCalculator {
     solanaImpactBps: number
   ): boolean {
     const maxImpactBps = this.tradingConfig.maxPriceImpactBps;
-    
-    return Math.abs(galaChainImpactBps) <= maxImpactBps && 
+
+    return Math.abs(galaChainImpactBps) <= maxImpactBps &&
            Math.abs(solanaImpactBps) <= maxImpactBps;
   }
 
   /**
    * Create invalid result with reasons
    */
-  private createInvalidResult(reasons: string[]): EdgeCalculationResult {
+  private createInvalidResult(
+    direction: TradeDirection,
+    reasons: string[]
+  ): EdgeCalculationResult {
+    // Set default sell/buy sides based on direction
+    const sellSide = direction === 'forward' ? 'galachain' : 'solana';
+    const buySide = direction === 'forward' ? 'solana' : 'galachain';
+
     return {
       isProfitable: false,
       netEdge: new BigNumber(0),
@@ -353,8 +396,8 @@ export class EdgeCalculator {
       // Universal fields
       income: new BigNumber(0),
       expense: new BigNumber(0),
-      sellSide: 'galachain',  // Default to forward direction
-      buySide: 'solana',
+      sellSide,
+      buySide,
 
       // Deprecated fields
       galaChainProceeds: new BigNumber(0),

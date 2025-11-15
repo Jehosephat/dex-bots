@@ -276,53 +276,22 @@ export class StrategyEvaluator {
 
       // Calculate edge
       // Determine if this is forward-like or reverse-like based on operations
-      const isForwardLike = strategy.galaChainSide.operation === 'sell' && 
+      const isForwardLike = strategy.galaChainSide.operation === 'sell' &&
                            strategy.solanaSide.operation === 'buy';
-      
+
+      const direction = isForwardLike ? 'forward' : 'reverse';
+
       let riskResult;
       try {
-        if (isForwardLike) {
-          // Forward-like: GC sell (get GALA) - SOL buy (spend quote)
-          riskResult = this.riskManager.evaluate(
-            token,
-            gcQuote as GalaChainQuote,
-            solQuote as SolanaQuote,
-            rateConversion.rate,
-            rateConversion.galaUsdPrice
-          );
-        } else {
-          // Reverse-like: GC buy (spend GALA) - SOL sell (get quote)
-          // Use reverse edge calculator
-          const reverseEdgeCalculator = (this.riskManager as any).reverseEdgeCalculator;
-          if (reverseEdgeCalculator) {
-            const edge = reverseEdgeCalculator.calculateReverseEdge(
-              token,
-              gcQuote as GalaChainQuote,
-              solQuote as SolanaQuote,
-              rateConversion.rate,
-              rateConversion.galaUsdPrice
-            );
-            
-            // Create risk result from reverse edge
-            const minEdgeBps = strategy.minEdgeBps || 
-              this.configService.getTradingConfig().minEdgeBps;
-            
-            riskResult = {
-              shouldProceed: edge.isProfitable && edge.meetsThreshold,
-              reasons: edge.invalidationReasons || [],
-              edge
-            };
-          } else {
-            // Fallback to forward evaluation
-            riskResult = this.riskManager.evaluate(
-              token,
-              gcQuote as GalaChainQuote,
-              solQuote as SolanaQuote,
-              rateConversion.rate,
-              rateConversion.galaUsdPrice
-            );
-          }
-        }
+        // Use RiskManager's evaluateDirection method which handles both directions
+        riskResult = this.riskManager.evaluateDirection(
+          token,
+          gcQuote as GalaChainQuote,
+          solQuote as SolanaQuote,
+          rateConversion.rate,
+          direction,
+          rateConversion.galaUsdPrice
+        );
       } catch (evalError) {
         const error = `Risk evaluation failed for strategy ${strategy.id}: ${evalError instanceof Error ? evalError.message : String(evalError)}`;
         logger.error(`   ❌ ${error}`);

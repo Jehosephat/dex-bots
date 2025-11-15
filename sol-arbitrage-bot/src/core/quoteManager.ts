@@ -5,16 +5,16 @@
  * manages quote freshness, validation, and cooldown logic.
  */
 
-import { 
-  ArbitrageOpportunity, 
-  PriceQuote, 
-  GalaChainQuote, 
+import {
+  ArbitrageOpportunity,
+  PriceQuote,
+  GalaChainQuote,
   SolanaQuote
 } from '../types/core';
 import { TokenConfig } from '../types/config';
 import { IConfigService, createConfigService } from '../config';
 import { IPriceProvider } from './priceProviders/base';
-import { EdgeCalculator } from './edgeCalculator';
+import { UnifiedEdgeCalculator } from './unifiedEdgeCalculator';
 import logger from '../utils/logger';
 import { isExpired } from '../utils/calculations';
 
@@ -35,7 +35,7 @@ export interface QuoteManagerConfig {
 export class QuoteManager {
   private galaChainProvider: IPriceProvider;
   private solanaProvider: IPriceProvider;
-  private edgeCalculator: EdgeCalculator;
+  private edgeCalculator: UnifiedEdgeCalculator;
   private config: QuoteManagerConfig;
   private tokenCooldowns: Map<string, number> = new Map();
   private retryCounts: Map<string, number> = new Map();
@@ -48,7 +48,7 @@ export class QuoteManager {
   ) {
     this.galaChainProvider = galaChainProvider;
     this.solanaProvider = solanaProvider;
-    this.edgeCalculator = new EdgeCalculator(configService || createConfigService());
+    this.edgeCalculator = new UnifiedEdgeCalculator(configService || createConfigService());
     
     this.config = {
       maxQuoteAge: 30, // 30 seconds
@@ -123,6 +123,7 @@ export class QuoteManager {
         // Calculate edge
         const solToGalaRate = await this.calculateSolToGalaRate();
         const edgeResult = this.edgeCalculator.calculateEdge(
+          'forward',
           token,
           galaChainQuote as GalaChainQuote,
           solanaQuote as SolanaQuote,
@@ -216,11 +217,11 @@ export class QuoteManager {
     try {
       // Get SOL/USD price from Solana provider
       const solUsdPrice = (this.solanaProvider as any).getSOLUSDPrice?.() || 225;
-      
+
       // Get GALA/USD price from GalaChain provider
       const galaUsdPrice = (this.galaChainProvider as any).getGALAUSDPrice?.() || 0.04;
-      
-      return await this.edgeCalculator.calculateSolToGalaRate(galaUsdPrice, solUsdPrice);
+
+      return await this.edgeCalculator.calculateQuoteToGalaRate(galaUsdPrice, solUsdPrice);
     } catch (error) {
       logger.warn('⚠️ Failed to calculate SOL to GALA rate, using fallback', { error });
       return new BigNumber(5625); // Fallback rate: 225 / 0.04

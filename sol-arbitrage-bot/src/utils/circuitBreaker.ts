@@ -43,7 +43,7 @@ export interface CircuitBreakerConfig {
  */
 const DEFAULT_CONFIG: CircuitBreakerConfig = {
   failureThreshold: 5,      // Open after 5 failures
-  timeout: 60000,           // Wait 60 seconds before half-open
+  timeout: 30000,           // Wait 30 seconds before half-open (was 60s)
   successThreshold: 2,      // Close after 2 successes in half-open
   failureWindow: 60000      // Track failures in 60 second window
 };
@@ -58,6 +58,7 @@ interface CircuitBreakerStateData {
   lastFailureTime?: number;
   openedAt?: number;
   halfOpenedAt?: number;
+  consecutiveOpenings: number; // Track repeated failures for progressive backoff
 }
 
 /**
@@ -77,7 +78,8 @@ export class CircuitBreaker {
     this.stateData = {
       state: CircuitBreakerState.CLOSED,
       failures: [],
-      successes: 0
+      successes: 0,
+      consecutiveOpenings: 0
     };
   }
 
@@ -121,9 +123,12 @@ export class CircuitBreaker {
 
     switch (this.stateData.state) {
       case CircuitBreakerState.OPEN:
-        // Check if timeout has passed
-        if (this.stateData.openedAt && 
-            (now - this.stateData.openedAt) >= this.config.timeout) {
+        // Check if timeout has passed (with progressive backoff)
+        const backoffMultiplier = Math.min(Math.pow(2, this.stateData.consecutiveOpenings - 1), 4);
+        const effectiveTimeout = this.config.timeout * backoffMultiplier;
+
+        if (this.stateData.openedAt &&
+            (now - this.stateData.openedAt) >= effectiveTimeout) {
           this.transitionToHalfOpen();
         }
         break;
@@ -197,8 +202,12 @@ export class CircuitBreaker {
     this.stateData.state = CircuitBreakerState.OPEN;
     this.stateData.openedAt = Date.now();
     this.stateData.successes = 0;
-    
-    logger.warn(`🔴 Circuit breaker ${this.name} opened after ${this.stateData.failures.length} failures`);
+    this.stateData.consecutiveOpenings++;
+
+    const backoffMultiplier = Math.min(Math.pow(2, this.stateData.consecutiveOpenings - 1), 4);
+    const effectiveTimeout = this.config.timeout * backoffMultiplier;
+
+    logger.warn(`🔴 Circuit breaker ${this.name} opened after ${this.stateData.failures.length} failures (retry in ${Math.ceil(effectiveTimeout / 1000)}s, attempt #${this.stateData.consecutiveOpenings})`);
   }
 
   /**
@@ -209,33 +218,57 @@ export class CircuitBreaker {
     this.stateData.halfOpenedAt = Date.now();
     this.stateData.successes = 0;
     this.stateData.failures = [];
-    
-    logger.info(`🟡 Circuit breaker ${this.name} half-opened (testing recovery)`);
+
+    logger.info(`🟡 Circuit breaker ${this.name} half-opened (testing recovery, attempt #${this.stateData.consecutiveOpenings})`);
   }
 
   /**
    * Transition to CLOSED state
    */
   private transitionToClosed(): void {
+    const wasConsecutive = this.stateData.consecutiveOpenings;
     this.stateData.state = CircuitBreakerState.CLOSED;
     this.stateData.failures = [];
     this.stateData.successes = 0;
     this.stateData.openedAt = undefined;
     this.stateData.halfOpenedAt = undefined;
-    
-    logger.info(`🟢 Circuit breaker ${this.name} closed (service recovered)`);
+    this.stateData.consecutiveOpenings = 0; // Reset on successful recovery
+
+    logger.info(`🟢 Circuit breaker ${this.name} closed (service recovered after ${wasConsecutive} opening(s))`);
   }
 
   /**
    * Get time until next retry attempt (in milliseconds)
+   * Uses progressive backoff based on consecutive openings
    */
   private getTimeUntilRetry(): number {
     if (this.stateData.state !== CircuitBreakerState.OPEN || !this.stateData.openedAt) {
       return 0;
     }
-    
+
+    // Progressive backoff: double timeout for each consecutive opening (up to 4x max)
+    const backoffMultiplier = Math.min(Math.pow(2, this.stateData.consecutiveOpenings - 1), 4);
+    const effectiveTimeout = this.config.timeout * backoffMultiplier;
+
     const elapsed = Date.now() - this.stateData.openedAt;
-    return Math.max(0, this.config.timeout - elapsed);
+    return Math.max(0, effectiveTimeout - elapsed);
+  }
+
+  /**
+   * Check if circuit is currently open (without throwing)
+   * Useful for retry logic to skip attempts when circuit is open
+   */
+  isOpen(): boolean {
+    this.updateState();
+    return this.stateData.state === CircuitBreakerState.OPEN;
+  }
+
+  /**
+   * Check if circuit allows requests (not open)
+   */
+  isAllowed(): boolean {
+    this.updateState();
+    return this.stateData.state !== CircuitBreakerState.OPEN;
   }
 
   /**
@@ -258,6 +291,7 @@ export class CircuitBreaker {
    * Reset circuit breaker (force to closed state)
    */
   reset(): void {
+    this.stateData.consecutiveOpenings = 0; // Reset before transitioning
     this.transitionToClosed();
     logger.info(`🔄 Circuit breaker ${this.name} manually reset`);
   }

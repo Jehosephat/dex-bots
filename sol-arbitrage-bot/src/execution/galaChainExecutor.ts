@@ -108,17 +108,68 @@ export class GalaChainExecutor {
         this.gswap = new GSwap({ signer });
       }
 
-      const tokenIn = tokenCfg.galaChainMint; // e.g., GSOL|Unit|none|none
-      const tokenOut = 'GALA|Unit|none|none';
+      // FORWARD direction: SELL token, receive GALA
+      // IMPORTANT: tokenIn = token we're SELLING (spending)
+      //            tokenOut = GALA we're RECEIVING
+      // This should result in: -token balance, +GALA balance
+      const tokenIn = tokenCfg.galaChainMint; // e.g., GUSDUC|Unit|none|none (what we're selling)
+      const tokenOut = 'GALA|Unit|none|none'; // GALA (what we're receiving)
+      
+      // Validate: tokenIn should NOT be GALA for a SELL operation
+      if (tokenIn === 'GALA|Unit|none|none') {
+        throw new Error(`Invalid swap direction: tokenIn is GALA but this is a SELL operation. Expected tokenIn=${tokenCfg.galaChainMint}, tokenOut=GALA`);
+      }
+      
+      // Validate: tokenOut MUST be GALA for a SELL operation
+      if (tokenOut !== 'GALA|Unit|none|none') {
+        throw new Error(`Invalid swap direction: tokenOut is not GALA for SELL operation. Expected tokenOut=GALA, got ${tokenOut}`);
+      }
+
+      logger.execution('🔄 Executing GalaChain SELL (FORWARD)', {
+        symbol,
+        direction: 'FORWARD (SELL token, receive GALA)',
+        tokenIn,
+        tokenOut,
+        tradeSize,
+        operation: `Selling ${tradeSize} ${symbol} for GALA`,
+        validation: 'tokenIn=token (selling), tokenOut=GALA (receiving)'
+      });
 
       // Fresh quote from SDK (more reliable for feeTier/minOut)
+      // quoteExactInput(tokenIn, tokenOut, amount) = quote for spending tokenIn, receiving tokenOut
       const q = await this.gswap.quoting.quoteExactInput(tokenIn, tokenOut, tradeSize);
+      
+      // Verify quote direction: we're spending tokenIn (token), receiving tokenOut (GALA)
+      logger.execution('📋 Quote received', {
+        tokenIn,
+        tokenOut,
+        amountIn: tradeSize,
+        expectedAmountOut: q.outTokenAmount.toString(),
+        feeTier: q.feeTier,
+        interpretation: `Spending ${tradeSize} ${symbol}, receiving ${q.outTokenAmount.toString()} GALA`
+      });
+      
       const expectedProceedsGala = new BigNumber(q.outTokenAmount.toString());
       const minProceedsGala = expectedProceedsGala.multipliedBy(1 - this.maxSlippageBps / 10000);
+      
+      // Sanity check: expected proceeds should be positive and reasonable
+      if (expectedProceedsGala.isLessThanOrEqualTo(0)) {
+        throw new Error(`Invalid quote: expected GALA proceeds is ${expectedProceedsGala.toString()}, should be positive`);
+      }
 
       params.expectedProceedsGala = expectedProceedsGala;
       params.minProceedsGala = minProceedsGala;
       params.feeTier = q.feeTier;
+
+      logger.execution('📊 GalaChain swap parameters', {
+        tokenIn,
+        tokenOut,
+        exactIn: tradeSize,
+        amountOutMinimum: minProceedsGala.toString(),
+        expectedProceedsGala: expectedProceedsGala.toString(),
+        feeTier: q.feeTier,
+        operation: 'SELL token → receive GALA'
+      });
 
       const result = await this.gswap.swaps.swap(
         tokenIn,
@@ -131,7 +182,15 @@ export class GalaChainExecutor {
         wallet
       );
 
-      logger.execution('✅ GalaChain swap executed', { symbol, transactionId: result.transactionId });
+      logger.execution('✅ GalaChain swap executed', { 
+        symbol, 
+        transactionId: result.transactionId,
+        direction: 'FORWARD (SELL)',
+        tokenIn,
+        tokenOut,
+        amountIn: tradeSize,
+        expectedAmountOut: expectedProceedsGala.toString()
+      });
       return { success: true, params, txHash: result.transactionId };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -142,7 +201,8 @@ export class GalaChainExecutor {
 
   /**
    * Execute a live GALA→token buy using the GSwap SDK.
-   * REVERSE: Spend GALA to buy token
+   * REVERSE: Spend GALA to buy EXACTLY tradeSize tokens.
+   * Uses exact output swap to ensure we receive exactly the amount we need.
    */
   async executeBuyFromQuoteLive(
     symbol: string,
@@ -175,46 +235,61 @@ export class GalaChainExecutor {
       const tokenIn = 'GALA|Unit|none|none';
       const tokenOut = tokenCfg.galaChainMint;
 
-      // Calculate GALA cost from quote (quote.price is GALA per token)
-      const galaCost = quote.price.multipliedBy(tradeSize);
-      
-      // Get fresh quote for buying (spending GALA to get token)
-      const q = await this.gswap.quoting.quoteExactInput(
+      // Get EXACT OUTPUT quote: how much GALA needed for exactly 'tradeSize' tokens
+      // This is critical for reverse arbitrage - we need EXACTLY tradeSize tokens
+      logger.execution('🔄 Getting exact output quote for REVERSE buy', {
+        symbol,
+        exactTokensNeeded: tradeSize,
+        tokenIn,
+        tokenOut
+      });
+
+      const q = await this.gswap.quoting.quoteExactOutput(
         tokenIn,
         tokenOut,
-        galaCost.toNumber()
+        tradeSize // Exact amount of tokens we want to receive
       );
-      
-      const expectedTokens = new BigNumber(q.outTokenAmount.toString());
-      const minTokens = expectedTokens.multipliedBy(1 - this.maxSlippageBps / 10000);
+
+      const exactGalaCost = new BigNumber(q.inTokenAmount.toString());
+      const maxGalaCost = exactGalaCost.multipliedBy(1 + this.maxSlippageBps / 10000); // Allow slippage on cost
 
       // Update params (for reverse, expectedProceedsGala is actually the cost)
-      params.expectedProceedsGala = galaCost;
-      params.minProceedsGala = galaCost.multipliedBy(1 + this.maxSlippageBps / 10000); // Max cost
+      params.expectedProceedsGala = exactGalaCost;
+      params.minProceedsGala = maxGalaCost; // Max cost with slippage
       params.feeTier = q.feeTier;
 
-      // Execute swap: spend GALA, get token
+      logger.execution('📊 Exact output quote received', {
+        symbol,
+        exactTokensToReceive: tradeSize,
+        exactGalaCost: exactGalaCost.toString(),
+        maxGalaCost: maxGalaCost.toString(),
+        feeTier: q.feeTier,
+        pricePerToken: exactGalaCost.div(tradeSize).toString()
+      });
+
+      // Execute EXACT OUTPUT swap: receive exactly tradeSize tokens, spend up to maxGalaCost GALA
       const result = await this.gswap.swaps.swap(
         tokenIn,
         tokenOut,
         q.feeTier,
         {
-          exactIn: galaCost.toNumber(),
-          amountOutMinimum: minTokens.toNumber()
+          exactOut: tradeSize, // We want EXACTLY this many tokens
+          amountInMaximum: maxGalaCost.toNumber() // Max GALA we're willing to spend
         },
         wallet
       );
 
-      logger.execution('✅ GalaChain buy executed (REVERSE)', { 
-        symbol, 
+      logger.execution('✅ GalaChain exact output buy executed (REVERSE)', {
+        symbol,
         transactionId: result.transactionId,
-        galaCost: galaCost.toString(),
-        tokensReceived: expectedTokens.toString()
+        exactTokensReceived: tradeSize,
+        expectedGalaCost: exactGalaCost.toString(),
+        maxGalaCost: maxGalaCost.toString()
       });
       return { success: true, params, txHash: result.transactionId };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error('❌ GalaChain buy execution failed (REVERSE)', { symbol, error: message });
+      logger.error('❌ GalaChain exact output buy execution failed (REVERSE)', { symbol, error: message });
       return { success: false, params, error: message };
     }
   }

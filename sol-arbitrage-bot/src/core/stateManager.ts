@@ -21,10 +21,33 @@ import {
 } from '../types/core';
 
 export class StateManager {
+  private static instance: StateManager | null = null;
+
   private state: BotState;
   private stateFilePath: string;
   private isDirty: boolean = false;
   private autoSaveInterval: NodeJS.Timeout | null = null;
+
+  /**
+   * Get the singleton instance of StateManager.
+   * All components should use this to share the same state.
+   */
+  static getInstance(): StateManager {
+    if (!StateManager.instance) {
+      StateManager.instance = new StateManager();
+    }
+    return StateManager.instance;
+  }
+
+  /**
+   * Reset the singleton instance (useful for testing)
+   */
+  static resetInstance(): void {
+    if (StateManager.instance) {
+      StateManager.instance.stopAutoSave();
+    }
+    StateManager.instance = null;
+  }
 
   constructor(stateFilePath?: string) {
     this.stateFilePath = stateFilePath || join(process.cwd(), 'state.json');
@@ -194,6 +217,16 @@ export class StateManager {
         this.saveState();
       }
     }, 30000); // Save every 30 seconds if dirty
+  }
+
+  /**
+   * Stop auto-save interval
+   */
+  stopAutoSave(): void {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
+    }
   }
 
   /**

@@ -71,7 +71,24 @@ export class TradeExecutor {
     }
 
     // Determine direction (default to forward)
-    const tradeDirection = direction || 'forward';
+    // IMPORTANT: Explicitly validate direction to prevent corruption
+    let tradeDirection: 'forward' | 'reverse' = direction || 'forward';
+    if (tradeDirection !== 'forward' && tradeDirection !== 'reverse') {
+      logger.warn(`⚠️ Invalid direction '${tradeDirection}' in evaluation, defaulting to 'forward'`, {
+        token: token.symbol,
+        receivedDirection: direction,
+        evaluationKeys: Object.keys(evaluation)
+      });
+      tradeDirection = 'forward';
+    }
+    
+    // Log direction explicitly for debugging
+    logger.execution(`🎯 Trade direction determined: ${tradeDirection.toUpperCase()}`, {
+      token: token.symbol,
+      directionFromEvaluation: direction,
+      finalDirection: tradeDirection,
+      evaluationHasDirection: 'direction' in evaluation
+    });
 
     // Prepare log entry
     const tradeLogger = getTradeLogger();

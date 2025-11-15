@@ -215,6 +215,7 @@ async function fetchSolanaBalances(): Promise<ChainBalances> {
   });
 
   const tokens: TokenBalance[] = [];
+  const solMint = 'So11111111111111111111111111111111111111112'; // Native SOL mint address
 
   // Process SPL token accounts
   tokenAccounts.value.forEach((acc: any) => {
@@ -222,9 +223,20 @@ async function fetchSolanaBalances(): Promise<ChainBalances> {
     if ((data as any).program === 'spl-token') {
       const info = (data as any).parsed.info;
       const mint = info.mint as string;
+      
+      // Skip native SOL - it's already shown as native balance
+      if (mint === solMint) {
+        return;
+      }
+      
       const tokenInfo = mintMap.get(mint);
       
       if (tokenInfo) {
+        // Also skip if symbol is SOL (in case of wrapped SOL or other SOL variants)
+        if (tokenInfo.symbol === 'SOL') {
+          return;
+        }
+        
         const uiAmount = new BigNumber(
           info.tokenAmount.uiAmountString ?? info.tokenAmount.uiAmount ?? 0
         );

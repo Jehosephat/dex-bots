@@ -194,6 +194,9 @@ export class TokenEvaluator {
   private async evaluateWithDirections(token: TokenConfig): Promise<TokenEvaluationResult> {
     // Get direction configuration
     const directionConfig = this.configService.getDirectionConfig();
+    
+    // Log direction config for debugging intermittent issues
+    logger.debug(`   ⚙️ Direction config: priority=${directionConfig.priority}, reverse.enabled=${directionConfig.reverse.enabled}`);
 
     // Evaluate forward direction (always)
     logger.debug(`   📈 Evaluating FORWARD direction...`);
@@ -222,10 +225,32 @@ export class TokenEvaluator {
       directionConfig
     );
 
+    // Log direction selection with explicit details for debugging
     if (reverseEvaluation && selectedEvaluation.direction !== forwardEvaluation.direction) {
-      logger.debug(`   ✅ Selected REVERSE direction (better edge)`);
+      logger.info(`   ✅ Selected REVERSE direction (better edge)`, {
+        forwardEdge: forwardEvaluation.riskResult?.edge?.netEdgeBps,
+        reverseEdge: reverseEvaluation.riskResult?.edge?.netEdgeBps,
+        configPriority: directionConfig.priority
+      });
     } else if (reverseEvaluation) {
-      logger.debug(`   ✅ Selected FORWARD direction`);
+      logger.debug(`   ✅ Selected FORWARD direction`, {
+        forwardEdge: forwardEvaluation.riskResult?.edge?.netEdgeBps,
+        reverseEdge: reverseEvaluation.riskResult?.edge?.netEdgeBps
+      });
+    } else {
+      logger.debug(`   ✅ Selected FORWARD direction (reverse disabled)`);
+    }
+    
+    // Safety check: warn if reverse was selected but reverse is disabled
+    if (selectedEvaluation.direction === 'reverse' && !directionConfig.reverse.enabled) {
+      logger.error(`❌ CRITICAL: Reverse direction selected but reverse is disabled in config!`, {
+        token: token.symbol,
+        selectedDirection: selectedEvaluation.direction,
+        configReverseEnabled: directionConfig.reverse.enabled,
+        configPriority: directionConfig.priority
+      });
+      // Force forward direction if reverse is disabled
+      return { ...forwardEvaluation, direction: 'forward' };
     }
 
     // Store both evaluations for logging purposes
@@ -619,52 +644,53 @@ export class TokenEvaluator {
         : tradingConfig.minEdgeBps;
 
       // Calculate gross edge (before bridge cost and risk buffer)
-      const grossEdge = edge.galaChainProceeds.minus(edge.solanaCostGala);
-      const grossEdgeBps = edge.galaChainProceeds.isZero() ? 0 : 
-        grossEdge.div(edge.galaChainProceeds).multipliedBy(10000).toNumber();
+      // Universal formula: income - expense (works for both directions!)
+      const grossEdge = edge.income.minus(edge.expense);
+      const grossEdgeBps = edge.income.isZero() ? 0 :
+        grossEdge.div(edge.income).multipliedBy(10000).toNumber();
 
       // Get USD values if we have rate conversion
       const galaUsdPrice = result.rateConversion?.galaUsdPrice;
       
       logger.info(`\n🧮 EDGE CALCULATION (${directionLabel})`);
       logger.info(`   ════════════════════════════════════════════════════════`);
-      
-      if (isReverse) {
-        // REVERSE: SOL proceeds - GC cost
-        logger.info(`   📥 INCOME:`);
-        logger.info(`      🔸 Solana Proceeds:    ${edge.galaChainProceeds.toFixed(8)} GALA`);
-        if (solQuote.currency !== 'GALA') {
-          logger.info(`                          (${solCost.toFixed(8)} ${solQuote.currency})`);
-        }
-        if (galaUsdPrice) {
-          const usdValue = edge.galaChainProceeds.multipliedBy(galaUsdPrice);
-          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
-        }
-        
-        logger.info(`\n   📤 COSTS:`);
-        logger.info(`      🔷 GalaChain Cost:    ${edge.solanaCostGala.toFixed(8)} GALA`);
-        if (galaUsdPrice) {
-          const usdValue = edge.solanaCostGala.multipliedBy(galaUsdPrice);
-          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
-        }
-      } else {
-        // FORWARD: GC proceeds - SOL cost
-        logger.info(`   📥 INCOME:`);
-        logger.info(`      🔷 GalaChain Proceeds:  ${edge.galaChainProceeds.toFixed(8)} GALA`);
-        if (galaUsdPrice) {
-          const usdValue = edge.galaChainProceeds.multipliedBy(galaUsdPrice);
-          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
-        }
-        
-        logger.info(`\n   📤 COSTS:`);
-        logger.info(`      🔸 Solana Cost:         ${edge.solanaCostGala.toFixed(8)} GALA`);
-        if (solQuote.currency !== 'GALA') {
-          logger.info(`                          (${solCost.toFixed(8)} ${solQuote.currency})`);
-        }
-        if (galaUsdPrice) {
-          const usdValue = edge.solanaCostGala.multipliedBy(galaUsdPrice);
-          logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
-        }
+
+      // Use universal fields - no branching needed!
+      const sellChainIcon = edge.sellSide === 'galachain' ? '🔷' : '🔸';
+      const sellChainName = edge.sellSide === 'galachain' ? 'GalaChain' : 'Solana';
+      const buyChainIcon = edge.buySide === 'galachain' ? '🔷' : '🔸';
+      const buyChainName = edge.buySide === 'galachain' ? 'GalaChain' : 'Solana';
+
+      // Income (from selling)
+      logger.info(`   📥 INCOME:`);
+      logger.info(`      ${sellChainIcon} ${sellChainName} Proceeds:  ${edge.income.toFixed(8)} GALA`);
+
+      // Show original currency if not GALA
+      const sellQuote = edge.sellSide === 'galachain' ? gcQuote : solQuote;
+      if (sellQuote.currency !== 'GALA') {
+        const sellAmount = sellQuote.price.multipliedBy(token.tradeSize);
+        logger.info(`                          (${sellAmount.toFixed(8)} ${sellQuote.currency})`);
+      }
+
+      if (galaUsdPrice) {
+        const usdValue = edge.income.multipliedBy(galaUsdPrice);
+        logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
+      }
+
+      // Expense (from buying)
+      logger.info(`\n   📤 COSTS:`);
+      logger.info(`      ${buyChainIcon} ${buyChainName} Cost:       ${edge.expense.toFixed(8)} GALA`);
+
+      // Show original currency if not GALA
+      const buyQuote = edge.buySide === 'galachain' ? gcQuote : solQuote;
+      if (buyQuote.currency !== 'GALA') {
+        const buyAmount = buyQuote.price.multipliedBy(token.tradeSize);
+        logger.info(`                          (${buyAmount.toFixed(8)} ${buyQuote.currency})`);
+      }
+
+      if (galaUsdPrice) {
+        const usdValue = edge.expense.multipliedBy(galaUsdPrice);
+        logger.info(`                          ≈ $${usdValue.toFixed(2)} USD`);
       }
       
       // Rate conversion details
@@ -679,7 +705,7 @@ export class TokenEvaluator {
       }
       
       logger.info(`\n   💰 COST BREAKDOWN:`);
-      logger.info(`      🔷 GalaChain/Solana Cost: ${edge.solanaCostGala.toFixed(8)} GALA`);
+      logger.info(`      ${buyChainIcon} ${buyChainName} Cost:     ${edge.expense.toFixed(8)} GALA`);
       logger.info(`      🌉 Bridge Cost (amort):   ${edge.bridgeCost.toFixed(8)} GALA`);
       logger.info(`      🛡️  Risk Buffer:           ${edge.riskBuffer.toFixed(8)} GALA`);
       logger.info(`      ───────────────────────────────────────────`);

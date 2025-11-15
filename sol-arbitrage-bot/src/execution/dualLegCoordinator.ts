@@ -123,6 +123,24 @@ export class DualLegCoordinator {
     gcQuote?: GalaChainQuote,
     solQuote?: SolanaQuote
   ): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
+    // Validate direction parameter
+    if (direction !== 'forward' && direction !== 'reverse') {
+      logger.error(`❌ Invalid direction '${direction}' passed to executeLive, defaulting to 'forward'`, {
+        symbol,
+        receivedDirection: direction,
+        type: typeof direction
+      });
+      direction = 'forward';
+    }
+    
+    logger.execution(`🚀 Dual-leg execution starting`, {
+      symbol,
+      direction: direction.toUpperCase(),
+      directionType: typeof direction,
+      gcQuoteProvided: !!gcQuote,
+      solQuoteProvided: !!solQuote
+    });
+    
     if (!this.gcExecutor) this.gcExecutor = new GalaChainExecutor();
     if (!this.solExecutor) this.solExecutor = new SolanaExecutor();
 

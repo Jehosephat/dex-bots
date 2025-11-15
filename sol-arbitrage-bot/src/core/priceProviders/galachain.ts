@@ -96,14 +96,22 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       const shouldReverse = reverse; // Only reverse for reverse arbitrage (buying token with GALA)
 
       // Try to use SDK for more accurate quotes (matches executor behavior)
-      // Only use SDK for forward quotes (selling token to get GALA) when quoteVia is GALA
       let quote;
-      if (!shouldReverse && quoteVia === 'GALA') {
+      let exactOutputQuote: { inputAmount: string; outputAmount: string; poolAddress: string; route?: string[] } | null = null;
+
+      if (shouldReverse && quoteVia === 'GALA') {
+        // Reverse quote: buying token with GALA - use exact output for accuracy
+        // This ensures we get EXACTLY the amount of tokens we need (e.g., exactly 0.01 SOL)
+        exactOutputQuote = await this.getSDKExactOutputQuote(symbol, amount);
+        if (exactOutputQuote) {
+          quote = exactOutputQuote;
+        }
+      } else if (!shouldReverse && quoteVia === 'GALA') {
         // Forward quote: selling token to get GALA - use SDK if available
         quote = await this.getSDKQuote(symbol, amount);
       }
-      
-      // Fall back to local API quote if SDK not available or for reverse quotes
+
+      // Fall back to local API quote if SDK not available
       if (!quote) {
         logger.debug(`🔍 ${reverse ? 'Reverse' : 'Forward'} Quote Parameters (${quoteVia === 'GALA' ? 'GALA' : 'Token'} → ${quoteVia === 'GALA' ? 'Token' : quoteVia}):`, {
           tokenSymbol: symbol,
@@ -132,20 +140,30 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       }
 
       // Calculate price and price impact
-      const outputAmount = new BigNumber(quote.outputAmount);
-      
-      // Price calculation depends on direction:
       let price: BigNumber;
-      if (shouldReverse) {
-        // REVERSE: Buying token with GALA (spend GALA, get token)
-        // outputAmount is GALA cost, amount is tokens received
-        // Price = outputAmount (GALA cost) / amount (tokens received) = GALA per token
-        price = outputAmount.div(amount);
+      let outputAmount: BigNumber;
+
+      if (exactOutputQuote) {
+        // Exact output quote: inputAmount is GALA cost, outputAmount is tokens received
+        // Price = inputAmount (GALA cost) / outputAmount (tokens received) = GALA per token
+        outputAmount = new BigNumber(exactOutputQuote.inputAmount); // GALA cost for the quote result
+        price = outputAmount.div(amount); // GALA per token
+        logger.info(`📊 Exact output pricing: ${outputAmount.toString()} GALA for exactly ${amount} ${symbol} = ${price.toString()} GALA per token`);
       } else {
-        // FORWARD: Selling token to get quote currency
-        // outputAmount is quote currency received, amount is tokens sold
-        // Price = outputAmount (quote currency received) / amount (tokens sold) = quote currency per token
-        price = outputAmount.div(amount);
+        outputAmount = new BigNumber(quote.outputAmount);
+
+        // Price calculation depends on direction:
+        if (shouldReverse) {
+          // REVERSE: Buying token with GALA (spend GALA, get token)
+          // outputAmount is GALA cost, amount is tokens received
+          // Price = outputAmount (GALA cost) / amount (tokens received) = GALA per token
+          price = outputAmount.div(amount);
+        } else {
+          // FORWARD: Selling token to get quote currency
+          // outputAmount is quote currency received, amount is tokens sold
+          // Price = outputAmount (quote currency received) / amount (tokens sold) = quote currency per token
+          price = outputAmount.div(amount);
+        }
       }
       const spotPrice = await this.getSpotPrice(symbol, quoteVia);
       
@@ -246,6 +264,57 @@ export class GalaChainPriceProvider extends BasePriceProvider {
       };
     } catch (error) {
       logger.debug('SDK quote failed, falling back to local API', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get exact output quote using GSwap SDK for reverse arbitrage.
+   * Returns the GALA cost required to receive exactly 'amount' tokens.
+   */
+  private async getSDKExactOutputQuote(symbol: string, amount: number): Promise<{
+    inputAmount: string;
+    outputAmount: string;
+    poolAddress: string;
+    route?: string[];
+  } | null> {
+    try {
+      // Initialize SDK if not already initialized
+      if (!this.gswap) {
+        const priv = process.env.GALACHAIN_PRIVATE_KEY;
+        if (!priv) {
+          logger.debug('GALACHAIN_PRIVATE_KEY not set, skipping SDK exact output quote');
+          return null;
+        }
+        const signer = new PrivateKeySigner(priv);
+        this.gswap = new GSwap({ signer });
+      }
+
+      const tokenConfig = this.configService.getTokenConfig(symbol);
+      if (!tokenConfig?.galaChainMint) {
+        return null;
+      }
+
+      // For reverse (buy token with GALA): tokenIn = GALA, tokenOut = token
+      const tokenIn = 'GALA|Unit|none|none';
+      const tokenOut = tokenConfig.galaChainMint;
+
+      // Use exact output quoting - how much GALA needed for exactly 'amount' tokens
+      const q = await this.gswap.quoting.quoteExactOutput(tokenIn, tokenOut, amount);
+      const inputAmount = new BigNumber(q.inTokenAmount.toString());
+
+      logger.info(`📊 Using SDK exact output quote for ${symbol}: ${inputAmount.toString()} GALA for exactly ${amount} ${symbol} (reverse arb)`);
+
+      return {
+        inputAmount: inputAmount.toString(),
+        outputAmount: amount.toString(),
+        poolAddress: 'unknown',
+        route: ['GALA', symbol]
+      };
+    } catch (error) {
+      logger.debug('SDK exact output quote failed, falling back to local API', {
         error: error instanceof Error ? error.message : String(error)
       });
       return null;

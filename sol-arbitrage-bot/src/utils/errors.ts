@@ -302,6 +302,15 @@ export function isRetryableError(error: unknown, category: ErrorCategory): boole
     return error.retryable;
   }
 
+  // Explicitly non-retryable: circuit breaker OPEN errors
+  // These should NOT be retried - the circuit breaker timeout will handle recovery
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes('circuit breaker') && message.includes('is open')) {
+      return false;
+    }
+  }
+
   // Default retryability by category
   switch (category) {
     case ErrorCategory.NETWORK:
@@ -317,8 +326,8 @@ export function isRetryableError(error: unknown, category: ErrorCategory): boole
       // Check error message for retryable patterns
       if (error instanceof Error) {
         const message = error.message.toLowerCase();
-        return message.includes('timeout') || 
-               message.includes('network') || 
+        return message.includes('timeout') ||
+               message.includes('network') ||
                message.includes('connection') ||
                message.includes('rate limit');
       }
@@ -326,5 +335,17 @@ export function isRetryableError(error: unknown, category: ErrorCategory): boole
     default:
       return false;
   }
+}
+
+/**
+ * Check if error is a circuit breaker OPEN error
+ * Useful for special handling of circuit breaker state
+ */
+export function isCircuitBreakerOpenError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return message.includes('circuit breaker') && message.includes('is open');
+  }
+  return false;
 }
 

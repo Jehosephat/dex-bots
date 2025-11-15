@@ -1,7 +1,6 @@
 import BigNumber from 'bignumber.js';
 import { IConfigService } from '../config';
-import { EdgeCalculator, EdgeCalculationResult } from '../core/edgeCalculator';
-import { ReverseEdgeCalculator } from '../core/reverseEdgeCalculator';
+import { UnifiedEdgeCalculator, EdgeCalculationResult } from '../core/unifiedEdgeCalculator';
 import { GalaChainQuote, SolanaQuote } from '../types/core';
 import { TokenConfig } from '../types/config';
 import { StateManager } from '../core/stateManager';
@@ -17,18 +16,17 @@ export interface RiskCheckResult {
 export class RiskManager {
   private trading: any;
   private stateManager: StateManager;
-  private edgeCalculator: EdgeCalculator;
-  private reverseEdgeCalculator: ReverseEdgeCalculator;
+  private edgeCalculator: UnifiedEdgeCalculator;
   private configService: IConfigService;
 
   constructor(stateManager?: StateManager, configService?: IConfigService) {
-    this.stateManager = stateManager || new StateManager();
+    // Use provided stateManager or the singleton instance
+    this.stateManager = stateManager || StateManager.getInstance();
     // Use provided config service or create default one
     const config = configService || (require('../config').createConfigService());
     this.configService = config;
     this.trading = config.getTradingConfig();
-    this.edgeCalculator = new EdgeCalculator(config);
-    this.reverseEdgeCalculator = new ReverseEdgeCalculator(config);
+    this.edgeCalculator = new UnifiedEdgeCalculator(config);
   }
 
   /**
@@ -60,13 +58,13 @@ export class RiskManager {
     // 3) Edge calculation and threshold
     let edge: EdgeCalculationResult;
     try {
-      logger.debug(`🔍 DEBUG: About to call edgeCalculator.calculateEdge()`, {
+      logger.debug(`🔍 DEBUG: About to call edgeCalculator.calculateEdge() (forward)`, {
         token: token.symbol,
         solQuoteVia: token.solQuoteVia,
         solQuoteCurrency: solanaQuote.currency,
         solToGalaRate: solToGalaRate.toString()
       });
-      edge = this.edgeCalculator.calculateEdge(token, galaChainQuote, solanaQuote, solToGalaRate, galaUsdPrice);
+      edge = this.edgeCalculator.calculateEdge('forward', token, galaChainQuote, solanaQuote, solToGalaRate, galaUsdPrice);
       logger.debug(`🔍 DEBUG: edgeCalculator.calculateEdge() completed`);
     } catch (edgeError) {
       logger.error(`❌ ERROR in edgeCalculator.calculateEdge() for ${token.symbol}`, {
@@ -164,11 +162,6 @@ export class RiskManager {
     direction: ArbitrageDirection,
     galaUsdPrice?: number
   ): RiskCheckResult {
-    // Use appropriate edge calculator based on direction
-    const edgeCalculator = direction === 'reverse' 
-      ? this.reverseEdgeCalculator 
-      : this.edgeCalculator;
-    
     const reasons: string[] = [];
 
     // 1) Price impact guardrails
@@ -187,23 +180,15 @@ export class RiskManager {
     // 3) Edge calculation and threshold (direction-aware)
     let edge: EdgeCalculationResult;
     try {
-      if (direction === 'reverse') {
-        edge = this.reverseEdgeCalculator.calculateReverseEdge(
-          token,
-          galaChainQuote,
-          solanaQuote,
-          solToGalaRate,
-          galaUsdPrice
-        );
-      } else {
-        edge = this.edgeCalculator.calculateEdge(
-          token,
-          galaChainQuote,
-          solanaQuote,
-          solToGalaRate,
-          galaUsdPrice
-        );
-      }
+      // Use unified edge calculator with direction parameter
+      edge = this.edgeCalculator.calculateEdge(
+        direction,
+        token,
+        galaChainQuote,
+        solanaQuote,
+        solToGalaRate,
+        galaUsdPrice
+      );
     } catch (edgeError) {
       logger.error(`❌ ERROR in edge calculation for ${token.symbol} (${direction})`, {
         error: edgeError instanceof Error ? edgeError.message : String(edgeError)

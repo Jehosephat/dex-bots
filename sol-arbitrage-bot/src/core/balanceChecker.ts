@@ -516,6 +516,54 @@ export class BalanceChecker {
       // Note: SOL on GalaChain is already checked in the loop above if it's an enabled token
       // No need to check it separately here - that would create duplicates
 
+      // Save balances to state
+      try {
+        const enabledTokens = this.configService!.getEnabledTokens();
+        const getQuoteTokenBySymbol = this.configService!.getQuoteTokenBySymbol.bind(this.configService);
+        const baseSymbols = ['GALA', 'GUSDC'];
+        const virtualBaseTokens = baseSymbols
+          .filter(sym => !enabledTokens.find(t => t.symbol === sym))
+          .map(sym => {
+            const qt = getQuoteTokenBySymbol(sym);
+            return qt ? { symbol: sym, galaChainMint: `${sym}|Unit|none|none`, decimals: qt.decimals } : null;
+          })
+          .filter(Boolean) as Array<{ symbol: string; galaChainMint: string; decimals: number }>;
+        const iterable = [...enabledTokens, ...virtualBaseTokens];
+        
+        const tokens: Record<string, any> = {};
+        for (const token of iterable) {
+          const [collection, category, type] = token.galaChainMint.split('|');
+          const prefix = `${collection}|${category}|${type}`;
+          
+          // Find matching balance from balanceMap
+          let tokenBalance = new BigNumber(0);
+          balanceMap.forEach((balance, key) => {
+            if (key.startsWith(prefix)) {
+              tokenBalance = balance;
+            }
+          });
+          
+          tokens[token.symbol] = {
+            symbol: token.symbol,
+            mint: token.galaChainMint,
+            rawBalance: tokenBalance,
+            balance: tokenBalance,
+            decimals: token.decimals,
+            valueUsd: new BigNumber(0),
+            lastUpdated: Date.now()
+          };
+        }
+        
+        this.stateManager.updateChainInventory('galaChain', {
+          tokens: tokens as any,
+          native: new BigNumber(0),
+          totalValueUsd: new BigNumber(0),
+          lastUpdated: Date.now()
+        } as any);
+      } catch (saveError) {
+        logger.debug('Failed to save GalaChain balances to state', { error: saveError instanceof Error ? saveError.message : String(saveError) });
+      }
+
     } catch (error) {
       logger.error('Failed to check GalaChain balances', {
         error: error instanceof Error ? error.message : String(error)
@@ -893,6 +941,46 @@ export class BalanceChecker {
             });
           }
         }
+      }
+
+      // Save balances to state
+      try {
+        const enabledTokens = this.configService!.getEnabledTokens();
+        const tokens: Record<string, any> = {};
+        
+        for (const token of enabledTokens) {
+          if (!token.solanaMint) continue;
+          
+          let balance: BigNumber;
+          if (token.symbol === 'SOL') {
+            // SOL is native token
+            balance = balanceMap.get('SOL') || new BigNumber(0);
+          } else {
+            // SPL tokens - lookup by mint address
+            balance = balanceMap.get(token.solanaMint) || new BigNumber(0);
+          }
+          
+          const rawBalance = balance.multipliedBy(new BigNumber(10).pow(token.decimals));
+          
+          tokens[token.symbol] = {
+            symbol: token.symbol,
+            mint: token.solanaMint,
+            rawBalance,
+            balance,
+            decimals: token.decimals,
+            valueUsd: new BigNumber(0),
+            lastUpdated: Date.now()
+          };
+        }
+        
+        this.stateManager.updateChainInventory('solana', {
+          tokens: tokens as any,
+          native: solBalance,
+          totalValueUsd: new BigNumber(0),
+          lastUpdated: Date.now()
+        } as any);
+      } catch (saveError) {
+        logger.debug('Failed to save Solana balances to state', { error: saveError instanceof Error ? saveError.message : String(saveError) });
       }
 
     } catch (error) {
