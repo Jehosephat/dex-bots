@@ -168,3 +168,9 @@ temp/
 *.backup
 bollinger-bot/bot-history.txt
 follow-bot/state.json
+sol-arbitrage-bot/bot1.env
+
+# Bot state files (should not be committed)
+sol-arbitrage-bot/state.json
+sol-arbitrage-bot/bridge-state.json
+sol-arbitrage-bot/test-state.json
