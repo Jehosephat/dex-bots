@@ -87,17 +87,6 @@
       "solanaSymbol": "USDT",
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA"
-    },
-    "UFD": {
-      "symbol": "UFD",
-      "enabled": true,
-      "tradeSize": 1000,
-      "decimals": 6,
-      "galaChainMint": "GUFD|Unit|none|none",
-      "solanaMint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-      "solanaSymbol": "UFD",
-      "gcQuoteVia": "GALA",
-      "solQuoteVia": "GALA"
     }
   },
   "quoteTokens": {

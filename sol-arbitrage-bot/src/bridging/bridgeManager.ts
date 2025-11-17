@@ -139,14 +139,29 @@ export class BridgeManager {
     if (!this.privateKey) throw new Error('BRIDGE_PRIVATE_KEY not set - cannot sign bridge payload');
 
     const { symbol, destination } = params;
-    const amount = new BigNumber(params.amount);
+    let amount = new BigNumber(params.amount);
     const recipient = params.recipient ?? process.env.SOLANA_WALLET_ADDRESS ?? '';
     
     try {
-      // 1. Resolve token descriptor
+      // 1. Get token config to determine decimals for proper rounding
+      const tokenConfig = this.configManager.getTokenConfig(symbol);
+      if (tokenConfig) {
+        // Round amount to token's decimal places to avoid "more than X decimal places" errors
+        // Use ROUND_DOWN to avoid rounding up beyond available balance
+        amount = amount.decimalPlaces(tokenConfig.decimals, BigNumber.ROUND_DOWN);
+        logger.debug(`Rounded bridge amount to ${tokenConfig.decimals} decimals`, {
+          symbol,
+          original: params.amount.toString(),
+          rounded: amount.toString()
+        });
+      } else {
+        logger.warn(`Token config not found for ${symbol}, using amount as-is (may cause decimal errors)`);
+      }
+      
+      // 2. Resolve token descriptor
       const descriptor = await this.resolveBridgeTokenDescriptor(symbol);
       
-      // 2. Fetch bridge fee (returns OracleBridgeFeeAssertionDto)
+      // 3. Fetch bridge fee (returns OracleBridgeFeeAssertionDto)
       logger.info('Fetching bridge fee', { symbol, amount: amount.toString() });
       const bridgeFee = await this.client.fetchBridgeFee({ chainId: 'Solana', bridgeToken: descriptor });
       
@@ -354,7 +369,7 @@ export class BridgeManager {
     recipient?: string;
   }): Promise<BridgeExecutionResult> {
     const { symbol, amount: amountParam } = params;
-    const amount = new BigNumber(amountParam);
+    let amount = new BigNumber(amountParam);
     const recipient = params.recipient ?? process.env.GALACHAIN_WALLET_ADDRESS ?? '';
 
     if (!recipient) {
@@ -391,6 +406,15 @@ export class BridgeManager {
           error: `Token ${symbol} not found in configuration`,
         };
       }
+
+      // Round amount to token's decimal places to avoid decimal precision errors
+      // Use ROUND_DOWN to avoid rounding up beyond available balance
+      amount = amount.decimalPlaces(tokenConfig.decimals, BigNumber.ROUND_DOWN);
+      logger.debug(`Rounded bridge amount to ${tokenConfig.decimals} decimals`, {
+        symbol,
+        original: amountParam.toString(),
+        rounded: amount.toString()
+      });
 
       // Handle native SOL
       if (symbol === 'SOL' || symbol === 'GSOL') {

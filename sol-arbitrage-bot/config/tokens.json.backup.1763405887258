@@ -68,7 +68,7 @@
     },
     "GSUSDC": {
       "symbol": "GSUSDC",
-      "enabled": false,
+      "enabled": true,
       "tradeSize": 4,
       "decimals": 6,
       "galaChainMint": "GSUSDC|Unit|none|none",
@@ -85,17 +85,6 @@
       "galaChainMint": "GSUSDT|Unit|none|none",
       "solanaMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
       "solanaSymbol": "USDT",
-      "gcQuoteVia": "GALA",
-      "solQuoteVia": "GALA"
-    },
-    "UFD": {
-      "symbol": "UFD",
-      "enabled": true,
-      "tradeSize": 1000,
-      "decimals": 6,
-      "galaChainMint": "GUFD|Unit|none|none",
-      "solanaMint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-      "solanaSymbol": "UFD",
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA"
     }

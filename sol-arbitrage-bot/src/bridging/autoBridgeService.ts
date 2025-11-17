@@ -310,9 +310,8 @@ export class AutoBridgeService {
   }
 
   /**
-   * Check if bridging is allowed (rate limits only, no cooldowns)
-   * Note: Cooldowns are for trading, not bridging. Bridging should happen to rebalance
-   * before more trades make the imbalance worse.
+   * Check if bridging is allowed (rate limits and cooldowns)
+   * Cooldowns prevent back-to-back bridges before balances can update
    */
   canBridge(token: string): boolean {
     const autoBridgingConfig = this.configService.getAutoBridgingConfig();
@@ -320,9 +319,16 @@ export class AutoBridgeService {
       return false;
     }
 
-    // Check daily limit only (cooldowns don't apply to bridging)
+    // Check daily limit
     if (this.bridgeStateTracker.hasExceededDailyLimit(token, autoBridgingConfig.maxBridgesPerDay)) {
       logger.info(`Token ${token} has exceeded daily bridge limit (${autoBridgingConfig.maxBridgesPerDay})`);
+      return false;
+    }
+
+    // Check cooldown period - prevent back-to-back bridges before balances update
+    if (this.bridgeStateTracker.isInCooldown(token, autoBridgingConfig.cooldownMinutes)) {
+      const remaining = this.bridgeStateTracker.getRemainingCooldown(token, autoBridgingConfig.cooldownMinutes);
+      logger.info(`Token ${token} is in cooldown period: ${remaining.toFixed(1)} minutes remaining (${autoBridgingConfig.cooldownMinutes} min cooldown)`);
       return false;
     }
 
@@ -523,11 +529,12 @@ export class AutoBridgeService {
       }
       
       if (imbalance.needsRebalancing) {
-        // Check if bridging is allowed (rate limits only, no cooldowns)
+        // Check if bridging is allowed (rate limits and cooldowns)
         if (this.canBridge(token.symbol)) {
           recommendations.push(imbalance);
         } else {
-          logger.info(`Token ${token.symbol} needs rebalancing but has exceeded daily bridge limit`);
+          // canBridge() already logs the reason (daily limit or cooldown)
+          logger.debug(`Token ${token.symbol} needs rebalancing but bridging is not allowed (check logs above for reason)`);
         }
       }
     }

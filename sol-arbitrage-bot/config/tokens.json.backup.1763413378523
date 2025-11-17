@@ -90,7 +90,7 @@
     },
     "UFD": {
       "symbol": "UFD",
-      "enabled": true,
+      "enabled": false,
       "tradeSize": 1000,
       "decimals": 6,
       "galaChainMint": "GUFD|Unit|none|none",

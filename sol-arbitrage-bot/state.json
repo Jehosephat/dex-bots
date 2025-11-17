@@ -1,99 +1,110 @@
 {
-  "galaChain": {
-    "SOL": "95"
-  },
-  "solana": {
-    "SOL": "5"
-  },
-  "updatedAtMs": 1761838143481,
   "inventory": {
     "galaChain": {
       "tokens": {
         "SOL": {
           "symbol": "SOL",
           "mint": "GSOL|Unit|none|none",
-          "rawBalance": "1.040603697",
-          "balance": "1.040603697",
+          "rawBalance": "0.04496811",
+          "balance": "0.04496811",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763248839179
+          "lastUpdated": 1763413714111
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "36434.41106",
-          "balance": "36434.41106",
+          "rawBalance": "6521.04432",
+          "balance": "6521.04432",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763248839179
+          "lastUpdated": 1763413714111
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "1274.673026",
-          "balance": "1274.673026",
+          "rawBalance": "1164.257532",
+          "balance": "1164.257532",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763248839179
+          "lastUpdated": 1763413714111
+        },
+        "UFD": {
+          "symbol": "UFD",
+          "mint": "GUFD|Unit|none|none",
+          "rawBalance": "6700",
+          "balance": "6700",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1763413714111
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "42612.58613789",
-          "balance": "42612.58613789",
+          "rawBalance": "121781.73495106",
+          "balance": "121781.73495106",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1763248839179
+          "lastUpdated": 1763413714111
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1763248839179
+      "lastUpdated": 1763413714111
     },
     "solana": {
       "tokens": {
         "SOL": {
           "symbol": "SOL",
           "mint": "So11111111111111111111111111111111111111112",
-          "rawBalance": "450932376",
-          "balance": "0.450932376",
+          "rawBalance": "118673666",
+          "balance": "0.118673666",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763248838311
+          "lastUpdated": 1763413714223
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
-          "rawBalance": "2980474546",
-          "balance": "29804.74546",
+          "rawBalance": "652104431",
+          "balance": "6521.04431",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763248838311
+          "lastUpdated": 1763413714223
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
-          "rawBalance": "1874673025",
-          "balance": "1874.673025",
+          "rawBalance": "1764257532",
+          "balance": "1764.257532",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763248838311
+          "lastUpdated": 1763413714223
+        },
+        "UFD": {
+          "symbol": "UFD",
+          "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
+          "rawBalance": "1429765523",
+          "balance": "1429.765523",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1763413714223
         }
       },
-      "native": "0.450932376",
+      "native": "0.118673666",
       "totalValueUsd": "0",
-      "lastUpdated": 1763248838311
+      "lastUpdated": 1763413714223
     },
-    "lastUpdated": 1763248839179,
-    "version": 2668
+    "lastUpdated": 1763413714223,
+    "version": 1733
   },
-  "lastSaved": 1763248839262,
-  "version": 215,
+  "pendingBridges": [],
+  "recentTrades": [],
   "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
-  "pendingBridges": [],
-  "recentTrades": [],
-  "status": "running",
-  "lastHeartbeat": 1762905266726
+  "status": "stopped",
+  "lastHeartbeat": 1763312607144,
+  "version": 40,
+  "lastSaved": 1763413715054
 }

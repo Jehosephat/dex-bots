@@ -352,7 +352,8 @@ export class BalanceChecker {
         }
         
         // Only add to insufficient funds for forward direction (since reverse doesn't need token on GC)
-        if (direction === 'forward' && !sufficientToken && quoteVia !== 'GALA') {
+        // For FORWARD trades, we ALWAYS need the token on GalaChain to sell it, regardless of quote currency
+        if (direction === 'forward' && !sufficientToken) {
           insufficientFunds.push({
             chain: 'galaChain',
             token: token.symbol,

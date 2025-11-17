@@ -58,17 +58,31 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
   await solProvider.initialize();
 
   // Check balances before starting (especially for live mode)
-  const balanceCheckResult = await checkInitialBalances(balanceChecker);
-  if (runMode === 'live' && !balanceCheckResult) {
-    return false;
-  }
+  let balanceCheckResult = await checkInitialBalances(balanceChecker);
   
-  // Check for auto-bridging opportunities after initial balance check (works in both live and dry_run)
+  // Check for auto-bridging opportunities BEFORE checking if we should pause
+  // This allows bridging to fix imbalances even when trading would otherwise be paused
   // Reuse the balance check result to avoid duplicate API calls
   if (autoBridgeService) {
     // Get the last balance check result from BalanceChecker (it caches the result)
     const lastBalanceCheck = balanceChecker.getLastBalanceCheckResult();
     await checkAutoBridging(autoBridgeService, lastBalanceCheck || undefined);
+    
+    // After auto-bridging, re-check balances in case bridging fixed the issue
+    // Only re-check if trading was paused, to avoid unnecessary API calls
+    if (!balanceCheckResult && runMode === 'live') {
+      logger.info(`\n🔍 Re-checking balances after auto-bridging attempt...`);
+      const recheckResult = await checkInitialBalances(balanceChecker);
+      if (recheckResult) {
+        logger.info(`✅ Trading can proceed after auto-bridging`);
+        balanceCheckResult = true; // Update result so trading can continue
+      }
+    }
+  }
+  
+  // Only pause trading if balance check failed AND auto-bridging didn't fix it
+  if (runMode === 'live' && !balanceCheckResult) {
+    return false;
   }
 
   let anyExecuted = false;
