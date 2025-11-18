@@ -10,6 +10,7 @@ import logger from '../utils/logger';
 import { sendAlert, sendSolanaTradeAlert } from '../utils/alerts';
 import { getErrorHandler } from '../utils/errorHandler';
 import { ExecutionError, ValidationError } from '../utils/errors';
+import { StateManager } from '../core/stateManager';
 
 export interface DualLegDryRunResult {
   symbol: string;
@@ -113,6 +114,36 @@ export class DualLegCoordinator {
   }
 
   /**
+   * Check if token inventory is below 80% of target
+   * Returns true if inventory is low (should only execute BUY side)
+   */
+  private isInventoryLow(symbol: string): { isLow: boolean; totalBalance: BigNumber; target: number; threshold: number } {
+    const token = this.configService.getTokenConfig(symbol);
+    if (!token || !token.inventoryTarget) {
+      return { isLow: false, totalBalance: new BigNumber(0), target: 0, threshold: 0 };
+    }
+
+    const stateManager = StateManager.getInstance();
+    const state = stateManager.getState();
+    
+    // Get balances from both chains
+    const gcBalance = state.inventory?.galaChain?.tokens?.[symbol]?.balance 
+      ? new BigNumber(state.inventory.galaChain.tokens[symbol].balance)
+      : new BigNumber(0);
+    const solBalance = state.inventory?.solana?.tokens?.[symbol]?.balance
+      ? new BigNumber(state.inventory.solana.tokens[symbol].balance)
+      : new BigNumber(0);
+    
+    const totalBalance = gcBalance.plus(solBalance);
+    const target = new BigNumber(token.inventoryTarget);
+    const threshold = target.multipliedBy(0.8); // 80% of target
+    
+    const isLow = totalBalance.isLessThan(threshold);
+    
+    return { isLow, totalBalance, target: target.toNumber(), threshold: threshold.toNumber() };
+  }
+
+  /**
    * Execute both legs live with simple failure handling.
    * Uses quotes from evaluation (with strategy-specific quote currencies).
    * GC sell and SOL buy are launched sequentially (Solana first).
@@ -148,6 +179,20 @@ export class DualLegCoordinator {
     const token = this.configService.getTokenConfig(symbol);
     if (!token) {
       throw new ValidationError(`Token not configured: ${symbol}`, { symbol });
+    }
+
+    // Check if inventory is low (below 80% of target)
+    const inventoryCheck = this.isInventoryLow(symbol);
+    const shouldSkipSell = inventoryCheck.isLow;
+
+    if (shouldSkipSell) {
+      logger.warn(`📉 Inventory below 80% of target - will only execute BUY side`, {
+        symbol,
+        totalBalance: inventoryCheck.totalBalance.toFixed(8),
+        target: inventoryCheck.target,
+        threshold: inventoryCheck.threshold,
+        reason: `Total balance ${inventoryCheck.totalBalance.toFixed(8)} is below 80% threshold of ${inventoryCheck.threshold.toFixed(8)} (target: ${inventoryCheck.target})`
+      });
     }
 
     // Global safety toggles
@@ -234,25 +279,39 @@ export class DualLegCoordinator {
     // For reverse: SELL on SOL first, then BUY on GC
     // For forward: BUY on SOL first, then SELL on GC
     
+    // Determine which side to execute based on direction and inventory status
+    // If inventory is low, skip SELL side (only execute BUY side)
+    const solIsSell = direction === 'reverse';
+    const shouldExecuteSol = !shouldSkipSell || !solIsSell; // Execute if not skipping, or if it's a BUY
+    
     logger.info(`🔄 Executing Solana leg first (${direction} direction)...`);
     let sol: SolanaExecutionResult;
-    try {
-      sol = await this.errorHandler.executeWithProtection(
-        () => {
-          if (direction === 'reverse') {
-            // Reverse: SELL on Solana
-            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
-          } else {
-            // Forward: BUY on Solana
-            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
-          }
+    
+    if (!shouldExecuteSol) {
+      // Skip Solana SELL because inventory is low
+      logger.warn(`⏭️ Skipping Solana SELL - inventory below 80% of target`, {
+        symbol,
+        direction,
+        totalBalance: inventoryCheck.totalBalance.toFixed(8),
+        threshold: inventoryCheck.threshold.toFixed(8),
+        target: inventoryCheck.target
+      });
+      
+      // Send Slack notification about one-sided buy
+      sendAlert(
+        'One-Sided Buy: Inventory Below Target',
+        {
+          symbol,
+          reason: 'Inventory below 80% of target - only executing BUY side',
+          totalBalance: inventoryCheck.totalBalance.toFixed(8),
+          target: inventoryCheck.target.toFixed(8),
+          threshold: inventoryCheck.threshold.toFixed(8),
+          skippedSide: 'Solana SELL',
+          direction
         },
-        'solana-executor',
-        `SOL execution for ${symbol} (${direction})`
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`❌ Solana execution failed before GalaChain execution`, { symbol, error: errorMessage });
+        'warn'
+      ).catch(() => {});
+      
       sol = {
         success: false,
         params: {
@@ -263,12 +322,48 @@ export class DualLegCoordinator {
           maxCostInQuote: new BigNumber(0),
           deadlineMs: Date.now() + 60_000
         },
-        error: errorMessage
+        error: `Skipped - inventory below 80% of target (${inventoryCheck.totalBalance.toFixed(8)} < ${inventoryCheck.threshold.toFixed(8)})`
       } as SolanaExecutionResult;
+    } else {
+      try {
+        sol = await this.errorHandler.executeWithProtection(
+          () => {
+            if (direction === 'reverse') {
+              // Reverse: SELL on Solana
+              return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
+            } else {
+              // Forward: BUY on Solana
+              return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
+            }
+          },
+          'solana-executor',
+          `SOL execution for ${symbol} (${direction})`
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`❌ Solana execution failed before GalaChain execution`, { symbol, error: errorMessage });
+        sol = {
+          success: false,
+          params: {
+            symbol,
+            tradeSize: token.tradeSize,
+            quoteCurrency: finalSolQuote.currency,
+            expectedCostInQuote: new BigNumber(0),
+            maxCostInQuote: new BigNumber(0),
+            deadlineMs: Date.now() + 60_000
+          },
+          error: errorMessage
+        } as SolanaExecutionResult;
+      }
     }
 
-    // If Solana failed, don't execute GalaChain to avoid one-sided trades
-    if (!sol.success) {
+    // If Solana failed, check if we should still execute GalaChain
+    // If Solana was skipped due to low inventory and GalaChain is a BUY, we should still execute GalaChain
+    const solWasSkipped = !sol.success && sol.error?.includes('Skipped - inventory below 80%');
+    const gcIsBuy = direction === 'reverse';
+    
+    if (!sol.success && !solWasSkipped) {
+      // Solana failed for a real error (not inventory skip) - don't execute GalaChain to avoid one-sided trades
       logger.warn(`⚠️ Solana execution failed - skipping GalaChain execution to prevent one-sided trade`, {
         symbol,
         solError: sol.error
@@ -295,31 +390,47 @@ export class DualLegCoordinator {
       
       return { gc, sol };
     }
+    
+    // If Solana was skipped due to low inventory, log it but continue to GalaChain if it's a BUY
+    if (solWasSkipped) {
+      logger.info(`ℹ️ Solana SELL skipped due to low inventory - proceeding to GalaChain ${gcIsBuy ? 'BUY' : 'SELL'}...`);
+    }
 
-    // Solana succeeded - proceed with GalaChain execution
-    logger.info(`✅ Solana execution succeeded - proceeding with GalaChain execution...`);
+    // Proceed with GalaChain execution
+    // Determine if GalaChain side should be executed
+    // For FORWARD: GalaChain is SELL (skip if inventory low)
+    // For REVERSE: GalaChain is BUY (always execute)
+    const gcIsSell = direction === 'forward';
+    const shouldExecuteGc = !shouldSkipSell || !gcIsSell; // Execute if not skipping, or if it's a BUY
+    
     let gc: GalaChainExecutionResult;
-    try {
-      gc = await this.errorHandler.executeWithProtection(
-        () => {
-          if (direction === 'reverse') {
-            // Reverse: BUY on GalaChain
-            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
-          } else {
-            // Forward: SELL on GalaChain
-            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
-          }
-        },
-        'galachain-executor',
-        `GC execution for ${symbol} (${direction})`
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`❌ GalaChain execution failed after Solana succeeded`, {
+    
+    if (!shouldExecuteGc) {
+      // Skip GalaChain SELL because inventory is low
+      logger.warn(`⏭️ Skipping GalaChain SELL - inventory below 80% of target`, {
         symbol,
-        solTx: sol.txSig,
-        error: errorMessage
+        direction,
+        totalBalance: inventoryCheck.totalBalance.toFixed(8),
+        threshold: inventoryCheck.threshold.toFixed(8),
+        target: inventoryCheck.target,
+        reason: `Only executing BUY side to rebuild inventory`
       });
+      
+      // Send Slack notification about one-sided buy
+      sendAlert(
+        'One-Sided Buy: Inventory Below Target',
+        {
+          symbol,
+          reason: 'Inventory below 80% of target - only executing BUY side',
+          totalBalance: inventoryCheck.totalBalance.toFixed(8),
+          target: inventoryCheck.target.toFixed(8),
+          threshold: inventoryCheck.threshold.toFixed(8),
+          skippedSide: 'GalaChain SELL',
+          direction
+        },
+        'warn'
+      ).catch(() => {});
+      
       gc = {
         success: false,
         params: {
@@ -329,8 +440,47 @@ export class DualLegCoordinator {
           minProceedsGala: new BigNumber(0),
           deadlineMs: Date.now() + 60_000
         },
-        error: errorMessage
+        error: `Skipped - inventory below 80% of target (${inventoryCheck.totalBalance.toFixed(8)} < ${inventoryCheck.threshold.toFixed(8)}). Only executing BUY side.`
       };
+    } else {
+      if (sol.success) {
+        logger.info(`✅ Solana execution succeeded - proceeding with GalaChain execution...`);
+      } else {
+        logger.info(`ℹ️ Proceeding with GalaChain execution (Solana was skipped due to low inventory)...`);
+      }
+      try {
+        gc = await this.errorHandler.executeWithProtection(
+          () => {
+            if (direction === 'reverse') {
+              // Reverse: BUY on GalaChain
+              return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
+            } else {
+              // Forward: SELL on GalaChain
+              return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
+            }
+          },
+          'galachain-executor',
+          `GC execution for ${symbol} (${direction})`
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`❌ GalaChain execution failed`, {
+          symbol,
+          solTx: sol.txSig,
+          error: errorMessage
+        });
+        gc = {
+          success: false,
+          params: {
+            symbol,
+            tradeSize: token.tradeSize,
+            expectedProceedsGala: new BigNumber(0),
+            minProceedsGala: new BigNumber(0),
+            deadlineMs: Date.now() + 60_000
+          },
+          error: errorMessage
+        };
+      }
     }
 
     // Handle partial success: Solana succeeded but GalaChain failed
@@ -345,6 +495,41 @@ export class DualLegCoordinator {
       sendAlert('Dual-leg partial success: GC failed', { symbol, solTx: sol.txSig, gcError: gc.error }, 'warn').catch(() => {});
     }
     // Note: If Solana failed, we already handled it above and skipped GalaChain execution
+
+    // Check if this was a one-sided buy (one side succeeded, other was skipped due to low inventory)
+    const solWasSkippedForInventory = !sol.success && sol.error?.includes('Skipped - inventory below 80%');
+    const gcWasSkippedForInventory = !gc.success && gc.error?.includes('Skipped - inventory below 80%');
+    const oneSidedBuy = (sol.success && gcWasSkippedForInventory) || (gc.success && solWasSkippedForInventory);
+
+    // Handle one-sided buy success (one side succeeded, other was skipped)
+    if (oneSidedBuy && !(gc.success && sol.success)) {
+      const executedSide = sol.success ? 'Solana BUY' : 'GalaChain BUY';
+      const skippedSide = solWasSkippedForInventory ? 'Solana SELL' : 'GalaChain SELL';
+      const txHash = sol.success ? sol.txSig : gc.txHash;
+      
+      logger.info(`✅ One-sided buy executed: ${executedSide} succeeded (${skippedSide} skipped due to low inventory)`, {
+        symbol,
+        executedSide,
+        skippedSide,
+        txHash
+      });
+      
+      sendAlert(
+        'One-Sided Buy Executed: Inventory Rebuilding',
+        {
+          symbol,
+          executedSide,
+          skippedSide,
+          totalBalance: inventoryCheck.totalBalance.toFixed(8),
+          target: inventoryCheck.target.toFixed(8),
+          threshold: inventoryCheck.threshold.toFixed(8),
+          reason: 'Successfully executed BUY side to rebuild inventory',
+          solTx: sol.success ? sol.txSig : 'N/A',
+          gcTx: gc.success ? gc.txHash : 'N/A'
+        },
+        'info'
+      ).catch(() => {});
+    }
 
     if (gc.success && sol.success) {
       logger.execution('✅ Dual-leg live execution complete', { symbol, gcTx: gc.txHash, solTx: sol.txSig });

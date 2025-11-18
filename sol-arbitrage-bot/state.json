@@ -9,7 +9,7 @@
           "balance": "0.04496811",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763484346904
+          "lastUpdated": 1763488199099
         },
         "MEW": {
           "symbol": "MEW",
@@ -18,50 +18,50 @@
           "balance": "3521.04431",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763484346904
+          "lastUpdated": 1763488199099
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "2576.641653",
-          "balance": "2576.641653",
+          "rawBalance": "1976.641653",
+          "balance": "1976.641653",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763484346904
+          "lastUpdated": 1763488199099
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "GUFD|Unit|none|none",
-          "rawBalance": "3512.672014",
-          "balance": "3512.672014",
+          "rawBalance": "3023.472014",
+          "balance": "3023.472014",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763484346904
+          "lastUpdated": 1763488199099
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "102205.05798731",
-          "balance": "102205.05798731",
+          "rawBalance": "101382.32216117",
+          "balance": "101382.32216117",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1763484346904
+          "lastUpdated": 1763488199099
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1763484346904
+      "lastUpdated": 1763488199099
     },
     "solana": {
       "tokens": {
         "SOL": {
           "symbol": "SOL",
           "mint": "So11111111111111111111111111111111111111112",
-          "rawBalance": "117971690",
-          "balance": "0.11797169",
+          "rawBalance": "117961691",
+          "balance": "0.117961691",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763484347014
+          "lastUpdated": 1763488199210
         },
         "MEW": {
           "symbol": "MEW",
@@ -70,54 +70,41 @@
           "balance": "9521.04432",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763484347014
+          "lastUpdated": 1763488199210
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
-          "rawBalance": "6176641654",
-          "balance": "6176.641654",
+          "rawBalance": "6776641654",
+          "balance": "6776.641654",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763484347014
+          "lastUpdated": 1763488199210
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-          "rawBalance": "561672014",
-          "balance": "561.672014",
+          "rawBalance": "2037172014",
+          "balance": "2037.172014",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763484347014
+          "lastUpdated": 1763488199210
         }
       },
-      "native": "0.11797169",
+      "native": "0.117961691",
       "totalValueUsd": "0",
-      "lastUpdated": 1763484347014
+      "lastUpdated": 1763488199210
     },
-    "lastUpdated": 1763484347014,
-    "version": 3597
+    "lastUpdated": 1763488199210,
+    "version": 3637
   },
   "pendingBridges": [],
   "recentTrades": [],
-  "tokenCooldowns": {
-    "USDUC": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1763484338336,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    },
-    "UFD": {
-      "isInCooldown": true,
-      "cooldownEndsAt": 1763484341364,
-      "remainingSeconds": 60,
-      "reason": "Trade executed successfully"
-    }
-  },
+  "tokenCooldowns": {},
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "status": "stopped",
   "lastHeartbeat": 1763312607144,
-  "version": 55,
-  "lastSaved": 1763484348423
+  "version": 57,
+  "lastSaved": 1763488209752
 }

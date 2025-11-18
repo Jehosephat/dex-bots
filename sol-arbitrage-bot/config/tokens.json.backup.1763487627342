@@ -53,8 +53,7 @@
       "tradeSize": 3000,
       "enabled": true,
       "gcQuoteVia": "GALA",
-      "solQuoteVia": "GALA",
-      "inventoryTarget": 10000
+      "solQuoteVia": "GALA"
     },
     "USDUC": {
       "symbol": "USDUC",
@@ -65,8 +64,7 @@
       "tradeSize": 300,
       "enabled": true,
       "gcQuoteVia": "GALA",
-      "solQuoteVia": "GALA",
-      "inventoryTarget": 10000
+      "solQuoteVia": "GALA"
     },
     "GSUSDC": {
       "symbol": "GSUSDC",
