@@ -51,6 +51,33 @@ export class BalanceChecker {
   private lastBalanceCheckResult: BalanceCheckResult | null = null;
 
   /**
+   * Check if token inventory is below 80% of target
+   * Returns true if inventory is low (should only execute BUY side, skip SELL checks)
+   */
+  private isInventoryLow(symbol: string): boolean {
+    const token = this.configService!.getTokenConfig(symbol);
+    if (!token || !token.inventoryTarget) {
+      return false; // No target set, use normal balance checks
+    }
+
+    const state = this.stateManager.getState();
+    
+    // Get balances from both chains
+    const gcBalance = state.inventory?.galaChain?.tokens?.[symbol]?.balance 
+      ? new BigNumber(state.inventory.galaChain.tokens[symbol].balance)
+      : new BigNumber(0);
+    const solBalance = state.inventory?.solana?.tokens?.[symbol]?.balance
+      ? new BigNumber(state.inventory.solana.tokens[symbol].balance)
+      : new BigNumber(0);
+    
+    const totalBalance = gcBalance.plus(solBalance);
+    const target = new BigNumber(token.inventoryTarget);
+    const threshold = target.multipliedBy(0.8); // 80% of target
+    
+    return totalBalance.isLessThan(threshold);
+  }
+
+  /**
    * Get the last balance check result (cached)
    */
   getLastBalanceCheckResult(): BalanceCheckResult | null {
@@ -404,16 +431,30 @@ export class BalanceChecker {
           }
         }
         
-        // Only add to insufficient funds for forward direction (since reverse doesn't need token on GC)
-        // For FORWARD trades, we ALWAYS need the token on GalaChain to sell it, regardless of quote currency
-        if (direction === 'forward' && !sufficientToken) {
-          insufficientFunds.push({
-            chain: 'galaChain',
-            token: token.symbol,
-            currentBalance: tokenBalance,
-            requiredBalance: requiredForSell,
-            purpose: 'sell'
-          });
+        // Check if inventory is low - if so, skip SELL-side balance checks
+        // (we'll only execute BUY side to rebuild inventory)
+        const inventoryLow = this.isInventoryLow(token.symbol);
+        
+        // If inventory is low, don't block on SELL-side insufficient funds
+        // (we'll only execute BUY side to rebuild inventory)
+        if (inventoryLow) {
+          if (!sufficientToken) {
+            recommendations.push(`Low ${token.symbol} balance on GalaChain (${tokenBalance.toFixed(4)}), but inventory is below 80% of target - will only execute BUY side to rebuild`);
+          }
+          // Don't add to insufficientFunds - allow BUY side to proceed
+        } else {
+          // Normal behavior: check SELL-side balances
+          // Only add to insufficient funds for forward direction (since reverse doesn't need token on GC)
+          // For FORWARD trades, we ALWAYS need the token on GalaChain to sell it, regardless of quote currency
+          if (direction === 'forward' && !sufficientToken) {
+            insufficientFunds.push({
+              chain: 'galaChain',
+              token: token.symbol,
+              currentBalance: tokenBalance,
+              requiredBalance: requiredForSell,
+              purpose: 'sell'
+            });
+          }
         }
         
         if (direction === 'reverse') {
@@ -872,6 +913,9 @@ export class BalanceChecker {
         const requiredForSell = new BigNumber(token.tradeSize || 0);
         const sufficient = tokenBalance.isGreaterThanOrEqualTo(requiredForSell);
         
+        // Check if inventory is low - if so, skip SELL-side balance checks
+        const inventoryLow = this.isInventoryLow(token.symbol);
+        
         // Track this check (always, for visibility)
         if (checkedBalances) {
           // Check if we already have this token in the list (avoid duplicates)
@@ -893,18 +937,28 @@ export class BalanceChecker {
           }
         }
         
-        // Only add to insufficient funds for reverse direction (since forward doesn't need token on SOL)
-        if (direction === 'reverse' && !sufficient) {
-          insufficientFunds.push({
-            chain: 'solana',
-            token: token.symbol,
-            currentBalance: tokenBalance,
-            requiredBalance: requiredForSell,
-            purpose: 'sell'
-          });
-        } else if (direction === 'forward' && !sufficient) {
-          // For forward, note in recommendations (not blocking)
-          recommendations.push(`Low ${token.symbol} balance on Solana for reverse trades: ${tokenBalance.toFixed(4)}`);
+        // If inventory is low, don't block on SELL-side insufficient funds
+        // (we'll only execute BUY side to rebuild inventory)
+        if (inventoryLow) {
+          if (!sufficient) {
+            recommendations.push(`Low ${token.symbol} balance on Solana (${tokenBalance.toFixed(4)}), but inventory is below 80% of target - will only execute BUY side to rebuild`);
+          }
+          // Don't add to insufficientFunds - allow BUY side to proceed
+        } else {
+          // Normal behavior: check SELL-side balances
+          // Only add to insufficient funds for reverse direction (since forward doesn't need token on SOL)
+          if (direction === 'reverse' && !sufficient) {
+            insufficientFunds.push({
+              chain: 'solana',
+              token: token.symbol,
+              currentBalance: tokenBalance,
+              requiredBalance: requiredForSell,
+              purpose: 'sell'
+            });
+          } else if (direction === 'forward' && !sufficient) {
+            // For forward, note in recommendations (not blocking)
+            recommendations.push(`Low ${token.symbol} balance on Solana for reverse trades: ${tokenBalance.toFixed(4)}`);
+          }
         }
       }
 

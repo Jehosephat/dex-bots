@@ -309,9 +309,28 @@ export class GalaChainExecutor {
         exactGalaCost: exactGalaCost.toString(),
         maxGalaCost: maxGalaCost.toString()
       });
-      const exactOutWithBuffer = new BigNumber(tradeSize)
-        .multipliedBy(1 - precisionBufferBps / 10000)
-        .decimalPlaces(9, BigNumber.ROUND_DOWN); // Round down to be conservative
+      
+      // Calculate buffer amount using token decimals for proper precision
+      const tokenDecimals = tokenCfg?.decimals || 6;
+      let exactOutWithBuffer = new BigNumber(tradeSize)
+        .multipliedBy(1 - precisionBufferBps / 10000);
+      
+      // Round down to token's decimal places
+      exactOutWithBuffer = exactOutWithBuffer.decimalPlaces(tokenDecimals, BigNumber.ROUND_DOWN);
+      
+      // Subtract a tiny additional buffer (1 unit in the smallest decimal place) to ensure
+      // we're always slightly below what the contract will actually deliver
+      // This prevents precision edge cases where the contract rounds slightly differently
+      const smallestUnit = new BigNumber(10).pow(-tokenDecimals);
+      exactOutWithBuffer = exactOutWithBuffer.minus(smallestUnit);
+      
+      // Ensure we don't go below zero
+      if (exactOutWithBuffer.isLessThan(0)) {
+        exactOutWithBuffer = new BigNumber(0);
+      }
+      
+      // Final rounding to token decimals
+      exactOutWithBuffer = exactOutWithBuffer.decimalPlaces(tokenDecimals, BigNumber.ROUND_DOWN);
 
       // Update params (for reverse, expectedProceedsGala is actually the cost)
       params.expectedProceedsGala = exactGalaCost;

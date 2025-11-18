@@ -100,7 +100,7 @@
       "solanaSymbol": "UFD",
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
-      "inventoryTarget": 15000
+      "inventoryTarget": 10000
     }
   },
   "quoteTokens": {
