@@ -49,7 +49,13 @@ export class SolanaSolToGalaStrategy implements IQuoteStrategy {
           timeout: 10000
         }),
         'jupiter-api',
-        `SOL→GALA quote for ${symbol}`
+        `SOL→GALA quote for ${symbol}`,
+        undefined, // retryPolicy
+        {
+          failureThreshold: 10,  // More tolerant: 10 failures instead of 5
+          timeout: 60000,         // Longer wait: 60s instead of 30s before retry
+          failureWindow: 120000  // Longer window: 2min instead of 1min
+        }
       );
 
       if (!response.data?.outAmount) {

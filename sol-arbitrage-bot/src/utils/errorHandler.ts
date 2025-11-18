@@ -210,9 +210,10 @@ export class ErrorHandler {
     fn: () => Promise<T>,
     serviceName: string,
     context?: string,
-    retryPolicy?: Partial<RetryPolicy>
+    retryPolicy?: Partial<RetryPolicy>,
+    circuitConfig?: Partial<import('./circuitBreaker').CircuitBreakerConfig>
   ): Promise<T> {
-    const protectedFn = () => this.executeWithCircuitBreaker(fn, serviceName);
+    const protectedFn = () => this.executeWithCircuitBreaker(fn, serviceName, circuitConfig);
     return this.executeWithRetry(protectedFn, context, retryPolicy);
   }
 

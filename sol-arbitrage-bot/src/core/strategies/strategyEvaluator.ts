@@ -35,7 +35,7 @@ export class StrategyEvaluator {
   private riskManager: RiskManager;
   // Quote cache to avoid duplicate API calls within an evaluation cycle
   private quoteCache: Map<string, { gcQuote: GalaChainQuote | null; solQuote: SolanaQuote | null; timestamp: number }> = new Map();
-  private readonly QUOTE_CACHE_TTL = 5000; // 5 seconds - quotes are only valid for a short time
+  private readonly QUOTE_CACHE_TTL = 15000; // 15 seconds - increased to reduce duplicate requests and rate limiting
 
   constructor(
     private configService: IConfigService,
@@ -73,7 +73,7 @@ export class StrategyEvaluator {
       
       // Add delay between evaluations to avoid rate limits (except for first one)
       if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay to reduce Jupiter API rate limiting
       }
       
       const result = await this.evaluateStrategy(token, strategy);

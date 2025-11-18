@@ -9,7 +9,7 @@
           "balance": "0.04496811",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763413714111
+          "lastUpdated": 1763473326883
         },
         "MEW": {
           "symbol": "MEW",
@@ -18,7 +18,7 @@
           "balance": "6521.04432",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763413714111
+          "lastUpdated": 1763473326883
         },
         "USDUC": {
           "symbol": "USDUC",
@@ -27,41 +27,41 @@
           "balance": "1164.257532",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763413714111
+          "lastUpdated": 1763473326883
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "GUFD|Unit|none|none",
-          "rawBalance": "6700",
-          "balance": "6700",
+          "rawBalance": "3564.882762",
+          "balance": "3564.882762",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763413714111
+          "lastUpdated": 1763473326883
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "121781.73495106",
-          "balance": "121781.73495106",
+          "rawBalance": "121713.69908547",
+          "balance": "121713.69908547",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1763413714111
+          "lastUpdated": 1763473326883
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1763413714111
+      "lastUpdated": 1763473326883
     },
     "solana": {
       "tokens": {
         "SOL": {
           "symbol": "SOL",
           "mint": "So11111111111111111111111111111111111111112",
-          "rawBalance": "118673666",
-          "balance": "0.118673666",
+          "rawBalance": "118658669",
+          "balance": "0.118658669",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763413714223
+          "lastUpdated": 1763473326992
         },
         "MEW": {
           "symbol": "MEW",
@@ -70,7 +70,7 @@
           "balance": "6521.04431",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763413714223
+          "lastUpdated": 1763473326992
         },
         "USDUC": {
           "symbol": "USDUC",
@@ -79,24 +79,24 @@
           "balance": "1764.257532",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763413714223
+          "lastUpdated": 1763473326992
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-          "rawBalance": "1429765523",
-          "balance": "1429.765523",
+          "rawBalance": "1564882761",
+          "balance": "1564.882761",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763413714223
+          "lastUpdated": 1763473326992
         }
       },
-      "native": "0.118673666",
+      "native": "0.118658669",
       "totalValueUsd": "0",
-      "lastUpdated": 1763413714223
+      "lastUpdated": 1763473326992
     },
-    "lastUpdated": 1763413714223,
-    "version": 1733
+    "lastUpdated": 1763473326992,
+    "version": 3319
   },
   "pendingBridges": [],
   "recentTrades": [],
@@ -105,6 +105,6 @@
   "lastBridgeTimes": {},
   "status": "stopped",
   "lastHeartbeat": 1763312607144,
-  "version": 40,
-  "lastSaved": 1763413715054
+  "version": 48,
+  "lastSaved": 1763473344501
 }

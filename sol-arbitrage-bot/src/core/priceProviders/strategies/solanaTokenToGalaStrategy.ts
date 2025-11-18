@@ -42,6 +42,7 @@ export class SolanaTokenToGalaStrategy implements IQuoteStrategy {
     const rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
     
     try {
+      // Use more tolerant circuit breaker config for Jupiter API
       const response = await this.errorHandler.executeWithProtection(
         () => axios.get(`${this.jupiterApiUrl}/quote`, {
           params: {
@@ -54,7 +55,13 @@ export class SolanaTokenToGalaStrategy implements IQuoteStrategy {
           timeout: 10000
         }),
         'jupiter-api',
-        `${symbol}→GALA quote`
+        `${symbol}→GALA quote`,
+        undefined, // retryPolicy
+        {
+          failureThreshold: 10,  // More tolerant: 10 failures instead of 5
+          timeout: 60000,         // Longer wait: 60s instead of 30s before retry
+          failureWindow: 120000  // Longer window: 2min instead of 1min
+        }
       );
 
       if (!response.data?.outAmount) {

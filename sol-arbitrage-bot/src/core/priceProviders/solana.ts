@@ -18,6 +18,7 @@ import { QuoteValidator } from '../../core/quoteValidator';
 import { getPriceCache } from '../../core/priceCache';
 import { StrategyManager } from './strategies/strategyManager';
 import { SolanaStandardQuoteStrategy } from './strategies/solanaStandardQuoteStrategy';
+import { JupiterUltraClient } from '../../services/jupiterUltraClient';
 import { 
   calculatePriceImpactBps,
   calculateBps,
@@ -38,10 +39,19 @@ export class SolanaPriceProvider extends BasePriceProvider {
   private quoteValidator: QuoteValidator;
   private priceCache = getPriceCache();
   private strategyManager: StrategyManager;
+  private useUltraSwap: boolean;
+  private ultraClient: JupiterUltraClient | null = null;
 
   constructor(private configService: IConfigService) {
     super();
     this.quoteValidator = new QuoteValidator();
+    
+    // Check if Ultra Swap should be used
+    this.useUltraSwap = (process.env.USE_JUPITER_ULTRA || '').toLowerCase() === 'true';
+    if (this.useUltraSwap) {
+      this.ultraClient = new JupiterUltraClient();
+      logger.info('✅ Jupiter Ultra Swap API enabled (dynamic rate limits)');
+    }
     
       // Initialize strategy manager with bound methods
       // Note: getJupiterQuote will be called with quoteCurrency from the strategy
@@ -210,7 +220,49 @@ export class SolanaPriceProvider extends BasePriceProvider {
         rawAmount = toRawAmount(new BigNumber(amount), tokenConfig.decimals).toString();
       }
 
-      // Get quote from Jupiter with error handling
+      // Try Ultra Swap API first if enabled, fallback to v1 API
+      if (this.useUltraSwap && this.ultraClient) {
+        try {
+          const wallet = process.env.SOLANA_WALLET_ADDRESS;
+          if (!wallet) {
+            throw new Error('SOLANA_WALLET_ADDRESS not set for Ultra Swap');
+          }
+
+          const order = await this.ultraClient.getOrder({
+            inputMint,
+            outputMint,
+            amount: rawAmount,
+            slippageBps: 50,
+            swapMode,
+            userPublicKey: wallet,
+            wrapAndUnwrapSol: true,
+            dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: 'auto'
+          });
+
+          return {
+            inputAmount: order.inAmount,
+            outputAmount: order.outAmount,
+            priceImpact: order.priceImpactPct || 0,
+            route: order.routePlan ? {
+              routeId: order.routePlan[0]?.swapInfo?.label || 'unknown',
+              inputMint: inputMint,
+              outputMint: outputMint,
+              steps: order.routePlan || [],
+              totalPriceImpact: order.priceImpactPct || 0,
+              totalFee: order.platformFee?.amount || 0
+            } : undefined
+          };
+        } catch (ultraError) {
+          logger.warn('⚠️ Ultra Swap API failed, falling back to v1 API', {
+            error: ultraError instanceof Error ? ultraError.message : String(ultraError)
+          });
+          // Fall through to v1 API
+        }
+      }
+
+      // Fallback to v1 API (or use if Ultra Swap not enabled)
+      // Use more tolerant circuit breaker config for Jupiter API to handle rate limiting better
       const response = await this.errorHandler.executeWithProtection(
         () => axios.get(`${this.jupiterApiUrl}/quote`, {
           params: {
@@ -223,7 +275,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
           timeout: 10000
         }),
         'jupiter-api',
-        `Jupiter quote ${inputMint}→${outputMint}`
+        `Jupiter quote ${inputMint}→${outputMint}`,
+        undefined, // retryPolicy
+        {
+          failureThreshold: 10,  // More tolerant: 10 failures instead of 5
+          timeout: 60000,         // Longer wait: 60s instead of 30s before retry
+          failureWindow: 120000  // Longer window: 2min instead of 1min
+        }
       );
 
       if (!response.data || !response.data.outAmount) {
@@ -315,7 +373,13 @@ export class SolanaPriceProvider extends BasePriceProvider {
           timeout: 5000
         }),
         'jupiter-api',
-        'SOL/USDC price update'
+        'SOL/USDC price update',
+        undefined, // retryPolicy
+        {
+          failureThreshold: 10,  // More tolerant: 10 failures instead of 5
+          timeout: 60000,         // Longer wait: 60s instead of 30s before retry
+          failureWindow: 120000  // Longer window: 2min instead of 1min
+        }
       );
 
       if (response.data?.outAmount) {

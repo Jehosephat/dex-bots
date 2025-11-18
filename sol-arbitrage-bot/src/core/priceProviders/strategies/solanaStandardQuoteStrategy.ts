@@ -62,10 +62,17 @@ export class SolanaStandardQuoteStrategy implements IQuoteStrategy {
       // reverse=false: SOL → Token (buying token with SOL/USDC)
       // reverse=true: Token → SOL (selling token for SOL/USDC)
       // Pass the quote currency from tokenConfig so getJupiterQuote uses the correct quote token
+      // Use more tolerant circuit breaker config for Jupiter API
       const quote = await this.errorHandler.executeWithProtection(
         () => this.getJupiterQuote(symbol, amount, reverse, tokenConfig.solQuoteVia),
         'jupiter-api',
-        `Jupiter quote for ${symbol}`
+        `Jupiter quote for ${symbol}`,
+        undefined, // retryPolicy
+        {
+          failureThreshold: 10,  // More tolerant: 10 failures instead of 5
+          timeout: 60000,         // Longer wait: 60s instead of 30s before retry
+          failureWindow: 120000  // Longer window: 2min instead of 1min
+        }
       );
 
       if (!quote) {

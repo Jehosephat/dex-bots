@@ -149,9 +149,13 @@ export class BalanceChecker {
       // - GALA on GalaChain (to buy tokens)
       // - Token inventory on Solana (to sell tokens)
       
+      // Fetch Solana balances once and reuse for both forward and reverse checks
+      // This prevents issues where the second RPC call fails and returns 0 balances
+      const solanaBalanceMap = await this.fetchSolanaBalanceMap(recommendations);
+      
       // Check all token balances on both chains
       await this.checkGalaChainBalances(enabledTokens, insufficientFunds, recommendations, gcProvider, checkedBalances.galaChain, 'forward');
-      await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'forward');
+      await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'forward', solanaBalanceMap);
       
       // Also check reverse-specific balances
       const tradingConfig = this.configService!.getTradingConfig();
@@ -159,7 +163,7 @@ export class BalanceChecker {
       if (enableReverse) {
         // Check reverse balances (GALA on GC for buying, tokens on SOL for selling)
         await this.checkGalaChainBalances(enabledTokens, insufficientFunds, recommendations, gcProvider, checkedBalances.galaChain, 'reverse');
-        await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'reverse');
+        await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'reverse', solanaBalanceMap);
       }
       
       // Determine if we can trade
@@ -574,23 +578,17 @@ export class BalanceChecker {
   }
 
   /**
-   * Check Solana balances
+   * Fetch Solana balance map (SOL + SPL tokens)
+   * This is called once and reused for both forward and reverse checks to avoid duplicate RPC calls
    */
-  private async checkSolanaBalances(
-    enabledTokens: any[],
-    insufficientFunds: InsufficientFund[],
-    recommendations: string[],
-    priceProvider?: SolanaPriceProvider | null,
-    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>,
-    direction: ArbitrageDirection = 'forward'
-  ): Promise<void> {
-    const config = this.configService!.getConfig();
+  private async fetchSolanaBalanceMap(recommendations: string[]): Promise<Map<string, BigNumber>> {
+    const balanceMap = new Map<string, BigNumber>();
     
     try {
       const wallet = process.env.SOLANA_WALLET_ADDRESS;
       if (!wallet) {
         recommendations.push('SOLANA_WALLET_ADDRESS not set');
-        return;
+        return balanceMap;
       }
 
       // Use dedicated balance RPC if available, otherwise fall back to main RPC
@@ -621,9 +619,6 @@ export class BalanceChecker {
       }
       
       const solBalance = new BigNumber(lamports).dividedBy(1_000_000_000);
-      
-      // Create balance map
-      const balanceMap = new Map<string, BigNumber>();
       
       // Add SOL to map (native SOL balance from getBalance - works on Chainstack)
       balanceMap.set('SOL', solBalance);
@@ -663,7 +658,36 @@ export class BalanceChecker {
         recommendations.push(`SPL token balance fetch failed (non-SOL tokens like USDC - may require premium RPC tier). Native SOL balance is unaffected: ${errorMsg}`);
         // Continue without SPL token balances - SOL balance is what matters for balance checks
       }
+    } catch (error) {
+      logger.error('Failed to fetch Solana balances', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      recommendations.push('Failed to fetch Solana balances');
+    }
+    
+    return balanceMap;
+  }
 
+  /**
+   * Check Solana balances
+   */
+  private async checkSolanaBalances(
+    enabledTokens: any[],
+    insufficientFunds: InsufficientFund[],
+    recommendations: string[],
+    priceProvider?: SolanaPriceProvider | null,
+    checkedBalances?: Array<{ token: string; current: BigNumber; required: BigNumber; purpose: string; sufficient: boolean; usdValue?: number }>,
+    direction: ArbitrageDirection = 'forward',
+    balanceMap?: Map<string, BigNumber>
+  ): Promise<void> {
+    const config = this.configService!.getConfig();
+    
+    // If balanceMap not provided, fetch it (for backward compatibility)
+    if (!balanceMap) {
+      balanceMap = await this.fetchSolanaBalanceMap(recommendations);
+    }
+
+    try {
       // Get tokens to skip from config
       const skipTokensSolana = (config as any).balanceChecking?.skipTokens || [];
       
@@ -883,6 +907,7 @@ export class BalanceChecker {
       }
       
       // ALWAYS check SOL balance on Solana (for visibility)
+      const solBalance = balanceMap.get('SOL') || new BigNumber(0);
       const solSufficient = solBalance.isGreaterThanOrEqualTo(minSolRequired);
       
       // Track this check (always, for visibility)
