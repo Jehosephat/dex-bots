@@ -55,18 +55,50 @@
       "hash": "1a4c72c3d93034dff105227bdd86b8964afbb83bdfd801e7dbe44e4304eef397",
       "timestamp": 1763414851135,
       "status": "pending"
+    },
+    {
+      "token": "UFD",
+      "amount": "2000.0000005",
+      "direction": "galaChain->solana",
+      "hash": "d1967b18d3a8a1f1f09c302efe57e15e50b6c6562e4d693bb0e32e2625c1cdde",
+      "timestamp": 1763477965873,
+      "status": "pending"
+    },
+    {
+      "token": "MEW",
+      "amount": "5999.999995",
+      "direction": "solana->galaChain",
+      "hash": "4GazcmvvF2wkw7vpb8feWmqFGtueQdDanmUQPgpakxZgMvDhtKWzUpcaQy4GC25jGm38prhMNLsVXQCSDmGNCFWN",
+      "timestamp": 1763478047530,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "897",
+      "direction": "galaChain->solana",
+      "hash": "44bb906d8fa2e9b0319a19f5847fecbc4d26bf5e1557bd78610a2b500e888e75",
+      "timestamp": 1763478148838,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "3084.6158785",
+      "direction": "solana->galaChain",
+      "hash": "2Hg7deUb9PDk4C5qEX2A1Vy1ugxBbeMZuEM4iHNk1M7roJzmsEa54FYacJrDfNEBxGvzJBTcSzVNNmctp2GzQVfw",
+      "timestamp": 1763480037557,
+      "status": "pending"
     }
   ],
   "lastBridgeTime": {
     "SOL": 1763317141395,
-    "MEW": 1763405909592,
-    "USDUC": 1763408147788,
-    "UFD": 1763414851135
+    "MEW": 1763478047530,
+    "USDUC": 1763480037557,
+    "UFD": 1763477965873
   },
   "dailyBridgeCount": {
+    "UFD": 1,
     "MEW": 1,
-    "USDUC": 2,
-    "UFD": 1
+    "USDUC": 2
   },
-  "lastResetDate": "2025-11-17"
+  "lastResetDate": "2025-11-18"
 }

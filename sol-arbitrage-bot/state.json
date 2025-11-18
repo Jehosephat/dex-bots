@@ -9,102 +9,109 @@
           "balance": "0.04496811",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763473326883
+          "lastUpdated": 1763481877809
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "GMEW|Unit|none|none",
-          "rawBalance": "6521.04432",
-          "balance": "6521.04432",
+          "rawBalance": "3521.04431",
+          "balance": "3521.04431",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763473326883
+          "lastUpdated": 1763481877809
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "GUSDUC|Unit|none|none",
-          "rawBalance": "1164.257532",
-          "balance": "1164.257532",
+          "rawBalance": "4376.641653",
+          "balance": "4376.641653",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763473326883
+          "lastUpdated": 1763481877809
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "GUFD|Unit|none|none",
-          "rawBalance": "3564.882762",
-          "balance": "3564.882762",
+          "rawBalance": "1508.461267",
+          "balance": "1508.461267",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763473326883
+          "lastUpdated": 1763481877809
         },
         "GALA": {
           "symbol": "GALA",
           "mint": "GALA|Unit|none|none",
-          "rawBalance": "121713.69908547",
-          "balance": "121713.69908547",
+          "rawBalance": "105482.40809591",
+          "balance": "105482.40809591",
           "decimals": 8,
           "valueUsd": "0",
-          "lastUpdated": 1763473326883
+          "lastUpdated": 1763481877809
         }
       },
       "native": "0",
       "totalValueUsd": "0",
-      "lastUpdated": 1763473326883
+      "lastUpdated": 1763481877809
     },
     "solana": {
       "tokens": {
         "SOL": {
           "symbol": "SOL",
           "mint": "So11111111111111111111111111111111111111112",
-          "rawBalance": "118658669",
-          "balance": "0.118658669",
+          "rawBalance": "118264355",
+          "balance": "0.118264355",
           "decimals": 9,
           "valueUsd": "0",
-          "lastUpdated": 1763473326992
+          "lastUpdated": 1763481877905
         },
         "MEW": {
           "symbol": "MEW",
           "mint": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
-          "rawBalance": "652104431",
-          "balance": "6521.04431",
+          "rawBalance": "952104432",
+          "balance": "9521.04432",
           "decimals": 5,
           "valueUsd": "0",
-          "lastUpdated": 1763473326992
+          "lastUpdated": 1763481877905
         },
         "USDUC": {
           "symbol": "USDUC",
           "mint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
-          "rawBalance": "1764257532",
-          "balance": "1764.257532",
+          "rawBalance": "4376641654",
+          "balance": "4376.641654",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763473326992
+          "lastUpdated": 1763481877905
         },
         "UFD": {
           "symbol": "UFD",
           "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-          "rawBalance": "1564882761",
-          "balance": "1564.882761",
+          "rawBalance": "5764882761",
+          "balance": "5764.882761",
           "decimals": 6,
           "valueUsd": "0",
-          "lastUpdated": 1763473326992
+          "lastUpdated": 1763481877905
         }
       },
-      "native": "0.118658669",
+      "native": "0.118264355",
       "totalValueUsd": "0",
-      "lastUpdated": 1763473326992
+      "lastUpdated": 1763481877905
     },
-    "lastUpdated": 1763473326992,
-    "version": 3319
+    "lastUpdated": 1763481877905,
+    "version": 3487
   },
   "pendingBridges": [],
   "recentTrades": [],
-  "tokenCooldowns": {},
+  "tokenCooldowns": {
+    "UFD": {
+      "isInCooldown": true,
+      "cooldownEndsAt": 1763481956446,
+      "remainingSeconds": 60,
+      "reason": "Trade executed successfully"
+    }
+  },
   "dailyTradeCounts": {},
   "lastBridgeTimes": {},
   "status": "stopped",
   "lastHeartbeat": 1763312607144,
-  "version": 48,
-  "lastSaved": 1763473344501
+  "version": 53,
+  "lastSaved": 1763481902734
 }

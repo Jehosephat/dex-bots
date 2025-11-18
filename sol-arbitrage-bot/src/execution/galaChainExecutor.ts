@@ -253,6 +253,14 @@ export class GalaChainExecutor {
       const exactGalaCost = new BigNumber(q.inTokenAmount.toString());
       const maxGalaCost = exactGalaCost.multipliedBy(1 + this.maxSlippageBps / 10000); // Allow slippage on cost
 
+      // Apply precision buffer to exactOut to account for rounding/precision issues
+      // The UI uses ~0.5% slippage tolerance (e.g., -999.999999 for -1000)
+      // We'll apply a small buffer (0.5% or minimum 0.000001) to prevent slippage failures
+      const precisionBufferBps = Math.max(this.maxSlippageBps, 50); // At least 0.5% buffer
+      const exactOutWithBuffer = new BigNumber(tradeSize)
+        .multipliedBy(1 - precisionBufferBps / 10000)
+        .decimalPlaces(9, BigNumber.ROUND_DOWN); // Round down to be conservative
+
       // Update params (for reverse, expectedProceedsGala is actually the cost)
       params.expectedProceedsGala = exactGalaCost;
       params.minProceedsGala = maxGalaCost; // Max cost with slippage
@@ -261,19 +269,22 @@ export class GalaChainExecutor {
       logger.execution('📊 Exact output quote received', {
         symbol,
         exactTokensToReceive: tradeSize,
+        exactOutWithBuffer: exactOutWithBuffer.toString(),
         exactGalaCost: exactGalaCost.toString(),
         maxGalaCost: maxGalaCost.toString(),
         feeTier: q.feeTier,
-        pricePerToken: exactGalaCost.div(tradeSize).toString()
+        pricePerToken: exactGalaCost.div(tradeSize).toString(),
+        precisionBufferBps
       });
 
-      // Execute EXACT OUTPUT swap: receive exactly tradeSize tokens, spend up to maxGalaCost GALA
+      // Execute EXACT OUTPUT swap: receive at least exactOutWithBuffer tokens (with precision buffer),
+      // spend up to maxGalaCost GALA
       const result = await this.gswap.swaps.swap(
         tokenIn,
         tokenOut,
         q.feeTier,
         {
-          exactOut: tradeSize, // We want EXACTLY this many tokens
+          exactOut: exactOutWithBuffer.toNumber(), // Apply precision buffer to prevent slippage failures
           amountInMaximum: maxGalaCost.toNumber() // Max GALA we're willing to spend
         },
         wallet
@@ -282,15 +293,42 @@ export class GalaChainExecutor {
       logger.execution('✅ GalaChain exact output buy executed (REVERSE)', {
         symbol,
         transactionId: result.transactionId,
-        exactTokensReceived: tradeSize,
+        exactTokensRequested: tradeSize,
+        exactOutWithBuffer: exactOutWithBuffer.toString(),
         expectedGalaCost: exactGalaCost.toString(),
         maxGalaCost: maxGalaCost.toString()
       });
       return { success: true, params, txHash: result.transactionId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error('❌ GalaChain exact output buy execution failed (REVERSE)', { symbol, error: message });
-      return { success: false, params, error: message };
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      logger.error('❌ GalaChain exact output buy execution failed (REVERSE)', {
+        symbol,
+        tradeSize,
+        error: errorMessage
+      });
+      
+      // Log specific slippage errors with more context
+      if (errorMessage.includes('Slippage') || errorMessage.includes('slippage')) {
+        const slippageDetails: any = {
+          symbol,
+          tradeSize,
+          errorMessage,
+          recommendation: 'Consider increasing maxSlippageBps or checking pool liquidity'
+        };
+        
+        // Add execution parameters if they were set
+        if (params.expectedProceedsGala && !params.expectedProceedsGala.isZero()) {
+          slippageDetails.expectedGalaCost = params.expectedProceedsGala.toString();
+        }
+        if (params.minProceedsGala && !params.minProceedsGala.isZero()) {
+          slippageDetails.maxGalaCost = params.minProceedsGala.toString();
+        }
+        
+        logger.error('⚠️ SLIPPAGE ERROR DETECTED (REVERSE)', slippageDetails);
+      }
+      
+      return { success: false, params, error: errorMessage };
     }
   }
 }
