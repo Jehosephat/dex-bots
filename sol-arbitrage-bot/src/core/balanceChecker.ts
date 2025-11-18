@@ -57,6 +57,40 @@ export class BalanceChecker {
     return this.lastBalanceCheckResult;
   }
 
+  /**
+   * Check if a specific token can trade based on the last balance check
+   * Returns true if the token has sufficient funds for trading
+   */
+  canTokenTrade(tokenSymbol: string): boolean {
+    if (!this.lastBalanceCheckResult) {
+      return true; // If no balance check yet, assume we can trade
+    }
+
+    // Check if this token appears in the insufficient funds list
+    const tokenInsufficient = this.lastBalanceCheckResult.insufficientFunds.some(
+      f => f.token === tokenSymbol
+    );
+
+    return !tokenInsufficient;
+  }
+
+  /**
+   * Get list of tokens that are paused due to insufficient funds
+   */
+  getPausedTokens(): string[] {
+    if (!this.lastBalanceCheckResult) {
+      return [];
+    }
+
+    // Get unique token symbols from insufficient funds
+    const pausedTokens = new Set<string>();
+    this.lastBalanceCheckResult.insufficientFunds.forEach(f => {
+      pausedTokens.add(f.token);
+    });
+
+    return Array.from(pausedTokens);
+  }
+
   constructor(stateManager?: StateManager, private configService?: IConfigService) {
     this.stateManager = stateManager || new StateManager();
     // Use provided config service or create default one
@@ -166,25 +200,36 @@ export class BalanceChecker {
         await this.checkSolanaBalances(enabledTokens, insufficientFunds, recommendations, solProvider, checkedBalances.solana, 'reverse', solanaBalanceMap);
       }
       
-      // Determine if we can trade
+      // Determine if we can trade (at least one token can trade)
       const canTrade = insufficientFunds.length === 0;
       
+      // Track which tokens are paused
+      const pausedTokens = new Set<string>();
+      insufficientFunds.forEach(f => pausedTokens.add(f.token));
+      
       if (!canTrade) {
-        this.isPaused = true;
-        this.pauseReason = insufficientFunds.map(f => `${f.chain}: ${f.token} (${f.purpose})`).join(', ');
-        logger.error(`\n⛔ TRADING PAUSED: Insufficient funds`);
+        // Log which tokens are paused (per-token pausing)
+        logger.warn(`\n⚠️ Some tokens paused due to insufficient funds:`);
         insufficientFunds.forEach(f => {
-          logger.error(`   ${f.chain === 'galaChain' ? '🔷' : '🔸'} ${f.chain.toUpperCase()}: ${f.token}`);
-          logger.error(`      Current: ${f.currentBalance.toFixed(8)}`);
-          logger.error(`      Required: ${f.requiredBalance.toFixed(8)}`);
-          logger.error(`      Purpose: ${f.purpose === 'sell' ? 'SELL (inventory)' : f.purpose === 'buy' ? 'BUY (quote currency)' : 'QUOTE'}`);
+          logger.warn(`   ${f.chain === 'galaChain' ? '🔷' : '🔸'} ${f.chain.toUpperCase()}: ${f.token}`);
+          logger.warn(`      Current: ${f.currentBalance.toFixed(8)}`);
+          logger.warn(`      Required: ${f.requiredBalance.toFixed(8)}`);
+          logger.warn(`      Purpose: ${f.purpose === 'sell' ? 'SELL (inventory)' : f.purpose === 'buy' ? 'BUY (quote currency)' : 'QUOTE'}`);
         });
         
-        // Send alert
+        // Log which tokens can still trade
+        const enabledTokenSymbols = enabledTokens.map(t => t.symbol);
+        const canTradeTokens = enabledTokenSymbols.filter(symbol => !pausedTokens.has(symbol));
+        if (canTradeTokens.length > 0) {
+          logger.info(`   ✅ Tokens that can still trade: ${canTradeTokens.join(', ')}`);
+        }
+        
+        // Send alert (but don't pause all trading)
         await sendAlert(
-          'Trading Paused: Insufficient Funds',
+          'Some Tokens Paused: Insufficient Funds',
           {
-            reason: this.pauseReason,
+            pausedTokens: Array.from(pausedTokens),
+            canTradeTokens,
             details: insufficientFunds.map(f => ({
               chain: f.chain,
               token: f.token,
@@ -193,16 +238,20 @@ export class BalanceChecker {
               purpose: f.purpose
             }))
           },
-          'error'
+          'warn'
         ).catch(() => {});
       } else {
-        // If we previously paused but now have funds, resume
+        // If we previously had paused tokens but now all have funds, log resume
         if (this.isPaused) {
-          logger.info(`\n✅ Trading RESUMED: Sufficient funds available`);
+          logger.info(`\n✅ All tokens resumed: Sufficient funds available`);
           this.isPaused = false;
           this.pauseReason = '';
         }
       }
+      
+      // Update global pause state (for backward compatibility, but we now do per-token)
+      this.isPaused = !canTrade;
+      this.pauseReason = insufficientFunds.map(f => `${f.chain}: ${f.token} (${f.purpose})`).join(', ');
 
       // Calculate USD values for all balances
       let totalUsdValue: { galaChain: number; solana: number; total: number } | undefined;

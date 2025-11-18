@@ -90,6 +90,13 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
   // Process each enabled token
   for (const token of enabled) {
     try {
+      // Check if this specific token can trade (per-token balance check)
+      if (!balanceChecker.canTokenTrade(token.symbol)) {
+        const pausedTokens = balanceChecker.getPausedTokens();
+        logger.warn(`⏸️ Skipping ${token.symbol}: Insufficient funds (paused tokens: ${pausedTokens.join(', ')})`);
+        continue;
+      }
+
       // Evaluate token
       const evaluation = await tokenEvaluator.evaluateToken(token);
       
@@ -112,12 +119,8 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
           // Set cooldown
           await setCooldown(stateManager, token.symbol, executionResult);
           
-          // Check balances after successful trade
-          const shouldStop = await checkBalancesAfterTrade(balanceChecker);
-          if (shouldStop) {
-            logger.info(`\n🛑 Stopping main cycle due to insufficient funds`);
-            return anyExecuted;
-          }
+          // Check balances after successful trade (but don't stop - just update per-token status)
+          await checkBalancesAfterTrade(balanceChecker, config);
         }
       }
 
@@ -222,19 +225,33 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
     });
   }
   
+  // Log balance status (but don't stop the cycle - we'll skip individual tokens)
   if (!initialBalanceCheck.canTrade) {
-    logger.error(`\n⛔ TRADING PAUSED: Insufficient funds detected at cycle start`);
+    const pausedTokens = balanceChecker.getPausedTokens();
+    logger.warn(`\n⚠️ Some tokens have insufficient funds at cycle start`);
+    logger.warn(`   Paused tokens: ${pausedTokens.join(', ')}`);
     
     if (initialBalanceCheck.recommendations.length > 0) {
       logger.warn(`   Recommendations:`);
       initialBalanceCheck.recommendations.forEach(r => logger.warn(`   - ${r}`));
     }
     
-    logger.error(`\n🛑 Stopping cycle - waiting for balance replenishment`);
-    logger.error(`   Run 'npm run balances' to check current balances`);
-    return false;
+    // Log which tokens can still trade
+    const enabledTokens = config.getEnabledTokens();
+    const canTradeTokens = enabledTokens
+      .map(t => t.symbol)
+      .filter(symbol => !pausedTokens.includes(symbol));
+    
+    if (canTradeTokens.length > 0) {
+      logger.info(`   ✅ Tokens that can still trade: ${canTradeTokens.join(', ')}`);
+      logger.info(`   Continuing cycle for tokens with sufficient funds...`);
+    } else {
+      logger.error(`\n🛑 All tokens paused - stopping cycle`);
+      logger.error(`   Run 'npm run balances' to check current balances`);
+      return false;
+    }
   } else {
-    logger.info(`✅ Balance check passed: Sufficient funds available`);
+    logger.info(`✅ Balance check passed: All tokens have sufficient funds`);
     
     if (balanceChecker.isTradingPaused()) {
       logger.info(`✅ Trading resumed: Funds replenished`);
@@ -272,25 +289,36 @@ async function setCooldown(stateManager: any, tokenSymbol: string, executionResu
 
 /**
  * Check balances after successful trade
+ * Updates per-token pause status but doesn't stop the cycle
  */
-async function checkBalancesAfterTrade(balanceChecker: BalanceChecker): Promise<boolean> {
+async function checkBalancesAfterTrade(balanceChecker: BalanceChecker, configService: IConfigService): Promise<void> {
   try {
     logger.info(`\n🔍 Checking balances after trade...`);
     const balanceCheck = await balanceChecker.checkBalances();
     
     if (!balanceCheck.canTrade) {
-      logger.error(`\n⛔ TRADING PAUSED: Insufficient funds detected`);
-      logger.error(`   Reason: ${balanceCheck.insufficientFunds.map(f => `${f.chain} ${f.token}`).join(', ')}`);
-      return true; // Signal to stop processing
+      const pausedTokens = balanceChecker.getPausedTokens();
+      logger.warn(`⚠️ Some tokens now have insufficient funds`);
+      logger.warn(`   Paused tokens: ${pausedTokens.join(', ')}`);
+      
+      // Log which tokens can still trade
+      const enabledTokens = configService.getEnabledTokens();
+      const canTradeTokens = enabledTokens
+        .map(t => t.symbol)
+        .filter(symbol => !pausedTokens.includes(symbol));
+      
+      if (canTradeTokens.length > 0) {
+        logger.info(`   ✅ Tokens that can still trade: ${canTradeTokens.join(', ')}`);
+      } else {
+        logger.error(`   🛑 All tokens paused - will stop after current cycle`);
+      }
     } else {
-      logger.info(`✅ Balance check passed: Sufficient funds available`);
-      return false;
+      logger.info(`✅ Balance check passed: All tokens have sufficient funds`);
     }
   } catch (balanceError) {
     logger.warn(`⚠️ Balance check failed, continuing with caution`, {
       error: balanceError instanceof Error ? balanceError.message : String(balanceError)
     });
-    return false;
   }
 }
 
