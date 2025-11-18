@@ -61,6 +61,7 @@ export const tokenConfigSchema = z.object({
   enabled: z.boolean(),
   gcQuoteVia: z.string().min(1).default('GALA'),
   solQuoteVia: z.string().min(1).default('SOL'),
+  inventoryTarget: positiveNumberSchema.optional(), // Total amount of tokens desired across both chains
 }).transform((data) => ({
   ...data,
   gcQuoteVia: data.gcQuoteVia || 'GALA',

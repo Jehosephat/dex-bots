@@ -26,6 +26,7 @@
             <th>Symbol</th>
             <th>Enabled</th>
             <th>Trade Size</th>
+            <th>Inventory Target</th>
             <th>Decimals</th>
             <th>GalaChain Mint</th>
             <th>Solana Mint</th>
@@ -48,6 +49,7 @@
               />
             </td>
             <td>{{ token.tradeSize }}</td>
+            <td>{{ token.inventoryTarget || '-' }}</td>
             <td>{{ token.decimals }}</td>
             <td class="mint-address">{{ truncate(token.galaChainMint) }}</td>
             <td class="mint-address">{{ truncate(token.solanaMint) }}</td>
@@ -100,17 +102,30 @@
                 required
                 placeholder="1500"
               />
+              <small>Amount to trade per execution</small>
             </div>
 
             <div class="form-group">
-              <label>Decimals *</label>
+              <label>Inventory Target</label>
               <input 
-                v-model.number="formData.decimals" 
+                v-model.number="formData.inventoryTarget" 
                 type="number" 
-                required
-                placeholder="5"
+                step="0.01"
+                min="0"
+                placeholder="Optional"
               />
+              <small>Total tokens desired across both chains</small>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label>Decimals *</label>
+            <input 
+              v-model.number="formData.decimals" 
+              type="number" 
+              required
+              placeholder="5"
+            />
           </div>
 
           <div class="form-group">
@@ -194,7 +209,8 @@ const formData = ref<Partial<TokenConfig>>({
   solanaMint: '',
   solanaSymbol: '',
   gcQuoteVia: '',
-  solQuoteVia: ''
+  solQuoteVia: '',
+  inventoryTarget: undefined
 })
 
 const truncate = (str: string, length: number = 20) => {
@@ -252,7 +268,8 @@ const closeModal = () => {
     solanaMint: '',
     solanaSymbol: '',
     gcQuoteVia: '',
-    solQuoteVia: ''
+    solQuoteVia: '',
+    inventoryTarget: undefined
   }
 }
 
@@ -461,6 +478,13 @@ tr.quote-token {
 
 .form-group input[type="checkbox"] {
   margin-right: 0.5rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #7f8c8d;
 }
 
 .form-actions {

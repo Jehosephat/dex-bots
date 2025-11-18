@@ -58,7 +58,7 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
   await solProvider.initialize();
 
   // Check balances before starting (especially for live mode)
-  let balanceCheckResult = await checkInitialBalances(balanceChecker);
+  let balanceCheckResult = await checkInitialBalances(balanceChecker, config);
   
   // Check for auto-bridging opportunities BEFORE checking if we should pause
   // This allows bridging to fix imbalances even when trading would otherwise be paused
@@ -72,7 +72,7 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
     // Only re-check if trading was paused, to avoid unnecessary API calls
     if (!balanceCheckResult && runMode === 'live') {
       logger.info(`\n🔍 Re-checking balances after auto-bridging attempt...`);
-      const recheckResult = await checkInitialBalances(balanceChecker);
+      const recheckResult = await checkInitialBalances(balanceChecker, config);
       if (recheckResult) {
         logger.info(`✅ Trading can proceed after auto-bridging`);
         balanceCheckResult = true; // Update result so trading can continue
@@ -145,7 +145,7 @@ export async function runMainCycle(runMode: 'live' | 'dry_run' = 'dry_run', conf
 /**
  * Check initial balances before starting cycle
  */
-async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boolean> {
+async function checkInitialBalances(balanceChecker: BalanceChecker, config: IConfigService): Promise<boolean> {
   logger.info(`\n🔍 Running initial balance check before cycle...`);
   const initialBalanceCheck = await balanceChecker.checkBalances(true, true);
 
@@ -239,8 +239,8 @@ async function checkInitialBalances(balanceChecker: BalanceChecker): Promise<boo
     // Log which tokens can still trade
     const enabledTokens = config.getEnabledTokens();
     const canTradeTokens = enabledTokens
-      .map(t => t.symbol)
-      .filter(symbol => !pausedTokens.includes(symbol));
+      .map((t: { symbol: string }) => t.symbol)
+      .filter((symbol: string) => !pausedTokens.includes(symbol));
     
     if (canTradeTokens.length > 0) {
       logger.info(`   ✅ Tokens that can still trade: ${canTradeTokens.join(', ')}`);

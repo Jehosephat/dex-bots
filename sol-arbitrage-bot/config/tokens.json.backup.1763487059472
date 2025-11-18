@@ -97,8 +97,7 @@
       "solanaMint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
       "solanaSymbol": "UFD",
       "gcQuoteVia": "GALA",
-      "solQuoteVia": "GALA",
-      "inventoryTarget": 10000
+      "solQuoteVia": "GALA"
     }
   },
   "quoteTokens": {

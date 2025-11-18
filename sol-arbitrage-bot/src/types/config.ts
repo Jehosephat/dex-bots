@@ -14,6 +14,7 @@ export interface TokenConfig {
   enabled: boolean;
   gcQuoteVia: string;
   solQuoteVia: string;
+  inventoryTarget?: number; // Total amount of tokens desired across both chains (optional)
 }
 
 export interface QuoteTokenConfig {

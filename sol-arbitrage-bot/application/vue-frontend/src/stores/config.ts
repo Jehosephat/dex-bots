@@ -15,6 +15,7 @@ export interface TokenConfig {
   minBalanceGc?: number
   minBalanceSol?: number
   cooldownMinutes?: number
+  inventoryTarget?: number // Total amount of tokens desired across both chains
 }
 
 export interface BridgingConfig {
