@@ -45,6 +45,20 @@ export interface InventoryConfig {
   skipTokens: string[];
 }
 
+export interface TradingConfig {
+  minEdgeBps: number;
+  maxSlippageBps: number;
+  riskBufferBps: number;
+  maxPriceImpactBps: number;
+  cooldownMinutes: number;
+  maxDailyTrades: number;
+  enableReverseArbitrage?: boolean;
+  reverseArbitrageMinEdgeBps?: number;
+  arbitrageDirection?: 'forward' | 'reverse' | 'best';
+  dynamicSlippageMaxMultiplier?: number;
+  dynamicSlippageEdgeRatio?: number;
+}
+
 export class ConfigService {
   private botRoot: string;
   private configPath: string;
@@ -247,6 +261,38 @@ export class ConfigService {
     config.balanceChecking = {
       ...(config.balanceChecking || {}),
       ...inventoryConfig
+    };
+    await this.writeConfig(config);
+  }
+
+  /**
+   * Get trading config from main config
+   */
+  async getTradingConfig(): Promise<TradingConfig> {
+    const config = await this.readConfig();
+    return config.trading || {
+      minEdgeBps: 30,
+      maxSlippageBps: 50,
+      riskBufferBps: 10,
+      maxPriceImpactBps: 250,
+      cooldownMinutes: 5,
+      maxDailyTrades: 100,
+      enableReverseArbitrage: true,
+      reverseArbitrageMinEdgeBps: 30,
+      arbitrageDirection: 'best',
+      dynamicSlippageMaxMultiplier: 2.0,
+      dynamicSlippageEdgeRatio: 0.75
+    };
+  }
+
+  /**
+   * Update trading config in main config
+   */
+  async updateTradingConfig(tradingConfig: Partial<TradingConfig>): Promise<void> {
+    const config = await this.readConfig();
+    config.trading = {
+      ...(config.trading || {}),
+      ...tradingConfig
     };
     await this.writeConfig(config);
   }

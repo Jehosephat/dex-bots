@@ -121,7 +121,8 @@ export class DualLegCoordinator {
     symbol: string, 
     direction: ArbitrageDirection = 'forward',
     gcQuote?: GalaChainQuote,
-    solQuote?: SolanaQuote
+    solQuote?: SolanaQuote,
+    edgeBps?: number
   ): Promise<{ gc: GalaChainExecutionResult; sol: SolanaExecutionResult }> {
     // Validate direction parameter
     if (direction !== 'forward' && direction !== 'reverse') {
@@ -240,10 +241,10 @@ export class DualLegCoordinator {
         () => {
           if (direction === 'reverse') {
             // Reverse: SELL on Solana
-            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, finalSolQuote);
+            return this.solExecutor!.executeSellFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
           } else {
             // Forward: BUY on Solana
-            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalSolQuote);
+            return this.solExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalSolQuote, edgeBps);
           }
         },
         'solana-executor',
@@ -303,10 +304,10 @@ export class DualLegCoordinator {
         () => {
           if (direction === 'reverse') {
             // Reverse: BUY on GalaChain
-            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, finalGcQuote);
+            return this.gcExecutor!.executeBuyFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
           } else {
             // Forward: SELL on GalaChain
-            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalGcQuote);
+            return this.gcExecutor!.executeFromQuoteLive(symbol, token.tradeSize, finalGcQuote, edgeBps);
           }
         },
         'galachain-executor',

@@ -25,6 +25,8 @@ export interface SolanaExecutionResult {
 
 export class SolanaExecutor {
   private readonly maxSlippageBps: number;
+  private readonly dynamicSlippageMaxMultiplier: number;
+  private readonly dynamicSlippageEdgeRatio: number;
   private readonly defaultDeadlineSeconds = 60;
   private readonly jupiterApiBases = [
     process.env.JUPITER_API_BASE || 'https://lite-api.jup.ag/swap/v1'
@@ -35,6 +37,31 @@ export class SolanaExecutor {
   constructor() {
     const trading = getTradingConfig();
     this.maxSlippageBps = trading.maxSlippageBps;
+    this.dynamicSlippageMaxMultiplier = trading.dynamicSlippageMaxMultiplier ?? 2.0;
+    this.dynamicSlippageEdgeRatio = trading.dynamicSlippageEdgeRatio ?? 0.75;
+  }
+
+  /**
+   * Calculate dynamic slippage tolerance based on expected edge
+   * Formula: min(maxSlippageBps * multiplier, edgeBps * edgeRatio) with floor of maxSlippageBps
+   * This allows higher slippage tolerance for trades with larger edges
+   */
+  private calculateDynamicSlippageBps(edgeBps?: number): number {
+    if (!edgeBps || edgeBps <= 0) {
+      return this.maxSlippageBps; // Use base slippage if no edge info
+    }
+
+    // Calculate slippage based on edge: allow up to edgeRatio% of edge as slippage
+    // Cap at multiplier * base slippage tolerance, floor at base slippage tolerance
+    const edgeBasedSlippage = edgeBps * this.dynamicSlippageEdgeRatio;
+    const maxAllowedSlippage = this.maxSlippageBps * this.dynamicSlippageMaxMultiplier;
+    
+    const dynamicSlippage = Math.max(
+      this.maxSlippageBps, // Floor: always at least base slippage
+      Math.min(maxAllowedSlippage, edgeBasedSlippage) // Cap: never more than multiplier * base
+    );
+
+    return Math.round(dynamicSlippage);
   }
 
   /**
@@ -90,19 +117,31 @@ export class SolanaExecutor {
    * Execute a live buy on Solana using Jupiter based on a prior SolanaQuote.
    * Uses ExactOut mode to purchase "tradeSize" amount of the output token.
    */
-  async executeFromQuoteLive(symbol: string, tradeSize: number, quote: SolanaQuote): Promise<SolanaExecutionResult> {
+  async executeFromQuoteLive(symbol: string, tradeSize: number, quote: SolanaQuote, edgeBps?: number): Promise<SolanaExecutionResult> {
     // Ensure config is initialized in case caller didn't
     try { initializeConfig(); } catch {}
 
+    // Calculate dynamic slippage based on expected edge
+    const slippageBps = this.calculateDynamicSlippageBps(edgeBps);
+    
     const params: SolanaExecutionParams = {
       symbol,
       tradeSize,
       quoteCurrency: quote.currency,
       expectedCostInQuote: quote.price.multipliedBy(tradeSize),
-      maxCostInQuote: quote.price.multipliedBy(tradeSize).multipliedBy(new BigNumber(1).plus(this.maxSlippageBps / 10000)),
+      maxCostInQuote: quote.price.multipliedBy(tradeSize).multipliedBy(new BigNumber(1).plus(slippageBps / 10000)),
       route: quote.jupiterRoute,
       deadlineMs: Date.now() + this.defaultDeadlineSeconds * 1000
     };
+    
+    logger.execution('📊 Dynamic slippage calculation (Solana BUY)', {
+      symbol,
+      baseSlippageBps: this.maxSlippageBps,
+      edgeBps: edgeBps || 'N/A',
+      dynamicSlippageBps: slippageBps,
+      expectedCost: params.expectedCostInQuote.toString(),
+      maxCost: params.maxCostInQuote.toString()
+    });
 
     try {
       // Setup connection and wallet
@@ -141,7 +180,7 @@ export class SolanaExecutor {
               inputMint,
               outputMint,
               amount: outAmountRaw,
-              slippageBps: this.maxSlippageBps,
+              slippageBps: slippageBps,
               swapMode: 'ExactOut'
             },
             timeout: 15000
@@ -201,8 +240,12 @@ export class SolanaExecutor {
   async executeSellFromQuoteLive(
     symbol: string,
     tradeSize: number,
-    quote: SolanaQuote
+    quote: SolanaQuote,
+    edgeBps?: number
   ): Promise<SolanaExecutionResult> {
+    // Calculate dynamic slippage based on expected edge
+    const slippageBps = this.calculateDynamicSlippageBps(edgeBps);
+    
     const params: SolanaExecutionParams = {
       symbol,
       tradeSize,
@@ -212,6 +255,13 @@ export class SolanaExecutor {
       route: quote.jupiterRoute,
       deadlineMs: Date.now() + this.defaultDeadlineSeconds * 1000
     };
+    
+    logger.execution('📊 Dynamic slippage calculation (Solana SELL)', {
+      symbol,
+      baseSlippageBps: this.maxSlippageBps,
+      edgeBps: edgeBps || 'N/A',
+      dynamicSlippageBps: slippageBps
+    });
 
     try {
       // Setup connection and wallet (same as executeFromQuoteLive)
@@ -253,7 +303,7 @@ export class SolanaExecutor {
               inputMint,
               outputMint,
               amount: inAmountRaw,
-              slippageBps: this.maxSlippageBps,
+              slippageBps: slippageBps,
               swapMode: 'ExactIn' // REVERSE: selling exact amount
             },
             timeout: 15000

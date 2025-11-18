@@ -5,7 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { ConfigService, TokenConfig, BridgingConfig, InventoryConfig } from '../services/configService';
+import { ConfigService, TokenConfig, BridgingConfig, InventoryConfig, TradingConfig } from '../services/configService';
 
 const router = Router();
 const configService = new ConfigService();
@@ -192,6 +192,40 @@ router.put('/inventory', async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({
       error: 'Failed to update inventory config',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * GET /api/config/trading
+ * Get trading config
+ */
+router.get('/trading', async (req: Request, res: Response) => {
+  try {
+    const config = await configService.getTradingConfig();
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to read trading config',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * PUT /api/config/trading
+ * Update trading config
+ */
+router.put('/trading', async (req: Request, res: Response) => {
+  try {
+    const updates: Partial<TradingConfig> = req.body;
+    await configService.updateTradingConfig(updates);
+    const updated = await configService.getTradingConfig();
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to update trading config',
       message: error instanceof Error ? error.message : String(error)
     });
   }

@@ -80,6 +80,9 @@ export const tradingConfigSchema = z.object({
   enableReverseArbitrage: z.boolean().optional(),
   reverseArbitrageMinEdgeBps: bpsSchema.optional(),
   arbitrageDirection: z.enum(['forward', 'reverse', 'best']).optional(),
+  // Dynamic slippage configuration
+  dynamicSlippageMaxMultiplier: z.number().positive().default(2.0).optional(), // Max slippage = baseSlippage * this multiplier
+  dynamicSlippageEdgeRatio: z.number().min(0).max(1).default(0.75).optional(), // Percentage of edge to allow as slippage (0-1)
 });
 
 /**

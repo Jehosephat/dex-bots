@@ -115,8 +115,11 @@ export class TradeExecutor {
       priceImpactSolBps: solQuote.priceImpactBps
     };
 
+    // Extract edge BPS for dynamic slippage calculation
+    const edgeBps = edge?.netEdgeBps;
+    
     if (runMode === 'live') {
-      return await this.executeLiveTrade(token, gcQuote, solQuote, tradeDirection, logEntry, tradeLogger, startTime);
+      return await this.executeLiveTrade(token, gcQuote, solQuote, tradeDirection, logEntry, tradeLogger, startTime, edgeBps);
     } else {
       return await this.executeDryRunTrade(token, gcQuote, solQuote, tradeDirection, logEntry, tradeLogger, startTime);
     }
@@ -132,7 +135,8 @@ export class TradeExecutor {
     direction: 'forward' | 'reverse',
     logEntry: any,
     tradeLogger: ReturnType<typeof getTradeLogger>,
-    startTime: number
+    startTime: number,
+    edgeBps?: number
   ): Promise<TradeExecutionResult> {
     try {
       logger.info(`   Mode:     🚀 LIVE TRADING`);
@@ -145,7 +149,8 @@ export class TradeExecutor {
       }
 
       // Pass quotes from evaluation to coordinator (they contain strategy-specific quote currencies)
-      const { gc, sol } = await this.coordinator.executeLive(token.symbol, direction, gcQuote, solQuote);
+      // Also pass edge information for dynamic slippage calculation
+      const { gc, sol } = await this.coordinator.executeLive(token.symbol, direction, gcQuote, solQuote, edgeBps);
       const endTime = Date.now();
       const executionDurationMs = endTime - startTime;
 

@@ -28,6 +28,7 @@
       <TokenConfig v-if="activeTab === 'tokens'" :key="'tokens'" />
       <BridgingConfig v-if="activeTab === 'bridging'" :key="'bridging'" />
       <InventoryConfig v-if="activeTab === 'inventory'" :key="'inventory'" />
+      <TradingConfig v-if="activeTab === 'trading'" :key="'trading'" />
     </div>
   </div>
 </template>
@@ -37,13 +38,15 @@ import { ref } from 'vue'
 import TokenConfig from '../components/config/TokenConfig.vue'
 import BridgingConfig from '../components/config/BridgingConfig.vue'
 import InventoryConfig from '../components/config/InventoryConfig.vue'
+import TradingConfig from '../components/config/TradingConfig.vue'
 
-const activeTab = ref<'tokens' | 'bridging' | 'inventory'>('tokens')
+const activeTab = ref<'tokens' | 'bridging' | 'inventory' | 'trading'>('tokens')
 
 const tabs = [
   { id: 'tokens' as const, label: 'Tokens' },
   { id: 'bridging' as const, label: 'Bridging' },
-  { id: 'inventory' as const, label: 'Inventory' }
+  { id: 'inventory' as const, label: 'Inventory' },
+  { id: 'trading' as const, label: 'Trading' }
 ]
 </script>
 

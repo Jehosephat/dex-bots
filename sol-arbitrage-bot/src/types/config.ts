@@ -32,6 +32,8 @@ export interface TradingConfig {
   enableReverseArbitrage?: boolean; // Enable reverse arbitrage (buy GC, sell SOL)
   reverseArbitrageMinEdgeBps?: number; // Min edge for reverse (defaults to minEdgeBps)
   arbitrageDirection?: 'forward' | 'reverse' | 'best'; // Force direction or choose best
+  dynamicSlippageMaxMultiplier?: number; // Max slippage = baseSlippage * this multiplier (default: 2.0)
+  dynamicSlippageEdgeRatio?: number; // Percentage of edge to allow as slippage, 0-1 (default: 0.75)
 }
 
 export interface BridgingConfig {

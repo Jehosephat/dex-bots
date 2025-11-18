@@ -1,0 +1,69 @@
+{
+  "trading": {
+    "minEdgeBps": 30,
+    "maxSlippageBps": 50,
+    "riskBufferBps": 10,
+    "maxPriceImpactBps": 250,
+    "cooldownMinutes": 5,
+    "maxDailyTrades": 100,
+    "enableReverseArbitrage": true,
+    "reverseArbitrageMinEdgeBps": 30,
+    "arbitrageDirection": "best",
+    "dynamicSlippageMaxMultiplier": 2.0,
+    "dynamicSlippageEdgeRatio": 0.75
+  },
+  "bridging": {
+    "intervalMinutes": 30,
+    "thresholdUsd": 100,
+    "maxRetries": 3,
+    "retryDelayMinutes": 5,
+    "tradesPerBridge": 100,
+    "bridgeCostUsd": 1.25
+  },
+  "monitoring": {
+    "enableAlerts": true,
+    "alertWebhookUrl": "",
+    "inventoryFloorUsd": 50,
+    "bridgeTimeoutMinutes": 60
+  },
+  "balanceChecking": {
+    "minSolForFees": 0.001,
+    "minGalaForReverse": 1000,
+    "balanceCheckCooldownSeconds": 120,
+    "skipTokens": [
+      "FARTCOIN",
+      "TRUMP"
+    ]
+  },
+  "autoBridging": {
+    "enabled": true,
+    "imbalanceThresholdPercent": 85,
+    "targetSplitPercent": 50,
+    "minRebalanceAmount": 0,
+    "checkIntervalMinutes": 60,
+    "cooldownMinutes": 30,
+    "maxBridgesPerDay": 10,
+    "enabledTokens": [
+      "SOL",
+      "MEW",
+      "USDUC",
+      "GALA",
+      "UFD",
+      "GSUSDC",
+      "GSUDST"
+    ],
+    "skipTokens": [
+      "GALA"
+    ]
+  },
+  "networks": {
+    "galaChain": {
+      "rpcUrl": "https://api.galachain.io",
+      "chainId": "galachain"
+    },
+    "solana": {
+      "rpcUrl": "https://api.mainnet-beta.solana.com",
+      "chainId": "solana"
+    }
+  }
+}

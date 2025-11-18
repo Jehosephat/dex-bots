@@ -25,12 +25,39 @@ export interface GalaChainExecutionResult {
 
 export class GalaChainExecutor {
   private readonly maxSlippageBps: number;
+  private readonly dynamicSlippageMaxMultiplier: number;
+  private readonly dynamicSlippageEdgeRatio: number;
   private readonly defaultDeadlineSeconds = 60;
   private gswap?: GSwap;
 
   constructor() {
     const trading = getTradingConfig();
     this.maxSlippageBps = trading.maxSlippageBps;
+    this.dynamicSlippageMaxMultiplier = trading.dynamicSlippageMaxMultiplier ?? 2.0;
+    this.dynamicSlippageEdgeRatio = trading.dynamicSlippageEdgeRatio ?? 0.75;
+  }
+
+  /**
+   * Calculate dynamic slippage tolerance based on expected edge
+   * Formula: min(maxSlippageBps * multiplier, edgeBps * edgeRatio) with floor of maxSlippageBps
+   * This allows higher slippage tolerance for trades with larger edges
+   */
+  private calculateDynamicSlippageBps(edgeBps?: number): number {
+    if (!edgeBps || edgeBps <= 0) {
+      return this.maxSlippageBps; // Use base slippage if no edge info
+    }
+
+    // Calculate slippage based on edge: allow up to edgeRatio% of edge as slippage
+    // Cap at multiplier * base slippage tolerance, floor at base slippage tolerance
+    const edgeBasedSlippage = edgeBps * this.dynamicSlippageEdgeRatio;
+    const maxAllowedSlippage = this.maxSlippageBps * this.dynamicSlippageMaxMultiplier;
+    
+    const dynamicSlippage = Math.max(
+      this.maxSlippageBps, // Floor: always at least base slippage
+      Math.min(maxAllowedSlippage, edgeBasedSlippage) // Cap: never more than multiplier * base
+    );
+
+    return Math.round(dynamicSlippage);
   }
 
   /**
@@ -85,7 +112,7 @@ export class GalaChainExecutor {
   /**
    * Execute a live token→GALA sell using the GSwap SDK.
    */
-  async executeFromQuoteLive(symbol: string, tradeSize: number, _quote?: GalaChainQuote): Promise<GalaChainExecutionResult> {
+  async executeFromQuoteLive(symbol: string, tradeSize: number, _quote?: GalaChainQuote, edgeBps?: number): Promise<GalaChainExecutionResult> {
     const tokenCfg = getTokenConfig(symbol);
     const params: GalaChainExecutionParams = {
       symbol,
@@ -150,7 +177,19 @@ export class GalaChainExecutor {
       });
       
       const expectedProceedsGala = new BigNumber(q.outTokenAmount.toString());
-      const minProceedsGala = expectedProceedsGala.multipliedBy(1 - this.maxSlippageBps / 10000);
+      
+      // Calculate dynamic slippage based on expected edge
+      const slippageBps = this.calculateDynamicSlippageBps(edgeBps);
+      const minProceedsGala = expectedProceedsGala.multipliedBy(1 - slippageBps / 10000);
+      
+      logger.execution('📊 Dynamic slippage calculation', {
+        symbol,
+        baseSlippageBps: this.maxSlippageBps,
+        edgeBps: edgeBps || 'N/A',
+        dynamicSlippageBps: slippageBps,
+        expectedProceeds: expectedProceedsGala.toString(),
+        minProceeds: minProceedsGala.toString()
+      });
       
       // Sanity check: expected proceeds should be positive and reasonable
       if (expectedProceedsGala.isLessThanOrEqualTo(0)) {
@@ -207,7 +246,8 @@ export class GalaChainExecutor {
   async executeBuyFromQuoteLive(
     symbol: string,
     tradeSize: number,
-    quote: GalaChainQuote
+    quote: GalaChainQuote,
+    edgeBps?: number
   ): Promise<GalaChainExecutionResult> {
     const tokenCfg = getTokenConfig(symbol);
     const params: GalaChainExecutionParams = {
@@ -251,12 +291,24 @@ export class GalaChainExecutor {
       );
 
       const exactGalaCost = new BigNumber(q.inTokenAmount.toString());
-      const maxGalaCost = exactGalaCost.multipliedBy(1 + this.maxSlippageBps / 10000); // Allow slippage on cost
+      
+      // Calculate dynamic slippage based on expected edge
+      const slippageBps = this.calculateDynamicSlippageBps(edgeBps);
+      const maxGalaCost = exactGalaCost.multipliedBy(1 + slippageBps / 10000); // Allow slippage on cost
 
       // Apply precision buffer to exactOut to account for rounding/precision issues
-      // The UI uses ~0.5% slippage tolerance (e.g., -999.999999 for -1000)
-      // We'll apply a small buffer (0.5% or minimum 0.000001) to prevent slippage failures
-      const precisionBufferBps = Math.max(this.maxSlippageBps, 50); // At least 0.5% buffer
+      // Use the dynamic slippage for precision buffer, but ensure at least 50 bps (0.5%)
+      const precisionBufferBps = Math.max(slippageBps, 50); // At least 0.5% buffer
+      
+      logger.execution('📊 Dynamic slippage calculation (REVERSE)', {
+        symbol,
+        baseSlippageBps: this.maxSlippageBps,
+        edgeBps: edgeBps || 'N/A',
+        dynamicSlippageBps: slippageBps,
+        precisionBufferBps,
+        exactGalaCost: exactGalaCost.toString(),
+        maxGalaCost: maxGalaCost.toString()
+      });
       const exactOutWithBuffer = new BigNumber(tradeSize)
         .multipliedBy(1 - precisionBufferBps / 10000)
         .decimalPlaces(9, BigNumber.ROUND_DOWN); // Round down to be conservative

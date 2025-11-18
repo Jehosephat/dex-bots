@@ -36,10 +36,25 @@ export interface InventoryConfig {
   skipTokens: string[]
 }
 
+export interface TradingConfig {
+  minEdgeBps: number
+  maxSlippageBps: number
+  riskBufferBps: number
+  maxPriceImpactBps: number
+  cooldownMinutes: number
+  maxDailyTrades: number
+  enableReverseArbitrage?: boolean
+  reverseArbitrageMinEdgeBps?: number
+  arbitrageDirection?: 'forward' | 'reverse' | 'best'
+  dynamicSlippageMaxMultiplier?: number
+  dynamicSlippageEdgeRatio?: number
+}
+
 export const useConfigStore = defineStore('config', () => {
   const tokens = ref<TokenConfig[]>([])
   const bridgingConfig = ref<BridgingConfig | null>(null)
   const inventoryConfig = ref<InventoryConfig | null>(null)
+  const tradingConfig = ref<TradingConfig | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -176,10 +191,41 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  // Trading config methods
+  const fetchTradingConfig = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await api.get<TradingConfig>('/config/trading')
+      tradingConfig.value = response.data
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to fetch trading config'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const updateTradingConfig = async (updates: Partial<TradingConfig>) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await api.put<TradingConfig>('/config/trading', updates)
+      tradingConfig.value = response.data
+      return response.data
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update trading config'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     tokens,
     bridgingConfig,
     inventoryConfig,
+    tradingConfig,
     loading,
     error,
     fetchTokens,
@@ -190,7 +236,9 @@ export const useConfigStore = defineStore('config', () => {
     fetchBridgingConfig,
     updateBridgingConfig,
     fetchInventoryConfig,
-    updateInventoryConfig
+    updateInventoryConfig,
+    fetchTradingConfig,
+    updateTradingConfig
   }
 })
 
