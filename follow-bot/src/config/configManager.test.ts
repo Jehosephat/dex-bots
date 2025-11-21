@@ -25,7 +25,7 @@ const mockEnv = {
   WEBSOCKET_MAX_RETRIES: '10',
   LOG_LEVEL: 'info',
   LOG_FILE: '/tmp/follow-bot.log',
-  GALACHAIN_RPC_URL: 'https://rpc.galachain.io',
+  GALACHAIN_RPC_URL: 'https://gateway-mainnet.galachain.com/api',
   GALACHAIN_WEBSOCKET_URL: 'wss://explorer.galachain.io/ws',
   NODE_ENV: 'test',
   DEBUG: 'false'

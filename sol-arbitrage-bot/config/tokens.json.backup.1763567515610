@@ -1,0 +1,128 @@
+{
+  "tokens": {
+    "FARTCOIN": {
+      "symbol": "FARTCOIN",
+      "galaChainMint": "GFARTCOIN|Unit|none|none",
+      "solanaMint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
+      "solanaSymbol": "FARTCOIN",
+      "decimals": 6,
+      "tradeSize": 2000,
+      "enabled": false,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "SOL"
+    },
+    "TRUMP": {
+      "symbol": "TRUMP",
+      "galaChainMint": "GTRUMP|Unit|none|none",
+      "solanaMint": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+      "solanaSymbol": "TRUMP",
+      "decimals": 6,
+      "tradeSize": 0.02,
+      "enabled": false,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "SOL"
+    },
+    "SOL": {
+      "symbol": "SOL",
+      "galaChainMint": "GSOL|Unit|none|none",
+      "solanaMint": "So11111111111111111111111111111111111111112",
+      "solanaSymbol": "SOL",
+      "decimals": 9,
+      "tradeSize": 0.02,
+      "enabled": true,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA"
+    },
+    "PENGU": {
+      "symbol": "PENGU",
+      "galaChainMint": "GPENGU|Unit|none|none",
+      "solanaMint": "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump",
+      "solanaSymbol": "PENGU",
+      "decimals": 6,
+      "tradeSize": 200,
+      "enabled": false,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA"
+    },
+    "MEW": {
+      "symbol": "MEW",
+      "galaChainMint": "GMEW|Unit|none|none",
+      "solanaMint": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
+      "solanaSymbol": "MEW",
+      "decimals": 5,
+      "tradeSize": 5000,
+      "enabled": true,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA",
+      "inventoryTarget": 10000
+    },
+    "USDUC": {
+      "symbol": "USDUC",
+      "galaChainMint": "GUSDUC|Unit|none|none",
+      "solanaMint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
+      "solanaSymbol": "USDUC",
+      "decimals": 6,
+      "tradeSize": 500,
+      "enabled": true,
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA",
+      "inventoryTarget": 20000
+    },
+    "GSUSDC": {
+      "symbol": "GSUSDC",
+      "enabled": false,
+      "tradeSize": 4,
+      "decimals": 6,
+      "galaChainMint": "GSUSDC|Unit|none|none",
+      "solanaMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "solanaSymbol": "USDC",
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA"
+    },
+    "GSUSDT": {
+      "symbol": "GSUSDT",
+      "enabled": false,
+      "tradeSize": 4,
+      "decimals": 6,
+      "galaChainMint": "GSUSDT|Unit|none|none",
+      "solanaMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      "solanaSymbol": "USDT",
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA"
+    },
+    "UFD": {
+      "symbol": "UFD",
+      "enabled": true,
+      "tradeSize": 1500,
+      "decimals": 6,
+      "galaChainMint": "GUFD|Unit|none|none",
+      "solanaMint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
+      "solanaSymbol": "UFD",
+      "gcQuoteVia": "GALA",
+      "solQuoteVia": "GALA",
+      "inventoryTarget": 20000
+    }
+  },
+  "quoteTokens": {
+    "GALA": {
+      "galaChainMint": "GALA|Unit|none|none",
+      "solanaMint": "eEUiUs4JWYZrp72djAGF1A8PhpR6rHphGeGN7GbVLp6",
+      "decimals": 8
+    },
+    "SOL": {
+      "galaChainMint": "GSOL|Unit|none|none",
+      "solanaMint": "So11111111111111111111111111111111111111112",
+      "decimals": 9
+    },
+    "USDC": {
+      "galaChainMint": "GUSDC|Unit|none|none",
+      "solanaMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "decimals": 6
+    },
+    "WBTC": {
+      "galaChainMint": "GWBTC|Unit|none|none",
+      "solanaMint": "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E",
+      "decimals": 8
+    }
+  }
+}

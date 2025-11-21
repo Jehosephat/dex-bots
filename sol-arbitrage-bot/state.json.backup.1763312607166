@@ -1,0 +1,99 @@
+{
+  "galaChain": {
+    "SOL": "95"
+  },
+  "solana": {
+    "SOL": "5"
+  },
+  "updatedAtMs": 1761838143481,
+  "inventory": {
+    "galaChain": {
+      "tokens": {
+        "SOL": {
+          "symbol": "SOL",
+          "mint": "GSOL|Unit|none|none",
+          "rawBalance": "1.040603697",
+          "balance": "1.040603697",
+          "decimals": 9,
+          "valueUsd": "0",
+          "lastUpdated": 1763248839179
+        },
+        "MEW": {
+          "symbol": "MEW",
+          "mint": "GMEW|Unit|none|none",
+          "rawBalance": "36434.41106",
+          "balance": "36434.41106",
+          "decimals": 5,
+          "valueUsd": "0",
+          "lastUpdated": 1763248839179
+        },
+        "USDUC": {
+          "symbol": "USDUC",
+          "mint": "GUSDUC|Unit|none|none",
+          "rawBalance": "1274.673026",
+          "balance": "1274.673026",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1763248839179
+        },
+        "GALA": {
+          "symbol": "GALA",
+          "mint": "GALA|Unit|none|none",
+          "rawBalance": "42612.58613789",
+          "balance": "42612.58613789",
+          "decimals": 8,
+          "valueUsd": "0",
+          "lastUpdated": 1763248839179
+        }
+      },
+      "native": "0",
+      "totalValueUsd": "0",
+      "lastUpdated": 1763248839179
+    },
+    "solana": {
+      "tokens": {
+        "SOL": {
+          "symbol": "SOL",
+          "mint": "So11111111111111111111111111111111111111112",
+          "rawBalance": "450932376",
+          "balance": "0.450932376",
+          "decimals": 9,
+          "valueUsd": "0",
+          "lastUpdated": 1763248838311
+        },
+        "MEW": {
+          "symbol": "MEW",
+          "mint": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
+          "rawBalance": "2980474546",
+          "balance": "29804.74546",
+          "decimals": 5,
+          "valueUsd": "0",
+          "lastUpdated": 1763248838311
+        },
+        "USDUC": {
+          "symbol": "USDUC",
+          "mint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
+          "rawBalance": "1874673025",
+          "balance": "1874.673025",
+          "decimals": 6,
+          "valueUsd": "0",
+          "lastUpdated": 1763248838311
+        }
+      },
+      "native": "0.450932376",
+      "totalValueUsd": "0",
+      "lastUpdated": 1763248838311
+    },
+    "lastUpdated": 1763248839179,
+    "version": 2668
+  },
+  "lastSaved": 1763248839262,
+  "version": 215,
+  "tokenCooldowns": {},
+  "dailyTradeCounts": {},
+  "lastBridgeTimes": {},
+  "pendingBridges": [],
+  "recentTrades": [],
+  "status": "running",
+  "lastHeartbeat": 1762905266726
+}

@@ -1,0 +1,180 @@
+{
+  "bridges": [
+    {
+      "token": "USDUC",
+      "amount": "3136.783166",
+      "direction": "solana->galaChain",
+      "hash": "2WRpBRvhfE99NLSRo6JC2osy6gD5K4sH13LkBz4fVYJ2gt3hhD9hoU5uc8BCR3qaCZNZLJ6BuDjsrMNZ4rt6FdHx",
+      "timestamp": 1762564924630,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "2850",
+      "direction": "solana->galaChain",
+      "hash": "wNmZtwenVuP5k1dBMggxpKTEYTFdcTJqHYq18inKNaFiHF55572HNvF7pgGJRrn4w9UEjiyNGHKora4d51bAvvC",
+      "timestamp": 1762566776188,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "3225",
+      "direction": "solana->galaChain",
+      "hash": "4KSvbxKYKYfaRu3uJ6pnFnGtKDwz8Gtm7Qx1d1ygghMgQL4U6Ec13No8svcdTHWTPhzoiKoEPKEZ2PCGuCBpBvvB",
+      "timestamp": 1762621185056,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "2100.006604",
+      "direction": "galaChain->solana",
+      "hash": "3f8ca2a8f0dada586dd247978bbb50da021cc4e2d375f6f6a845b3e07d7c76f1",
+      "timestamp": 1762627210069,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1493.0911195",
+      "direction": "solana->galaChain",
+      "hash": "2FsaShjk99fxPHqm2tUuTvtPuvhRiQUGvqYVV3xz51uZKSzsNp8GafJoREGri4f9iwtXy9RUjdoyVBm5caBF3icZ",
+      "timestamp": 1762696791687,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1186.733421",
+      "direction": "solana->galaChain",
+      "hash": "V3X8TKyyMrhpoVbHg9dWoUDHzZitrDYMReSDDFXnHCJzb2LnPTS7jT6Wqg7RZJf2HpD1u23vbqM88PvKFgMKc1j",
+      "timestamp": 1762698622128,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "518.057649",
+      "direction": "solana->galaChain",
+      "hash": "NGGZ6jznK97g2KKyHT2U95KBw1D8zextfScUE3GQSrtsG3LTWb7aRLyuK2Qn9xCedAG1PzZLYE2Wb1PbCG5puEB",
+      "timestamp": 1762701380955,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1099.0839115",
+      "direction": "solana->galaChain",
+      "hash": "3HDQcf2tdRqj34ahZSW2bT8pvVBWAPUuerbLFYiSXJ7RmVa5UeDW2JYg6TPfQjAKFjz1PPNDSq3KnpaJ4dDNCgx8",
+      "timestamp": 1762702606833,
+      "status": "pending"
+    },
+    {
+      "token": "MEW",
+      "amount": "20745.27797",
+      "direction": "galaChain->solana",
+      "hash": "2f12a59a699c70bf81dd82fe9f1df513a0b5a7d1318819bfd15d2b8f8735b036",
+      "timestamp": 1762706240540,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "669.9044205",
+      "direction": "solana->galaChain",
+      "hash": "2G6hRngFyWUZo3LERWczw1DZvNSQRNCfkaH6vPBwFD3FyGwaxi5eZv2f7P7cNfFzfmmTsq7oxPF8HYTPz1DdRL2Y",
+      "timestamp": 1762706644920,
+      "status": "pending"
+    },
+    {
+      "token": "MEW",
+      "amount": "21000.00497",
+      "direction": "galaChain->solana",
+      "hash": "56400e837991f084f066671d1172936ef962b373f2989a5e7b605387fb765017",
+      "timestamp": 1762706906567,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "446.6073045",
+      "direction": "solana->galaChain",
+      "hash": "4Uo3416Nt1Y4kyCeDuCEx2iuhucrjGhrwid5bc4hiXYVyxYHhjqTHBTwGpbG5hL8Baw62gy4ajtxbFg9jRmG1Ch1",
+      "timestamp": 1762707028752,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "297.73814",
+      "direction": "solana->galaChain",
+      "hash": "44PMKtXLutL2UUyChVnsFkzmmjoBeXyiWpfg32acuSxj6qYSyurVjn6ZYj5LUPnqzBXYQ9FYyJTk4QL1Pdh2K4i",
+      "timestamp": 1762707061252,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1057.101663",
+      "direction": "solana->galaChain",
+      "hash": "SoJeERhCJbKngBd5knqQKAbdhHoY4AKHGGieRqN1dNsD9N7ALpPjcnBgpyJMc6z8mE2RzTHT2cc6igy3AMeMEXw",
+      "timestamp": 1762708380653,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "602.9796585",
+      "direction": "solana->galaChain",
+      "hash": "2sTZ3vWgAepoU5N4PxLUiNM5f6VKoT9HFMiyt8A22ZdLy28ZkL4poLheeEz17HJLvGvCUkwDmK11H6YqcvGbFhP2",
+      "timestamp": 1762708414036,
+      "status": "pending"
+    },
+    {
+      "token": "MEW",
+      "amount": "21750.00497",
+      "direction": "galaChain->solana",
+      "hash": "5c84e4392b4657964fa7ed3257d13796e7ee7e4332412f684bffd55dec7488cb",
+      "timestamp": 1762708519587,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "364.594197",
+      "direction": "solana->galaChain",
+      "hash": "6FX7DvFxQXXeD1cKyKgdzuEcV28y6vZVudGpFV6yMxwMpuTkhEaB1Emvj1ym5jiRb2h8S8ztTMGxvpRLTVyDLGK",
+      "timestamp": 1762710324230,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1401.9889365",
+      "direction": "solana->galaChain",
+      "hash": "5r2NEKqG8j78rYLTzbAk2fAdPXSU8aWUc4GsCNF3WXYT2qcevPQJfZ4YygcRZi33xnX1ahe87BpQuUdUU1dKwJmR",
+      "timestamp": 1762905821781,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "949.0055315",
+      "direction": "solana->galaChain",
+      "hash": "3Uh1PeU7H346ZZB6tBJZRxviWjJAqZgE3QPSiKmDBAFN4xi5x1G1WqXrtJiqBJfjP2E86X1vbD19aZFSehfSUT2c",
+      "timestamp": 1762907121116,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1049.9999995",
+      "direction": "solana->galaChain",
+      "hash": "451tRuc2Nr4vp4Sw2rkbGytz2SgwXoaETia4BBNm4QLSSJaqQ3LiFiPq9GGpmF2d8NvnGffuiZH8nfHNvN1ejn5e",
+      "timestamp": 1762907577494,
+      "status": "pending"
+    },
+    {
+      "token": "USDUC",
+      "amount": "1049.9999995",
+      "direction": "solana->galaChain",
+      "hash": "5tX9QB3DBVpamhzjKuBRjbPHWpjW45byRZNNDhJUwmTUJpo6evxgJNRoKoRav54FK7nsX8v1eaWMeVczmvgXYeLh",
+      "timestamp": 1763246945924,
+      "status": "pending"
+    }
+  ],
+  "lastBridgeTime": {
+    "USDUC": 1763246945924,
+    "MEW": 1762708519587
+  },
+  "dailyBridgeCount": {
+    "USDUC": 1
+  },
+  "lastResetDate": "2025-11-15"
+}

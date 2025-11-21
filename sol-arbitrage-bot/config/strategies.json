@@ -1,0 +1,34 @@
+{
+  "strategies": {
+    "forward-gala-gala": {
+      "id": "forward-gala-gala",
+      "name": "Forward: GALA on GC, GALA on SOL",
+      "description": "SELL token for GALA on GalaChain → BUY token with GALA on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "GALA",
+        "operation": "sell"
+      },
+      "solanaSide": {
+        "quoteCurrency": "GALA",
+        "operation": "buy"
+      },
+      "enabled": true,
+      "priority": 1
+    },
+    "reverse-gala-gala": {
+      "id": "reverse-gala-gala",
+      "name": "Reverse: GALA on GC, GALA on SOL",
+      "description": "BUY token with GALA on GalaChain → SELL token for GALA on Solana",
+      "galaChainSide": {
+        "quoteCurrency": "GALA",
+        "operation": "buy"
+      },
+      "solanaSide": {
+        "quoteCurrency": "GALA",
+        "operation": "sell"
+      },
+      "enabled": true,
+      "priority": 2
+    }
+  }
+}
