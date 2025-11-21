@@ -28,7 +28,7 @@
       "solanaMint": "So11111111111111111111111111111111111111112",
       "solanaSymbol": "SOL",
       "decimals": 9,
-      "tradeSize": 0.05,
+      "tradeSize": 0.02,
       "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA"
@@ -50,11 +50,11 @@
       "solanaMint": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
       "solanaSymbol": "MEW",
       "decimals": 5,
-      "tradeSize": 5000,
-      "enabled": false,
+      "tradeSize": 3000,
+      "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
-      "inventoryTarget": 20000
+      "inventoryTarget": 10000
     },
     "USDUC": {
       "symbol": "USDUC",
@@ -66,7 +66,7 @@
       "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
-      "inventoryTarget": 20000
+      "inventoryTarget": 15000
     },
     "GSUSDC": {
       "symbol": "GSUSDC",
@@ -100,7 +100,7 @@
       "solanaSymbol": "UFD",
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
-      "inventoryTarget": 20000
+      "inventoryTarget": 15000
     }
   },
   "quoteTokens": {

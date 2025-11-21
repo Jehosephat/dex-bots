@@ -201,7 +201,8 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         expiresAt: Date.now() + 30000, // 30 seconds
         isValid: true,
         galaFee,
-        route: quote.route
+        route: quote.route,
+        poolLiquidity: (quote as any).poolLiquidity // Include liquidity if available
       };
 
       this.updateTimestamp();
@@ -331,6 +332,10 @@ export class GalaChainPriceProvider extends BasePriceProvider {
     outputAmount: string;
     poolAddress: string;
     route?: string[];
+    poolLiquidity?: {
+      liquidity: BigNumber;
+      grossPoolLiquidity: BigNumber;
+    };
   } | null> {
     // Declare variables outside try block for use in catch block
     let tokenConfig: TokenConfig | undefined;
@@ -540,10 +545,17 @@ export class GalaChainPriceProvider extends BasePriceProvider {
         outputAmount = outputAmount.abs();
       }
       
+      // Extract liquidity information from pool data
+      const poolLiquidity = compositePoolData?.pool ? {
+        liquidity: compositePoolData.pool.liquidity,
+        grossPoolLiquidity: compositePoolData.pool.grossPoolLiquidity
+      } : undefined;
+
       return {
         outputAmount: outputAmount.toString(),
         poolAddress: 'unknown',
-        route: [tokenSymbol, quoteVia]
+        route: [tokenSymbol, quoteVia],
+        poolLiquidity
       };
 
     } catch (error) {
@@ -587,10 +599,17 @@ export class GalaChainPriceProvider extends BasePriceProvider {
               expectedGalaOutput: expectedOutput.toString()
             });
             
+            // Extract liquidity information from pool data if available
+            const poolLiquidity = compositePoolData?.pool ? {
+              liquidity: compositePoolData.pool.liquidity,
+              grossPoolLiquidity: compositePoolData.pool.grossPoolLiquidity
+            } : undefined;
+
             return {
               outputAmount: expectedOutput.toString(),
               poolAddress: 'unknown',
-              route: [tokenSymbol, quoteVia]
+              route: [tokenSymbol, quoteVia],
+              poolLiquidity
             };
           }
         } catch (reverseError: any) {

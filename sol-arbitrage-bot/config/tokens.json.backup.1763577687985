@@ -51,7 +51,7 @@
       "solanaSymbol": "MEW",
       "decimals": 5,
       "tradeSize": 5000,
-      "enabled": false,
+      "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
       "inventoryTarget": 20000

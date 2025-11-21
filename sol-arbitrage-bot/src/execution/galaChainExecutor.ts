@@ -66,6 +66,41 @@ export class GalaChainExecutor {
    */
   dryRunFromQuote(symbol: string, tradeSize: number, quote: GalaChainQuote): GalaChainExecutionResult {
     try {
+      // Check liquidity before execution if available
+      if (quote.poolLiquidity) {
+        const { liquidity, grossPoolLiquidity } = quote.poolLiquidity;
+        // Heuristic: require at least 1000 units of liquidity for small trades
+        // For larger trades, we'd need more sophisticated calculation
+        const minLiquidityThreshold = 1000;
+        
+        if (liquidity.isLessThan(minLiquidityThreshold)) {
+          const errorMsg = `Insufficient pool liquidity: ${liquidity.toString()} (minimum: ${minLiquidityThreshold}). Execution will likely fail.`;
+          logger.warn(`⚠️ ${errorMsg}`, {
+            symbol,
+            feeTier: quote.feeTier,
+            activeLiquidity: liquidity.toString(),
+            totalLiquidity: grossPoolLiquidity.toString(),
+            tradeSize
+          });
+          return {
+            success: false,
+            params: {
+              symbol,
+              tradeSize,
+              expectedProceedsGala: new BigNumber(0),
+              minProceedsGala: new BigNumber(0),
+              deadlineMs: Date.now() + this.defaultDeadlineSeconds * 1000
+            },
+            error: errorMsg
+          };
+        }
+      } else {
+        logger.warn(`⚠️ Pool liquidity information not available for ${symbol} - cannot validate liquidity before execution`, {
+          symbol,
+          feeTier: quote.feeTier
+        });
+      }
+
       // Expected proceeds in GALA = quote.price (GALA per token) * size
       const expectedProceedsGala = quote.price.multipliedBy(tradeSize);
       const minProceedsGala = calculateMinOutput(expectedProceedsGala, this.maxSlippageBps);
@@ -88,7 +123,11 @@ export class GalaChainExecutor {
         minProceedsGala: minProceedsGala.toString(),
         feeTier: quote.feeTier,
         poolAddress: quote.poolAddress,
-        deadline: params.deadlineMs
+        deadline: params.deadlineMs,
+        liquidity: quote.poolLiquidity ? {
+          active: quote.poolLiquidity.liquidity.toString(),
+          total: quote.poolLiquidity.grossPoolLiquidity.toString()
+        } : 'N/A'
       });
 
       return { success: true, params };

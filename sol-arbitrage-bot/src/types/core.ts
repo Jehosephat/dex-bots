@@ -275,6 +275,14 @@ export interface GalaChainQuote extends PriceQuote {
   
   /** Route taken (for multi-hop swaps) */
   route?: string[];
+  
+  /** Pool liquidity information (if available) */
+  poolLiquidity?: {
+    /** Active liquidity in current tick */
+    liquidity: BigNumber;
+    /** Total liquidity across all ticks */
+    grossPoolLiquidity: BigNumber;
+  };
 }
 
 export interface SolanaQuote extends PriceQuote {

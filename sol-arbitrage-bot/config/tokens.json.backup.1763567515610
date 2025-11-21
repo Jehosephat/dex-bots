@@ -28,7 +28,7 @@
       "solanaMint": "So11111111111111111111111111111111111111112",
       "solanaSymbol": "SOL",
       "decimals": 9,
-      "tradeSize": 0.05,
+      "tradeSize": 0.02,
       "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA"
@@ -51,10 +51,10 @@
       "solanaSymbol": "MEW",
       "decimals": 5,
       "tradeSize": 5000,
-      "enabled": false,
+      "enabled": true,
       "gcQuoteVia": "GALA",
       "solQuoteVia": "GALA",
-      "inventoryTarget": 20000
+      "inventoryTarget": 10000
     },
     "USDUC": {
       "symbol": "USDUC",

@@ -136,6 +136,20 @@ export class QuoteValidator {
           errors.push(`Negative GALA fee: ${gcQuote.galaFee.toString()}`);
         }
       }
+      // Check liquidity if available
+      if (gcQuote.poolLiquidity) {
+        const { liquidity, grossPoolLiquidity } = gcQuote.poolLiquidity;
+        // Warn if liquidity seems low (less than 1000 tokens worth)
+        // This is a heuristic - actual minimum depends on trade size
+        if (liquidity && liquidity.isLessThan(1000)) {
+          warnings.push(`Low active liquidity: ${liquidity.toString()} (may cause execution failures)`);
+        }
+        if (grossPoolLiquidity && grossPoolLiquidity.isLessThan(1000)) {
+          warnings.push(`Low total pool liquidity: ${grossPoolLiquidity.toString()} (may cause execution failures)`);
+        }
+      } else {
+        warnings.push('Pool liquidity information not available - cannot validate liquidity before execution');
+      }
     }
 
     const isValid = errors.length === 0;
